@@ -412,20 +412,6 @@
                 <label>端口:</label>
                 <input type="number" id="portInput" placeholder="8888" value="8888" min="1" max="65535">
             </div>
-            <div class="form-group">
-                <label>子协议:</label>
-                <select id="subprotocolSelect">
-                    <option value="ascii">ASCII (纯文本)</option>
-                    <option value="telnet">Telnet (终端协议)</option>
-                    <option value="binary">Binary (旧版兼容)</option>
-                    <option value="http">HTTP (静态文件)</option>
-                    <option value="">无</option>
-                </select>
-                <div style="font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4;">
-                    Telnet：支持 GMCP 状态栏，客户端本地回显<br>
-                    ASCII：纯文本模式，无状态栏
-                </div>
-            </div>
             <div class="panel-actions">
                 <button class="connect-btn" id="connectBtn">连接</button>
                 <button class="connect-btn secondary" id="defaultBtn">默认配置</button>
@@ -827,7 +813,6 @@
                 this.history = [];
                 this.historyIndex = -1;
                 this.currentInput = '';
-                this.protocolType = 'ascii';
                 this.heartbeat = null;
                 this.cleanupTimeout = null;
                 this._expectPassword = false;  // 密码输入状态标记
@@ -930,7 +915,6 @@
                 this.protocolSelect = document.getElementById('protocolSelect');
                 this.addressInput = document.getElementById('addressInput');
                 this.portInput = document.getElementById('portInput');
-                this.subprotocolSelect = document.getElementById('subprotocolSelect');
                 this.connectBtn = document.getElementById('connectBtn');
                 this.defaultBtn = document.getElementById('defaultBtn');
 
@@ -1050,7 +1034,6 @@
                         this.protocolSelect.value = cfg.protocol || 'wss://';
                         this.addressInput.value = cfg.address || 'mud.ren';
                         this.portInput.value = cfg.port || '8888';
-                        this.subprotocolSelect.value = cfg.subprotocol || 'ascii';
                         return;
                     } catch (e) { /* 解析失败则使用默认值 */ }
                 }
@@ -1060,12 +1043,10 @@
                     this.protocolSelect.value = 'ws://';
                     this.addressInput.value = 'localhost';
                     this.portInput.value = '8888';
-                    this.subprotocolSelect.value = 'telnet';
                 } else {
                     this.protocolSelect.value = 'wss://';
                     this.addressInput.value = 'mud.ren';
                     this.portInput.value = '8888';
-                    this.subprotocolSelect.value = 'telnet';
                 }
             }
 
@@ -1073,8 +1054,7 @@
                 localStorage.setItem('mud_client_config', JSON.stringify({
                     protocol: this.protocolSelect.value,
                     address: this.addressInput.value,
-                    port: this.portInput.value,
-                    subprotocol: this.subprotocolSelect.value
+                    port: this.portInput.value
                 }));
             }
 
@@ -1082,7 +1062,6 @@
                 this.protocolSelect.value = 'ws://';
                 this.addressInput.value = 'localhost';
                 this.portInput.value = '8888';
-                this.subprotocolSelect.value = 'telnet';
                 this.saveConfig();
             }
 
@@ -1090,7 +1069,6 @@
                 const protocol = this.protocolSelect.value;
                 const address = this.addressInput.value.trim();
                 const port = this.portInput.value;
-                const subprotocol = this.subprotocolSelect.value;
 
                 if (!address) {
                     alert('请输入服务器地址');
@@ -1102,15 +1080,13 @@
                     return;
                 }
 
-                this.protocolType = subprotocol;
                 const wsUrl = `${protocol}${address}:${port}`;
-                const protocols = subprotocol ? [subprotocol] : [];
 
                 this.saveConfig();
-                this.connect(wsUrl, protocols);
+                this.connect(wsUrl);
             }
 
-            connect(wsUrl, protocols) {
+            connect(wsUrl) {
                 try {
                     // 先强制清理之前的连接
                     this.forceCleanup();
@@ -1123,7 +1099,8 @@
                         `${wsUrl}&t=${Date.now()}` :
                         `${wsUrl}?t=${Date.now()}`;
 
-                    this.ws = new WebSocket(cleanUrl, protocols);
+                    // 固定 telnet 子协议：驱动据此发送二进制 telnet 流（含 GMCP 子协商）
+                    this.ws = new WebSocket(cleanUrl, ['telnet']);
                     this.ws.binaryType = 'arraybuffer';
 
                     this.ws.onopen = () => {
@@ -1146,31 +1123,23 @@
                         // 启动心跳检测
                         this.startHeartbeat();
 
-                        if (this.protocolType === 'telnet' || this.protocolType === 'binary') {
-                            const protocolName = this.protocolType === 'telnet' ? 'Telnet' : 'Binary';
-                            this.appendMessage(`✅ ${protocolName}协议已激活，正在协商...`, 'system');
-                            // 延迟初始化Telnet协商，确保连接稳定
-                            this.cleanupTimeout = setTimeout(() => {
-                                this.initTelnetNegotiation();
-                                // 连接 GMCPHandler 回调，将数据流转到 UI 更新
-                                if (this.telnet && this.telnet.gmcp) {
-                                    this.telnet.gmcp.onMessage = (module, data) => {
-                                        this.processGMCPData({ module, data });
-                                    };
-                                }
-                                // hp 兑底改由登录完成检测触发（见 appendMessage 中的 _loginDone 逻辑）
-                            }, 500);
-                        } else {
-                            this.appendMessage('✅ 已连接到MUD服务器', 'system');
-                        }
+                        this.appendMessage('✅ Telnet协议已激活，正在协商...', 'system');
+                        // 延迟初始化Telnet协商，确保连接稳定
+                        this.cleanupTimeout = setTimeout(() => {
+                            this.initTelnetNegotiation();
+                            // 连接 GMCPHandler 回调，将数据流转到 UI 更新
+                            if (this.telnet && this.telnet.gmcp) {
+                                this.telnet.gmcp.onMessage = (module, data) => {
+                                    this.processGMCPData({ module, data });
+                                };
+                            }
+                            // hp 兑底改由登录完成检测触发（见 appendMessage 中的 _loginDone 逻辑）
+                        }, 500);
                     };
 
                     this.ws.onmessage = (event) => {
-                        if (this.protocolType === 'telnet' || this.protocolType === 'binary') {
-                            this.handleTelnetData(event.data);
-                        } else {
-                            this.handleMessage(event.data);
-                        }
+                        // telnet 二进制流经 handleTelnetData 解析，文本帧由其内部转 handleMessage
+                        this.handleTelnetData(event.data);
                     };
 
                     this.ws.onclose = () => {
@@ -1203,8 +1172,7 @@
                             setTimeout(() => {
                                 this.appendMessage(`🔄 正在重连...(${this.retryCount}/${this.maxRetries})`, 'system');
                                 const wsUrl = `${this.protocolSelect.value}${this.addressInput.value}:${this.portInput.value}`;
-                                const protocols = this.subprotocolSelect.value ? [this.subprotocolSelect.value] : [];
-                                this.connect(wsUrl, protocols);
+                                this.connect(wsUrl);
                             }, 2000 * this.retryCount);
                         }
                     };
@@ -1618,7 +1586,7 @@
 
 
             handleMessage(data) {
-                // 检测服务端密码提示，ASCII 模式下用于控制本地回显
+                // 检测服务端密码提示，用于控制本地回显（telnet 文本帧经 processTelnetBytes/handleTelnetData 汇入此处）
                 if (typeof data === 'string' && /密码|password|passwd/i.test(data)) {
                     this._expectPassword = true;
                 } else if (typeof data === 'string' && /确认|再输入一次|确认密码/i.test(data)) {
