@@ -109,7 +109,11 @@ void gmcp(string req)
             "name" : remove_ansi(ob->query("short") || ob->query("name") || ""),
             "exits": keys(ob->query("exits") || ([])),
             "area" : ob->query("outdoors") || explode(base_name(ob), "/")[1],
+#if defined(__PACKAGE_CRYPTO__) && efun_defined(hash)
             "hash" : hash("md5", base_name(ob))
+#else
+            "hash" : sha1(base_name(ob))
+#endif
         ]);
         sendGMCP(room_info, "Room", "Info");
         // 音效示例
