@@ -32,28 +32,34 @@
 
 - https://gitee.com/mudcore/mudcore.git
 
-### 环境配置
+### 环境要求
 
-请把`data`目录中的`.env.example`复制为`.env`，并根据需要修改环境配置。
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) 或 [Docker Engine](https://docs.docker.com/engine/install/) (Linux)
+- 首次启动会自动构建镜像，需要几分钟
 
-### 启动服务
+### 一键部署
 
-使用以下指令启动游戏：
+**Windows (PowerShell):**
 
-    driver config.ini
+    .\docker-deploy.ps1              # 启动服务
+    .\docker-deploy.ps1 -DebugMode   # 调试模式
+    .\docker-deploy.ps1 -Rebuild     # 重建镜像
+    .\docker-deploy.ps1 -Stop        # 停止服务
 
-> 推荐使用`run.sh`（Linux）或`run.ps1`（Windows）脚本启动项目。
+**Linux / Mac:**
 
-如果是开发学习，使用以下方式之一开启调试模式：
+    ./docker-deploy.sh               # 启动服务
+    ./docker-deploy.sh -d            # 调试模式
+    ./docker-deploy.sh --rebuild     # 重建镜像
+    ./docker-deploy.sh --stop        # 停止服务
 
-    driver config.ini -fdebug
-    driver config.ini -d
+### 端口说明
 
- * 5566 端口为GBK编码
- * 6666 端口为UTF-8编码
- * 8888 端口为WEBSOCKET访问
+ * 5566 端口为 GBK 编码 (Telnet)
+ * 6666 端口为 UTF-8 编码 (Telnet)
+ * 8888 端口为 WebSocket 访问
 
-> 推荐使用[mudlet](https://github.com/Mudlet/Mudlet)客户端连接游戏，推荐使用UTF-8编码进行游戏。
+> 推荐使用 [Mudlet](https://github.com/Mudlet/Mudlet) 客户端连接游戏，推荐使用 UTF-8 编码进行游戏。
 
 注册ID为 `mudren` 的帐号为游戏管理员(admin)。
 

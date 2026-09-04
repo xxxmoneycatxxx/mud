@@ -7,9 +7,9 @@ This is a UTF-8 Chinese MUD written primarily in LPC and run by FluffOS. Adminis
 ## Build, Test, and Development Commands
 
 - `git submodule update --init` initializes the required `mudcore` framework.
-- `./build.sh` installs Linux prerequisites and builds the FluffOS driver; `./build_msys2.sh` is the Windows/MSYS2 equivalent.
-- `./run.sh` starts the Linux build with `config.ini`; `run.ps1` starts the Windows driver.
-- `driver config.ini -d` runs directly in debug mode. Default listeners are telnet ports `5566`/`6666` and WebSocket port `8888`.
+- **Deploy (recommended):** `.\docker-deploy.ps1` (Windows) or `./docker-deploy.sh` (Linux) handles Docker build, container start, readiness check, and access info.
+- **Docker direct:** `docker compose up -d` for production; `docker compose --profile dev up` for debug mode.
+- `driver config.cfg -d` runs the driver directly in debug mode (requires driver binary locally). Default listeners are telnet ports `5566`/`6666` and WebSocket port `8888`.
 - `cd ai_service && python -m pip install -r requirements.txt && python main.py -d` starts the optional AI NPC service in debug mode.
 
 ## Coding Style & Naming Conventions
