@@ -309,6 +309,36 @@
         .room-info-bar .room-name { font-weight: bold; }
         .room-info-bar .room-area { color: #888; }
         .room-info-bar .room-exits { color: #666; margin-left: 4px; }
+        /* 房间出口可点击按钮（点击移动） */
+        .exit-btn {
+            background: #1a2a1a;
+            color: #4f4;
+            border: 1px solid #0a0;
+            border-radius: 3px;
+            padding: 0 5px;
+            margin-left: 3px;
+            font-size: 11px;
+            line-height: 16px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .exit-btn:hover {
+            background: #0a0;
+            color: #000;
+        }
+        /* 终端 look 输出中的可点击出口 */
+        .exit-link {
+            color: #4f4;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            text-underline-offset: 2px;
+        }
+        .exit-link:hover {
+            color: #0f0;
+            background: #1a3a1a;
+            text-decoration: none;
+        }
 
         /* ===== 底部条：快捷命令 + 连接状态 ===== */
         .bottom-bar {
@@ -341,22 +371,6 @@
             background: #0f0;
             color: #000;
             border-color: #0f0;
-        }
-        .qc-btn.dir {
-            background: #1a2a1a;
-            border-color: #0a0;
-            min-width: 28px;
-            text-align: center;
-        }
-        .qc-btn.dir:hover {
-            background: #0a0;
-            color: #000;
-        }
-        .qc-separator {
-            width: 1px;
-            height: 20px;
-            background: #333;
-            margin: 0 4px;
         }
 
         @media (max-width: 768px) {
@@ -863,41 +877,22 @@
                 this.setupEventListeners();
                 this.setupTerminalFeatures();
                 this.setupQuickCommands();
+                this.setupRoomExits();
+                this.setupTerminalExits();
             }
 
             setupQuickCommands() {
                 const qcContainer = document.getElementById('quickCommands');
                 if (!qcContainer) return;
 
-                const dirs = [
-                    { label: 'N', cmd: 'north' },
-                    { label: 'S', cmd: 'south' },
-                    { label: 'E', cmd: 'east' },
-                    { label: 'W', cmd: 'west' },
-                    { label: 'U', cmd: 'up' },
-                    { label: 'D', cmd: 'down' },
-                ];
+                // 方向移动改由房间信息栏的可点击出口承担（点击移动），
+                // 此处只保留与当前房间无关的通用动作键
                 const actions = [
                     { label: 'look', cmd: 'look' },
                     { label: 'score', cmd: 'score' },
                     { label: 'i', cmd: 'i' },
                     { label: 'hp', cmd: 'hp' },
                 ];
-
-                dirs.forEach(d => {
-                    const btn = document.createElement('button');
-                    btn.className = 'qc-btn dir';
-                    btn.textContent = d.label;
-                    btn.addEventListener('click', () => {
-                        this.commandInput.value = d.cmd;
-                        this.handleSendCommand();
-                    });
-                    qcContainer.appendChild(btn);
-                });
-
-                const sep = document.createElement('div');
-                sep.className = 'qc-separator';
-                qcContainer.appendChild(sep);
 
                 actions.forEach(a => {
                     const btn = document.createElement('button');
@@ -909,6 +904,45 @@
                     });
                     qcContainer.appendChild(btn);
                 });
+            }
+
+            // 房间出口按钮点击委托：点击即移动（按钮由 updateRoomInfo 动态重建）
+            setupRoomExits() {
+                const roomBar = document.getElementById('roomInfoBar');
+                if (!roomBar) return;
+                roomBar.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.exit-btn');
+                    if (!btn || !this.connected) return;
+                    const cmd = btn.getAttribute('data-cmd');
+                    if (!cmd) return;
+                    this.commandInput.value = cmd;
+                    this.handleSendCommand();
+                });
+            }
+
+            // 终端 look 输出中的出口链接点击委托（历史消息同样生效）
+            setupTerminalExits() {
+                if (!this.terminal) return;
+                this.terminal.addEventListener('click', (e) => {
+                    const link = e.target.closest('.exit-link');
+                    if (!link || !this.connected) return;
+                    const cmd = link.getAttribute('data-cmd');
+                    if (!cmd) return;
+                    this.commandInput.value = cmd;
+                    this.handleSendCommand();
+                });
+            }
+
+            // 方向命令 → 紧凑中文标签（未收录的自定义出口原样显示）
+            dirLabel(dir) {
+                const map = {
+                    'north': '北', 'south': '南', 'east': '东', 'west': '西',
+                    'up': '上', 'down': '下',
+                    'northeast': '东北', 'northwest': '西北',
+                    'southeast': '东南', 'southwest': '西南',
+                    'in': '进', 'out': '出', 'enter': '进入', 'leave': '离开'
+                };
+                return map[dir] || dir;
             }
 
             setupConnectionUI() {
@@ -1248,10 +1282,15 @@
             updateRoomInfo(roomInfo) {
                 const roomBar = document.getElementById('roomInfoBar');
                 if (!roomBar) return;
-                let html = '<span class="room-name">' + (roomInfo.name || '未知') + '</span>';
-                if (roomInfo.area) html += ' <span class="room-area">[' + roomInfo.area + ']</span>';
+                const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                let html = '<span class="room-name">' + esc(roomInfo.name || '未知') + '</span>';
+                if (roomInfo.area) html += ' <span class="room-area">[' + esc(roomInfo.area) + ']</span>';
                 if (roomInfo.exits && roomInfo.exits.length > 0) {
-                    html += '<span class="room-exits">→ ' + roomInfo.exits.join(', ') + '</span>';
+                    html += '<span class="room-exits">';
+                    roomInfo.exits.forEach(dir => {
+                        html += '<button class="exit-btn" data-cmd="' + esc(dir) + '" title="移动: ' + esc(dir) + '">' + esc(this.dirLabel(dir)) + '</button>';
+                    });
+                    html += '</span>';
                 }
                 roomBar.innerHTML = html;
             }
@@ -1639,7 +1678,11 @@
 
                 const div = document.createElement('div');
                 div.className = 'message ' + className;
-                const html = this.parseANSI(message);
+                let html = this.parseANSI(message);
+                // look/l 输出的“明显出口”渲染成可点击链接（点击移动）
+                if (/这里明显的出口是|这里唯一的出口是/.test(message)) {
+                    html = this.linkifyRoomExits(html);
+                }
                 div.innerHTML = html;
                 this.terminal.appendChild(div);
 
@@ -1703,6 +1746,16 @@
                 }
 
                 return result;
+            }
+
+            // 将 look 出口句中的方向词渲染为可点击链接（data-cmd 为英文方向命令）
+            linkifyRoomExits(html) {
+                return html.replace(/(这里(?:明显的出口是|唯一的出口是))([\s\S]*?。)/g, (m, prefix, sentence) => {
+                    return prefix + sentence.replace(
+                        /\b(northeast|northwest|southeast|southwest|north|south|east|west|up|down|in|out|enter|leave)\b(\([^<)]*\))?/g,
+                        (mm, dir) => '<a class="exit-link" data-cmd="' + dir + '">' + mm + '</a>'
+                    );
+                });
             }
 
             setupEventListeners() {
