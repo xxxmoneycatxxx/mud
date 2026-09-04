@@ -20,6 +20,10 @@ object connect(int port)
     {
         set_encoding("GBK");
     }
+    else if (port == 8888)
+    {
+        set_encoding("UTF-8");
+    }
 
     err = catch(login_ob = new(LOGIN_OB));
 

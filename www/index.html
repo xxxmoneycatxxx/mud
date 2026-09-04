@@ -1092,7 +1092,7 @@
                 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]') {
                     this.protocolSelect.value = 'ws://';
                     this.addressInput.value = 'localhost';
-                    this.portInput.value = '8000';
+                    this.portInput.value = '8888';
                     this.subprotocolSelect.value = 'telnet';
                 } else {
                     this.protocolSelect.value = 'wss://';
@@ -1114,7 +1114,7 @@
             setLocalConfig() {
                 this.protocolSelect.value = 'ws://';
                 this.addressInput.value = 'localhost';
-                this.portInput.value = '8000';
+                this.portInput.value = '8888';
                 this.subprotocolSelect.value = 'telnet';
                 this.saveConfig();
             }
