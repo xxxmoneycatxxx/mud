@@ -42,7 +42,7 @@
 
     driver config.ini
 
-> 推荐使用`run.sh`或`run.bat`脚本启动项目。
+> 推荐使用`run.sh`（Linux）或`run.ps1`（Windows）脚本启动项目。
 
 如果是开发学习，使用以下方式之一开启调试模式：
 
