@@ -1,0 +1,865 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE MudletPackage>
+<MudletPackage version="1.001">
+	<TriggerPackage>
+		<TriggerGroup isActive="yes" isFolder="yes" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+			<name>map</name>
+			<script></script>
+			<triggerType>0</triggerType>
+			<conditonLineDelta>0</conditonLineDelta>
+			<mStayOpen>0</mStayOpen>
+			<mCommand></mCommand>
+			<packageName></packageName>
+			<mFgColor>#ff0000</mFgColor>
+			<mBgColor>#ffff00</mBgColor>
+			<mSoundFile></mSoundFile>
+			<colorTriggerFgColor>#000000</colorTriggerFgColor>
+			<colorTriggerBgColor>#000000</colorTriggerBgColor>
+			<regexCodeList />
+			<regexCodePropertyList />
+			<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>doSpeedWalk</name>
+				<script>map.resumeSpeedwalk(1)</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string>艄公说道：「到啦，上岸吧。」随即把一块踏脚板搭上堤岸。</string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>0</integer>
+				</regexCodePropertyList>
+			</Trigger>
+			<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>pauseSpeedWalk</name>
+				<script>map.pauseSpeedwalk()</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string>你鼓足中气，高喊一声：「船家」声音远远传了出去。</string>
+					<string>看起来(.*)想杀死你！$</string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>0</integer>
+					<integer>1</integer>
+				</regexCodePropertyList>
+			</Trigger>
+			<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>prompt</name>
+				<script>if map.currentName then
+  map.find_me(nil, nil, nil, false)
+end</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string>^&gt; $</string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>1</integer>
+				</regexCodePropertyList>
+			</Trigger>
+			<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>setLink-exit</name>
+				<script>for exit in string.gmatch(matches[2], "%a+") do
+  selectString(exit, 1)
+  setUnderline(true)
+  setLink([[send("]] .. exit .. [[")]], "移动到" .. exit)
+  resetFormat()
+end</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string>^\s+这里明显的方向有 (.+)。</string>
+					<string>^\s+这里唯一的出口是 (.+)。</string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>1</integer>
+					<integer>1</integer>
+				</regexCodePropertyList>
+			</Trigger>
+			<Trigger isActive="no" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>setLink-look</name>
+				<script>-- 需要优化
+if string.find(matches[2], "□ ") then
+  return
+end
+selectString(matches[3], 1)
+setUnderline(true)
+setLink([[send("look ]] .. matches[3] .. [[")]], "查看" .. matches[2])
+resetFormat()</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string>^\s+(.+)\((.+)\)$</string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>1</integer>
+				</regexCodePropertyList>
+			</Trigger>
+			<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>areaMap</name>
+				<script>selectCurrentLine()
+copy()
+areaMap:appendBuffer()
+deleteLine()
+miniMap:restore()</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string>╲</string>
+					<string> |</string>
+					<string>╱</string>
+					<string>这里的出口有 </string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>2</integer>
+					<integer>2</integer>
+					<integer>2</integer>
+					<integer>2</integer>
+				</regexCodePropertyList>
+			</Trigger>
+		</TriggerGroup>
+		<TriggerGroup isActive="yes" isFolder="yes" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+			<name>战斗</name>
+			<script></script>
+			<triggerType>0</triggerType>
+			<conditonLineDelta>0</conditonLineDelta>
+			<mStayOpen>0</mStayOpen>
+			<mCommand></mCommand>
+			<packageName></packageName>
+			<mFgColor>#ff0000</mFgColor>
+			<mBgColor>#ffff00</mBgColor>
+			<mSoundFile></mSoundFile>
+			<colorTriggerFgColor>#000000</colorTriggerFgColor>
+			<colorTriggerBgColor>#000000</colorTriggerBgColor>
+			<regexCodeList />
+			<regexCodePropertyList />
+			<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+				<name>状态status</name>
+				<script>sendGMCP("Char.Vitals.Get")</script>
+				<triggerType>0</triggerType>
+				<conditonLineDelta>0</conditonLineDelta>
+				<mStayOpen>0</mStayOpen>
+				<mCommand></mCommand>
+				<packageName></packageName>
+				<mFgColor>#ff0000</mFgColor>
+				<mBgColor>#ffff00</mBgColor>
+				<mSoundFile></mSoundFile>
+				<colorTriggerFgColor>#000000</colorTriggerFgColor>
+				<colorTriggerBgColor>#000000</colorTriggerBgColor>
+				<regexCodeList>
+					<string>似乎有些疲惫，但是仍然十分有活力。</string>
+					<string>看起来可能有些累了。</string>
+					<string>动作似乎有点不太灵光，但仍然有条不紊。</string>
+					<string>气喘嘘嘘，看起来状况并不太好。</string>
+					<string>似乎十分疲惫，看来需要好好休息了。</string>
+					<string>招架已然散乱，正勉力支撑著不倒下去。</string>
+					<string>看起来已经力不从心了。</string>
+					<string>歪歪斜斜地站都站立不稳，眼看就要倒地。</string>
+					<string>已经陷入半昏迷状态，随时都可能摔倒晕去。</string>
+					<string>似乎受了点轻伤，不过光从外表看不大出来。</string>
+					<string>看起来可能受了点轻伤。</string>
+					<string>受了几处伤，不过似乎并不碍事。</string>
+					<string>受伤不轻，看起来状况并不太好。</string>
+					<string>气息粗重，动作开始散乱，看来所受的伤著实不轻。</string>
+					<string>已经伤痕累累，正在勉力支撑著不倒下去。</string>
+					<string>受了相当重的伤，只怕会有生命危险。</string>
+					<string>伤重之下已经难以支撑，眼看就要倒在地上。</string>
+					<string>受伤过重，已经奄奄一息，命在旦夕了。</string>
+					<string>受伤过重，已经有如风中残烛，随时都可能断气。</string>
+					<string>你目前的状态属性如下</string>
+				</regexCodeList>
+				<regexCodePropertyList>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>0</integer>
+					<integer>2</integer>
+				</regexCodePropertyList>
+			</Trigger>
+		</TriggerGroup>
+		<Trigger isActive="yes" isFolder="no" isTempTrigger="no" isMultiline="no" isPerlSlashGOption="no" isColorizerTrigger="no" isFilterTrigger="no" isSoundTrigger="no" isColorTrigger="no" isColorTriggerFg="no" isColorTriggerBg="no">
+			<name>仙丹</name>
+			<script></script>
+			<triggerType>0</triggerType>
+			<conditonLineDelta>0</conditonLineDelta>
+			<mStayOpen>0</mStayOpen>
+			<mCommand>get dan</mCommand>
+			<packageName></packageName>
+			<mFgColor>#ff0000</mFgColor>
+			<mBgColor>#ffff00</mBgColor>
+			<mSoundFile></mSoundFile>
+			<colorTriggerFgColor>#000000</colorTriggerFgColor>
+			<colorTriggerBgColor>#000000</colorTriggerBgColor>
+			<regexCodeList>
+				<string>"啪"的一声一颗仙丹掉到你面前。</string>
+			</regexCodeList>
+			<regexCodePropertyList>
+				<integer>2</integer>
+			</regexCodePropertyList>
+		</Trigger>
+	</TriggerPackage>
+	<TimerPackage>
+		<Timer isActive="yes" isFolder="no" isTempTimer="no" isOffsetTimer="no">
+			<name>Vitals</name>
+			<script>sendGMCP("Char.Vitals.Get")</script>
+			<command></command>
+			<packageName></packageName>
+			<time>00:00:10.000</time>
+		</Timer>
+	</TimerPackage>
+	<AliasPackage>
+		<AliasGroup isActive="yes" isFolder="yes">
+			<name>map</name>
+			<script></script>
+			<command></command>
+			<packageName></packageName>
+			<regex></regex>
+			<AliasGroup isActive="no" isFolder="yes">
+				<name>mapper</name>
+				<script></script>
+				<command></command>
+				<packageName></packageName>
+				<regex></regex>
+				<Alias isActive="yes" isFolder="no">
+					<name>set room hash</name>
+					<script>if not getRoomHashByID(map.currentRoom) then
+  display("---"..map.currentName.."---")
+  if map.currentName == gmcp.Room.Info.name then
+    display([[---setRoomIDbyHash---]])
+    setRoomIDbyHash(map.currentRoom, gmcp.Room.Info.hash)
+  end
+end</script>
+					<command></command>
+					<packageName></packageName>
+					<regex>^setHash$</regex>
+				</Alias>
+				<Alias isActive="yes" isFolder="no">
+					<name>set room xyz</name>
+					<script>local roomID = matches[2]
+local x, y, z = matches[3],matches[4],matches[5]
+display(roomID.."("..x..","..y..","..z..")")
+setRoomCoordinates(roomID, x, y, z)</script>
+					<command></command>
+					<packageName></packageName>
+					<regex>^setXYZ (-?\d+) (-?\d+) (-?\d+) (-?\d+)$</regex>
+				</Alias>
+				<Alias isActive="yes" isFolder="no">
+					<name>clearAllMapData</name>
+					<script>for id,name in pairs(getAreaTableSwap()) do
+  if id &gt; 0 then
+    display("now delete area "..name)
+    deleteArea(id)
+  end
+end</script>
+					<command></command>
+					<packageName></packageName>
+					<regex>^clearAllMapData$</regex>
+				</Alias>
+				<Alias isActive="yes" isFolder="no">
+					<name>保存Json格式地图</name>
+					<script>saveJsonMap(getMudletHomeDir() .. "/map.json")</script>
+					<command></command>
+					<packageName></packageName>
+					<regex>^saveJsonMap$</regex>
+				</Alias>
+				<Alias isActive="yes" isFolder="no">
+					<name>加载Json格式地图</name>
+					<script>loadJsonMap(getMudletHomeDir() .. "/map.json")</script>
+					<command></command>
+					<packageName></packageName>
+					<regex>^loadJsonMap$</regex>
+				</Alias>
+			</AliasGroup>
+			<Alias isActive="yes" isFolder="no">
+				<name>游戏地区Room列表</name>
+				<script>if matches[2] == "all" then
+  for id, name in pairs(getRooms()) do
+    print(getRoomHashByID(id), id, name)
+  end
+end
+if tonumber(matches[2]) then
+  for _, id in pairs(getAreaRooms(matches[2])) do
+    print(_, getRoomHashByID(id), id, getRoomName(id))
+  end
+else
+  for _, id in pairs(getAreaRooms(getRoomAreaName(matches[2]))) do
+    print(_, getRoomHashByID(id), id, getRoomName(id))
+  end
+end</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>^room list (.*)$</regex>
+			</Alias>
+			<Alias isActive="yes" isFolder="no">
+				<name>查看环境信息</name>
+				<script>local room = matches[2] or map.currentRoom
+local x, y, z = getRoomCoordinates(room)
+echo("Room Coordinates for " .. room .. ":")
+echo("\n     X:" .. x)
+echo("\n     Y:" .. y)
+echo("\n     Z:" .. z)
+echo("\nRoom Hash " .. getRoomHashByID(room))
+echo("\nRoom Name " .. getRoomName(room))
+for _, roomid in ipairs(getAllRoomEntrances(room)) do
+  echo("\nRoom exits " .. _ .. ":" .. roomid)
+end</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>^room info(?: (.*))?$</regex>
+			</Alias>
+			<Alias isActive="yes" isFolder="no">
+				<name>寻路</name>
+				<script>if getPath(matches[2], matches[3]) then
+  display(speedWalkDir)
+  display(speedWalkPath)
+  display(speedWalkWeight)
+else
+  echo("\nCan't go there!")
+end</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>^findpath ([1-9][0-9]*) ([1-9][0-9]*)$</regex>
+			</Alias>
+			<Alias isActive="yes" isFolder="no">
+				<name>更新游戏地图</name>
+				<script>map.load_map(gmcp.Client.Map.url)
+map.configs.download_path = "https://mud.ren/storage"
+map.updateVersion()</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>^load map$</regex>
+			</Alias>
+			<Alias isActive="yes" isFolder="no">
+				<name>goto room</name>
+				<script>map.setConfigs("speedwalk_delay", 0.2)
+if tonumber(matches[2]) then
+  display(getRoomName(matches[2]))
+  gotoRoom(matches[2])
+else
+  for id, name in pairs(searchRoom(matches[2])) do
+    cechoLink(
+      string.format(
+        "&lt;tomato&gt;ID: %-5s地区: %-10s名称：%-25s\n", id, getRoomAreaName(getRoomArea(id)), name
+      ),
+      'gotoRoom("'..id..'")',
+      "点列表直接移动到对应地点",
+      true
+    )
+  end
+end</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>^gtr (.*)$</regex>
+			</Alias>
+		</AliasGroup>
+		<AliasGroup isActive="yes" isFolder="yes">
+			<name>LUA</name>
+			<script></script>
+			<command></command>
+			<packageName></packageName>
+			<regex></regex>
+			<Alias isActive="yes" isFolder="no">
+				<name>LuaTest</name>
+				<script>display(getMudletHomeDir())</script>
+				<command></command>
+				<packageName></packageName>
+				<regex>^LuaTest$</regex>
+			</Alias>
+		</AliasGroup>
+		<Alias isActive="yes" isFolder="no">
+			<name>更新扩展包</name>
+			<script>uninstallPackage("mudren")
+installPackage([[https://mud.ren/storage/mudren.mpackage.zip]])</script>
+			<command></command>
+			<packageName></packageName>
+			<regex>^mudren update$</regex>
+		</Alias>
+		<Alias isActive="yes" isFolder="no">
+			<name>安装扩展包</name>
+			<script>local pkg = matches[2]
+uninstallPackage("mudren_" .. pkg)
+installPackage(f("https://mud.ren/storage/mudren_{pkg}.mpackage.zip"))</script>
+			<command></command>
+			<packageName></packageName>
+			<regex>^mudren install (.*)$</regex>
+		</Alias>
+	</AliasPackage>
+	<ActionPackage />
+	<ScriptPackage>
+		<ScriptGroup isActive="yes" isFolder="yes">
+			<name>CSSman</name>
+			<packageName>CSSman</packageName>
+			<script></script>
+			<eventHandlerList />
+			<Script isActive="yes" isFolder="no">
+				<name>CSSMan</name>
+				<packageName></packageName>
+				<script>-- CSSMan by Vadi. Public domain.
+
+CSSMan = {}
+CSSMan.__index = CSSMan
+
+function CSSMan.new(stylesheet)
+  local obj  = { stylesheet = {} }
+  setmetatable(obj,CSSMan)
+  local trim = string.trim
+
+  assert(type(stylesheet) == "string", "CSSMan.new: no stylesheet provided. A possible error is that you might have used CSSMan.new, not CSSMan:new")
+
+  for line in stylesheet:gmatch("[^\r\n]+") do
+    local attribute, value = line:match("^(.-):(.-);$")
+    if attribute and value then
+      attribute, value = trim(attribute), trim(value)
+      obj.stylesheet[attribute] = value
+    end
+  end
+
+  return obj
+end
+
+function CSSMan:set(key, value)
+  self.stylesheet[key] = value
+end
+
+function CSSMan:get(key)
+  return self.stylesheet[key]
+end
+
+function CSSMan:getCSS(key)
+  local lines, concat = {}, table.concat
+  for k,v in pairs(self.stylesheet) do lines[#lines+1] = concat({k,": ", v, ";"}) end
+  return concat(lines, "\n")
+end
+
+function CSSMan:gettable()
+  return self.stylesheet
+end
+
+function CSSMan:settable(tbl)
+  assert(type(tbl) == "table", "CSSMan:settable: table expected, got "..type(tbl))
+  self.stylesheet = tbl
+end</script>
+				<eventHandlerList />
+			</Script>
+		</ScriptGroup>
+		<ScriptGroup isActive="yes" isFolder="yes">
+			<name>GUI</name>
+			<packageName></packageName>
+			<script>GUI = GUI or {}</script>
+			<eventHandlerList />
+			<Script isActive="yes" isFolder="no">
+				<name>Set Borders</name>
+				<packageName></packageName>
+				<script>local w,h = getMainWindowSize()
+setBorderLeft(0)
+setBorderTop(h/20)
+setBorderBottom(h/10)
+setBorderRight(w/4)</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>Create Background</name>
+				<packageName></packageName>
+				<script>GUI.BackgroundCSS = CSSMan.new([[
+  background-color: rgb(20,0,20);
+]])
+
+GUI.Right = Geyser.Label:new({
+  name = "GUI.Right",
+  x = "-25%", y = 0,
+  width = "25%",
+  height = "100%",
+})
+GUI.Right:setStyleSheet(GUI.BackgroundCSS:getCSS())
+
+GUI.Top = Geyser.Label:new({
+  name = "GUI.Top",
+  x = 0, y = 0,
+  width = "75%",
+  height = "5%",
+})
+GUI.Top:setStyleSheet(GUI.BackgroundCSS:getCSS())
+
+GUI.Bottom = Geyser.Label:new({
+  name = "GUI.Bottom",
+  x = 0, y = "90%",
+  width = "75%",
+  height = "10%",
+})
+GUI.Bottom:setStyleSheet(GUI.BackgroundCSS:getCSS())</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>Header Icons</name>
+				<packageName></packageName>
+				<script>GUI.Header = Geyser.HBox:new({
+  name = "GUI.Header",
+  x = 0, y = 0,
+  width = "100%",
+  height = "100%",
+}, GUI.Top)
+
+GUI.IconCSS = CSSMan.new([[
+  background-color: rgba(0,0,0,100);
+  border-style: solid;
+  border-width: 2px;
+  border-color: gold;
+  border-radius: 5px;
+  margin: 5px;
+  qproperty-wordWrap: true;
+]])
+
+for i=1,12 do
+  GUI["Icon"..i] = Geyser.Label:new({
+    name = "GUI.Icon"..i,
+  }, GUI.Header)
+  GUI["Icon"..i]:setStyleSheet(GUI.IconCSS:getCSS())
+  GUI["Icon"..i]:echo("&lt;center&gt;GUI. Icon"..i)
+end
+
+function cmd(cmd)
+  send(cmd)
+end
+
+GUI.Icon1:setClickCallback("cmd", "score")
+GUI.Icon1:echo("&lt;center&gt;资料&lt;/center&gt;")
+
+GUI.Icon2:setClickCallback("cmd", "i")
+GUI.Icon2:echo("&lt;center&gt;物品&lt;/center&gt;")
+
+GUI.Icon3:setClickCallback("cmd", "cha")
+GUI.Icon3:echo("&lt;center&gt;技能&lt;/center&gt;")
+
+GUI.Icon4:setClickCallback("cmd", "quest")
+GUI.Icon4:echo("&lt;center&gt;任务&lt;/center&gt;")
+
+GUI.Icon5:setClickCallback("cmd", "who")
+GUI.Icon5:echo("&lt;center&gt;玩家列表&lt;/center&gt;")
+
+GUI.Icon6:setClickCallback("cmd", "top lv")
+GUI.Icon6:echo("&lt;center&gt;英雄榜&lt;/center&gt;")
+
+GUI.Icon7:setClickCallback("cmd", "help")
+GUI.Icon7:echo("&lt;center&gt;游戏手册&lt;/center&gt;", "red")
+
+GUI.Icon8:setClickCallback("cmd", "help cmds")
+GUI.Icon8:echo("&lt;center&gt;基础指令&lt;/center&gt;")
+
+GUI.Icon9:setClickCallback("cmd", "help work")
+GUI.Icon9:echo("&lt;center&gt;新手工作&lt;/center&gt;")
+
+GUI.Icon10:setClickCallback("openWebPage", "https://bbs.mud.ren/nodes/6")
+GUI.Icon10:echo("&lt;center&gt;BBS&lt;/center&gt;", "green")
+
+GUI.Icon11:setClickCallback("receiveMSP", "!!MUSIC(1001.mp3 L=-1 V=100 U=https://mud.ren/storage/wav/)")
+GUI.Icon11:setDoubleClickCallback("receiveMSP","!!MUSIC(Off)")
+GUI.Icon11:echo("&lt;center&gt;Music&lt;/center&gt;")
+
+GUI.Icon12:setClickCallback("showColors")
+GUI.Icon12:echo("&lt;center&gt;showColors&lt;/center&gt;")</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>Gauges</name>
+				<packageName></packageName>
+				<script>GUI.Footer = Geyser.HBox:new({
+  name = "GUI.Footer",
+  x = 0, y = 0,
+  width = "100%",
+  height = "100%",
+}, GUI.Bottom)
+
+GUI.LeftColumn = Geyser.VBox:new({
+  name = "GUI.LeftColumn",
+}, GUI.Footer)
+
+GUI.MiddleColumn = Geyser.VBox:new({
+  name = "GUI.MiddleColumn",
+}, GUI.Footer)
+
+GUI.RightColumn = Geyser.VBox:new({
+  name = "GUI.RightColumn",
+}, GUI.Footer)
+
+GUI.GaugeBackCSS = CSSMan.new([[
+  background-color: rgba(0,0,0,0);
+  border-style: solid;
+  border-color: white;
+  border-width: 1px;
+  border-radius: 5px;
+  margin: 5px;
+]])
+
+GUI.GaugeFrontCSS = CSSMan.new([[
+  background-color: rgba(0,0,0,0);
+  border-style: solid;
+  border-color: white;
+  border-width: 1px;
+  border-radius: 5px;
+  margin: 5px;
+]])
+
+GUI.Health = Geyser.Gauge:new({
+  name = "GUI.Health",
+}, GUI.LeftColumn)
+GUI.Health.back:setStyleSheet(GUI.GaugeBackCSS:getCSS())
+GUI.GaugeFrontCSS:set("background-color","red")
+GUI.Health.front:setStyleSheet(GUI.GaugeFrontCSS:getCSS())
+GUI.Health:setValue(0, 100)
+GUI.Health.front:echo("气血")
+
+GUI.Mana = Geyser.Gauge:new({
+  name = "GUI.Mana",
+}, GUI.LeftColumn)
+GUI.Mana.back:setStyleSheet(GUI.GaugeBackCSS:getCSS())
+GUI.GaugeFrontCSS:set("background-color","blue")
+GUI.Mana.front:setStyleSheet(GUI.GaugeFrontCSS:getCSS())
+GUI.Mana:setValue(0, 100)
+GUI.Mana.front:echo("精气")
+
+GUI.Endurance = Geyser.Gauge:new({
+  name = "GUI.Endurance",
+}, GUI.MiddleColumn)
+GUI.Endurance.back:setStyleSheet(GUI.GaugeBackCSS:getCSS())
+GUI.GaugeFrontCSS:set("background-color","DodgerBlue")
+GUI.Endurance.front:setStyleSheet(GUI.GaugeFrontCSS:getCSS())
+GUI.Endurance:setValue(0, 100)
+GUI.Endurance.front:echo("内力")
+
+GUI.Willpower = Geyser.Gauge:new({
+  name = "GUI.Willpower",
+}, GUI.MiddleColumn)
+GUI.Willpower.back:setStyleSheet(GUI.GaugeBackCSS:getCSS())
+GUI.GaugeFrontCSS:set("background-color","purple")
+GUI.Willpower.front:setStyleSheet(GUI.GaugeFrontCSS:getCSS())
+GUI.Willpower:setValue(0, 100)
+GUI.Willpower.front:echo("精力")
+
+GUI.Food = Geyser.Gauge:new({
+  name = "GUI.Food",
+}, GUI.RightColumn)
+GUI.Food.back:setStyleSheet(GUI.GaugeBackCSS:getCSS())
+GUI.GaugeFrontCSS:set("background-color","tomato")
+GUI.Food.front:setStyleSheet(GUI.GaugeFrontCSS:getCSS())
+GUI.Food:setValue(0, 100)
+GUI.Food.front:echo("食物")
+
+GUI.Water = Geyser.Gauge:new({
+  name = "GUI.Water",
+}, GUI.RightColumn)
+GUI.Water.back:setStyleSheet(GUI.GaugeBackCSS:getCSS())
+GUI.GaugeFrontCSS:set("background-color","green")
+GUI.Water.front:setStyleSheet(GUI.GaugeFrontCSS:getCSS())
+GUI.Water:setValue(0, 100)
+GUI.Water.front:echo("饮水")</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>Boxes</name>
+				<packageName></packageName>
+				<script>GUI.BoxCSS = CSSMan.new([[
+  background-color: rgba(0,0,0,100);
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 5px;
+  border-color: white;
+  margin: 10px;
+]])
+
+GUI.Box1 = Geyser.Label:new({
+  name = "GUI.Box1",
+  x = 0, y = 0,
+  width = "100%",
+  height = "50%",
+}, GUI.Right)
+GUI.Box1:setStyleSheet(GUI.BoxCSS:getCSS())
+GUI.Box1:echo("&lt;center&gt;GUI.Mapper&lt;/center&gt;")
+
+GUI.Box2 = Geyser.Label:new({
+  name = "GUI.Box2",
+  x = 0, y = "50%",
+  width = "50%",
+  height = "50%",
+  message = [[&lt;center&gt;江湖笑 恩怨了&lt;/center&gt;]]
+}, GUI.Right)
+GUI.Box2:setStyleSheet(GUI.BoxCSS:getCSS())
+GUI.Box2:setFontSize(14)
+
+GUI.Box3 = Geyser.Label:new({
+  name = "GUI.Box3",
+  x = "50%", y = "50%",
+  width = "50%",
+  height = "50%",
+  message = [[&lt;center&gt;人过招 笑藏刀&lt;/center&gt;]]
+}, GUI.Right)
+GUI.Box3:setStyleSheet(GUI.BoxCSS:getCSS())
+GUI.Box3:setFontSize(14)</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>Mapper</name>
+				<packageName></packageName>
+				<script>GUI.Map_Container = Geyser.Container:new({
+  name = "GUI.Map_Container",
+  x = 0,
+  y = 0,
+  width = "100%",
+  height = "100%",
+}, GUI.Box1)
+
+GUI.Mapper = Geyser.Mapper:new({
+  name = "GUI.Mapper",
+  x = 20,
+  y = 20,
+  width = GUI.Map_Container:get_width() - 40,
+  height = GUI.Map_Container:get_height() - 40,
+}, GUI.Map_Container)
+
+setMapZoom(13)</script>
+				<eventHandlerList />
+			</Script>
+			<Script isActive="yes" isFolder="no">
+				<name>areaMap</name>
+				<packageName></packageName>
+				<script>local w,h = getMainWindowSize()
+miniMap = Adjustable.Container:new({
+  name = "miniMap",
+  x = "0", y = h/20,
+  fontSize = 11,
+  width = "81c", height = "15c",
+  locked = true,
+})
+areaMap = Geyser.MiniConsole:new({
+  name ="areaMap",
+  x="0", y="0",
+  autoWrap = true,
+  color = "black",
+  scrollBar = false,
+  width="100%", height="100%",
+}, miniMap)
+
+areaMap:clear()
+miniMap:minimize()</script>
+				<eventHandlerList />
+			</Script>
+		</ScriptGroup>
+		<Script isActive="yes" isFolder="no">
+			<name>setVitals</name>
+			<packageName></packageName>
+			<script>function setVitals()
+  GUI.Health:setValue(gmcp.Char.Vitals.hp, gmcp.Char.Vitals.max_hp)
+  GUI.Health.front:echo(
+    string.format("气血：%d / %d", gmcp.Char.Vitals.hp, gmcp.Char.Vitals.max_hp)
+  )
+  GUI.Mana:setValue(gmcp.Char.Vitals.jing, gmcp.Char.Vitals.max_jing)
+  GUI.Mana.front:echo(
+    string.format("精气：%d / %d", gmcp.Char.Vitals.jing, gmcp.Char.Vitals.max_jing)
+  )
+  GUI.Endurance:setValue(gmcp.Char.Vitals.neili, gmcp.Char.Vitals.max_neili + 1)
+  GUI.Endurance.front:echo(
+    string.format("内力：%d / %d", gmcp.Char.Vitals.neili, gmcp.Char.Vitals.max_neili)
+  )
+  GUI.Willpower:setValue(gmcp.Char.Vitals.jingli, gmcp.Char.Vitals.max_jingli + 1)
+  GUI.Willpower.front:echo(
+    string.format("精力：%d / %d", gmcp.Char.Vitals.jingli, gmcp.Char.Vitals.max_jingli)
+  )
+  GUI.Food:setValue(gmcp.Char.Vitals.food, gmcp.Char.Vitals.max_food)
+  GUI.Food.front:echo(
+    string.format("食物：%d / %d", gmcp.Char.Vitals.food, gmcp.Char.Vitals.max_food)
+  )
+  GUI.Water:setValue(gmcp.Char.Vitals.water, gmcp.Char.Vitals.max_water)
+  GUI.Water.front:echo(
+    string.format("饮水：%d / %d", gmcp.Char.Vitals.water, gmcp.Char.Vitals.max_water)
+  )
+end</script>
+			<eventHandlerList>
+				<string>gmcp.Char.Vitals</string>
+			</eventHandlerList>
+		</Script>
+		<Script isActive="yes" isFolder="no">
+			<name>setGMCPRoomInfo</name>
+			<packageName></packageName>
+			<script>function setGMCPRoomInfo()
+  map.prompt.room = gmcp.Room.Info.name
+  map.prompt.exits = table.concat(gmcp.Room.Info.exits, " ")
+  map.prompt.hash = gmcp.Room.Info.hash
+  if gmcp.Room.Info.area ~= "area" then
+    miniMap:minimize()
+  end
+  if map.mapping and map.getRoomAreaName ~= gmcp.Room.Info.area then
+    map.set_area(gmcp.Room.Info.area)
+  end
+end</script>
+			<eventHandlerList>
+				<string>gmcp.Room.Info</string>
+			</eventHandlerList>
+		</Script>
+	</ScriptPackage>
+	<KeyPackage />
+	<VariablePackage>
+		<HiddenVariables />
+	</VariablePackage>
+</MudletPackage>
