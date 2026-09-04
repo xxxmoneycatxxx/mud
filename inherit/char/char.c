@@ -96,6 +96,10 @@ void heart_beat()
     me = this_object();
     my = query_entire_dbase();
 
+    // GMCP: 在线玩家属性变化时实时推送状态栏
+    if (userp(me) && interactive(me))
+        me->gmcp_vitals_update();
+
     if (userp(me) && living(me) && mapp(my["env"]))
     {
         // update prompt
