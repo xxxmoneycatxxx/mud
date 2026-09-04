@@ -7,7 +7,7 @@ if [[ $(uname -o) != "Msys" ]]; then
 fi
 
 # 更新系统软件包列表
-pacman -Syu
+pacman -Syu --noconfirm
 # 安装软件包及依赖库
 pacman --noconfirm -S --needed mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-zlib mingw-w64-x86_64-pcre mingw-w64-x86_64-icu mingw-w64-x86_64-sqlite3 mingw-w64-x86_64-jemalloc mingw-w64-x86_64-gtest mingw-w64-x86_64-zstd mingw-w64-x86_64-curl bison make
 
@@ -19,6 +19,9 @@ fi
 # 进入 fluffos 目录并拉取最新代码
 cd fluffos
 git checkout . && git pull
+
+# 在 Windows/MinGW 上禁用 LTO（GCC 链接器会卡死）
+sed -i 's/set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)/set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)/' src/CMakeLists.txt
 
 # 如果 build 目录已存在，则删除
 if [ -d "build" ]; then
