@@ -41,7 +41,8 @@ int look_room(object me, object env)
     int i;
     object *inv;
     mapping exits;
-    string str, *dirs;
+    string str, *dirs, dest, short;
+    object dest_ob;
 
     if (!env)
     {
@@ -58,8 +59,26 @@ int look_room(object me, object env)
     {
         dirs = keys(exits);
         for (i = 0; i < sizeof(dirs); i++)
+        {
             if ((int)env->query_door(dirs[i], "status") & DOOR_CLOSED)
+            {
                 dirs[i] = 0;
+                continue;
+            }
+
+            dest = exits[dirs[i]];
+            if (stringp(dest))
+            {
+                dest_ob = find_object(dest);
+                if (!objectp(dest_ob))
+                {
+                    catch(call_other(dest, "???"));
+                    dest_ob = find_object(dest);
+                }
+                if (objectp(dest_ob) && stringp(short = dest_ob->query("short")) && short != "")
+                    dirs[i] = dirs[i] + "(" + short + ")";
+            }
+        }
         dirs -= ({0});
         if (sizeof(dirs) == 0)
             str += "    这里没有任何明显的出路。\n";

@@ -172,7 +172,8 @@ int look_room(object me, object env, int brief)
 {
     int i;
     mapping exits;
-    string str, *dirs;
+    string str, *dirs, dest, short;
+    object dest_ob;
 
     if( !env )
     {
@@ -206,8 +207,26 @@ int look_room(object me, object env, int brief)
     {
         dirs = keys(exits);
         for(i=0; i<sizeof(dirs); i++)
+        {
             if ((int)env->query_door(dirs[i], "status") & DOOR_CLOSED )
+            {
                 dirs[i] = 0;
+                continue;
+            }
+
+            dest = exits[dirs[i]];
+            if (stringp(dest))
+            {
+                dest_ob = find_object(dest);
+                if (!objectp(dest_ob))
+                {
+                    catch(call_other(dest, "???"));
+                    dest_ob = find_object(dest);
+                }
+                if (objectp(dest_ob) && stringp(short = dest_ob->query("short")) && short != "")
+                    dirs[i] = dirs[i] + "(" + short + ")";
+            }
+        }
 
         dirs -= ({ 0 });
         if (sizeof(dirs) == 0)
@@ -215,7 +234,7 @@ int look_room(object me, object env, int brief)
         else if (sizeof(dirs) == 1)
             str += "    这里唯一的出口是 " + BOLD + dirs[0] + NOR + "。\n";
         else
-            str += sprintf("    这里明显的方向有 " + BOLD + "%s" + NOR + " 和 " + BOLD + "%s" + NOR + "。\n",
+            str += sprintf("    这里明显的出口是 " + BOLD + "%s" + NOR + " 和 " + BOLD + "%s" + NOR + "。\n",
                         implode(dirs[0..sizeof(dirs)-2], "、"), dirs[sizeof(dirs)-1]);
     }
 
