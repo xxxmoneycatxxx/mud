@@ -507,6 +507,10 @@
                     <option value="http">HTTP (静态文件)</option>
                     <option value="">无</option>
                 </select>
+                <div style="font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4;">
+                    ASCII：客户端本地回显，推荐 Web 浏览器使用<br>
+                    Telnet：服务端控制回显，部分浏览器可能不显示输入
+                </div>
             </div>
             <div class="panel-actions">
                 <button class="connect-btn" id="connectBtn">连接</button>
@@ -900,6 +904,7 @@
                 this.protocolType = 'ascii';
                 this.heartbeat = null;
                 this.cleanupTimeout = null;
+                this._expectPassword = false;  // 密码输入状态标记
 
                 // ANSI 颜色码映射表 (与服务端 ansi.h 对齐)
                 this._ansiColorMap = {
@@ -1119,12 +1124,12 @@
                     this.protocolSelect.value = 'ws://';
                     this.addressInput.value = 'localhost';
                     this.portInput.value = '8888';
-                    this.subprotocolSelect.value = 'telnet';
+                    this.subprotocolSelect.value = 'ascii';
                 } else {
                     this.protocolSelect.value = 'wss://';
                     this.addressInput.value = 'mud.ren';
                     this.portInput.value = '8888';
-                    this.subprotocolSelect.value = 'telnet';
+                    this.subprotocolSelect.value = 'ascii';
                 }
             }
 
@@ -1141,7 +1146,7 @@
                 this.protocolSelect.value = 'ws://';
                 this.addressInput.value = 'localhost';
                 this.portInput.value = '8888';
-                this.subprotocolSelect.value = 'telnet';
+                this.subprotocolSelect.value = 'ascii';
                 this.saveConfig();
             }
 
@@ -1604,6 +1609,15 @@
 
 
             handleMessage(data) {
+                // 检测服务端密码提示，ASCII 模式下用于控制本地回显
+                if (typeof data === 'string' && /密码|password|passwd/i.test(data)) {
+                    this._expectPassword = true;
+                } else if (typeof data === 'string' && /确认|再输入一次|确认密码/i.test(data)) {
+                    this._expectPassword = true;
+                } else if (typeof data === 'string' && /角色|性别|male.*female|男.*女/i.test(data)) {
+                    this._expectPassword = false;
+                }
+
                 if (data instanceof Blob) {
                     const reader = new FileReader();
                     reader.onload = () => {
@@ -1722,6 +1736,16 @@
 
             handleSendCommand() {
                 const command = this.commandInput.value;
+
+                // ASCII 模式本地回显 (Telnet 模式由服务端回显)
+                if (this.protocolType === 'ascii' && command.trim() && this.connected) {
+                    if (this._expectPassword) {
+                        this.appendMessage('> ***', 'system');
+                    } else {
+                        this.appendMessage('> ' + command);
+                    }
+                }
+
                 if (command.trim()) {
                     this.addToHistory(command);
                     this.sendCommand(command);
