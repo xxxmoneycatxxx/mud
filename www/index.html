@@ -309,59 +309,52 @@
             opacity: 0.7;
         }
 
-        /* ===== 状态栏 ===== */
+        /* ===== 状态栏（紧凑单行） ===== */
         .status-bar {
             display: none;
-            background: linear-gradient(180deg, #0d1a0d 0%, #0a120a 100%);
-            border-bottom: 1px solid #0f0;
-            padding: 6px 15px;
-            font-size: 11px;
-            color: #ccc;
+            background: #0a0f0a;
+            border-bottom: 1px solid #1a3a1a;
+            padding: 4px 12px;
+            font-size: 12px;
+            color: #aaa;
+            white-space: nowrap;
+            overflow: hidden;
         }
-        .status-bar.visible { display: block; }
-        .stat-row {
+        .status-bar.visible { display: flex; align-items: center; gap: 0; }
+        .stats-line {
             display: flex;
             align-items: center;
-            gap: 6px;
-            margin-bottom: 3px;
-            flex-wrap: wrap;
-        }
-        .stat-label {
-            min-width: 32px;
-            color: #888;
-            text-align: right;
-        }
-        .stat-bar-bg {
+            gap: 0;
             flex: 1;
-            max-width: 120px;
-            height: 10px;
-            background: #222;
-            border-radius: 2px;
+            min-width: 0;
             overflow: hidden;
-            position: relative;
         }
-        .stat-bar-fill {
-            height: 100%;
-            transition: width 0.3s ease, background-color 0.3s ease;
-            border-radius: 2px;
+        .stat-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            margin-right: 2px;
         }
-        .stat-value {
-            min-width: 60px;
-            font-size: 10px;
-            color: #aaa;
+        .stat-item .label { color: #666; }
+        .stat-item .val { color: #2ecc71; font-weight: bold; }
+        .stat-item .val.exp { color: #ffd93d; }
+        .stat-item .val.pot { color: #ff6b6b; }
+        .stat-sep {
+            color: #333;
+            margin: 0 4px;
+            user-select: none;
         }
         .room-info-bar {
-            margin-top: 4px;
-            padding-top: 4px;
-            border-top: 1px solid #1a2a1a;
             color: #0f0;
-            font-size: 11px;
-        }
-        .room-exits {
-            color: #888;
-            font-size: 10px;
+            font-size: 12px;
             margin-left: 8px;
+            padding-left: 8px;
+            border-left: 1px solid #1a3a1a;
+            flex-shrink: 0;
         }
+        .room-info-bar .room-name { font-weight: bold; }
+        .room-info-bar .room-area { color: #888; }
+        .room-info-bar .room-exits { color: #666; margin-left: 4px; }
 
         /* ===== 快捷命令栏 ===== */
         .quick-commands {
@@ -445,35 +438,8 @@
 
     <!-- 状态栏 -->
     <div class="status-bar" id="statusBar">
-        <div class="stat-row">
-            <span class="stat-label">气血</span>
-            <div class="stat-bar-bg"><div class="stat-bar-fill" id="hpBar"></div></div>
-            <span class="stat-value" id="hpVal">--/--</span>
-            <span class="stat-label">精</span>
-            <div class="stat-bar-bg"><div class="stat-bar-fill" id="jingBar"></div></div>
-            <span class="stat-value" id="jingVal">--/--</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">精力</span>
-            <div class="stat-bar-bg"><div class="stat-bar-fill" id="jingliBar"></div></div>
-            <span class="stat-value" id="jingliVal">--/--</span>
-            <span class="stat-label">内力</span>
-            <div class="stat-bar-bg"><div class="stat-bar-fill" id="neiliBar"></div></div>
-            <span class="stat-value" id="neiliVal">--/--</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">食物</span>
-            <div class="stat-bar-bg"><div class="stat-bar-fill" id="foodBar"></div></div>
-            <span class="stat-value" id="foodVal">--/--</span>
-            <span class="stat-label">水</span>
-            <div class="stat-bar-bg"><div class="stat-bar-fill" id="waterBar"></div></div>
-            <span class="stat-value" id="waterVal">--/--</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">经验</span>
-            <span class="stat-value" id="expVal" style="min-width:auto;color:#ffd93d;">--</span>
-            <span class="stat-label">潜能</span>
-            <span class="stat-value" id="potVal" style="min-width:auto;color:#ff6b6b;">--</span>
+        <div class="stats-line" id="statsLine">
+            <span style="color:#666;">气血 --/--</span>
         </div>
         <div class="room-info-bar" id="roomInfoBar">房间: --</div>
     </div>
@@ -508,8 +474,8 @@
                     <option value="">无</option>
                 </select>
                 <div style="font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4;">
-                    ASCII：客户端本地回显，推荐 Web 浏览器使用<br>
-                    Telnet：服务端控制回显，部分浏览器可能不显示输入
+                    Telnet：支持 GMCP 状态栏，客户端本地回显<br>
+                    ASCII：纯文本模式，无状态栏
                 </div>
             </div>
             <div class="panel-actions">
@@ -790,6 +756,7 @@
                 this.telnet = telnet;
                 this.enabled = false;
                 this.modules = new Map();
+                this.onMessage = null; // 外部回调: (module, data) => void
             }
 
             // 处理GMCP消息
@@ -809,6 +776,10 @@
 
             // 处理GMCP模块
             processModule(module, data) {
+                // 通知外部回调
+                if (this.onMessage) {
+                    this.onMessage(module, data);
+                }
                 switch (module) {
                     case 'Client.GUI':
                         this.handleClientGUI(data);
@@ -905,6 +876,11 @@
                 this.heartbeat = null;
                 this.cleanupTimeout = null;
                 this._expectPassword = false;  // 密码输入状态标记
+                this._vitalsReceived = false;   // 是否已收到属性数据
+                this._gmcpInitSent = false;     // GMCP 初始化是否已发送
+                this._loginDone = false;        // 是否已进入游戏（登录完成）
+                this._hpFallbackSent = false;   // hp 兑底是否已发送
+                this._lastVitals = null;        // 最近一次状态栏数据（合并用）
 
                 // ANSI 颜色码映射表 (与服务端 ansi.h 对齐)
                 this._ansiColorMap = {
@@ -1071,6 +1047,11 @@
                 if (statusBar) statusBar.classList.remove('visible');
                 if (quickCmds) quickCmds.classList.remove('visible');
 
+                this._vitalsReceived = false;
+                this._gmcpInitSent = false;
+                this._loginDone = false;
+                this._hpFallbackSent = false;
+                this._lastVitals = null;
                 this.connected = false;
                 console.log('🔧 连接已强制清理');
             }
@@ -1124,12 +1105,12 @@
                     this.protocolSelect.value = 'ws://';
                     this.addressInput.value = 'localhost';
                     this.portInput.value = '8888';
-                    this.subprotocolSelect.value = 'ascii';
+                    this.subprotocolSelect.value = 'telnet';
                 } else {
                     this.protocolSelect.value = 'wss://';
                     this.addressInput.value = 'mud.ren';
                     this.portInput.value = '8888';
-                    this.subprotocolSelect.value = 'ascii';
+                    this.subprotocolSelect.value = 'telnet';
                 }
             }
 
@@ -1146,7 +1127,7 @@
                 this.protocolSelect.value = 'ws://';
                 this.addressInput.value = 'localhost';
                 this.portInput.value = '8888';
-                this.subprotocolSelect.value = 'ascii';
+                this.subprotocolSelect.value = 'telnet';
                 this.saveConfig();
             }
 
@@ -1188,6 +1169,7 @@
                         `${wsUrl}?t=${Date.now()}`;
 
                     this.ws = new WebSocket(cleanUrl, protocols);
+                    this.ws.binaryType = 'arraybuffer';
 
                     this.ws.onopen = () => {
                         this.connected = true;
@@ -1215,6 +1197,13 @@
                             // 延迟初始化Telnet协商，确保连接稳定
                             this.cleanupTimeout = setTimeout(() => {
                                 this.initTelnetNegotiation();
+                                // 连接 GMCPHandler 回调，将数据流转到 UI 更新
+                                if (this.telnet && this.telnet.gmcp) {
+                                    this.telnet.gmcp.onMessage = (module, data) => {
+                                        this.processGMCPData({ module, data });
+                                    };
+                                }
+                                // hp 兑底改由登录完成检测触发（见 appendMessage 中的 _loginDone 逻辑）
                             }, 500);
                         } else {
                             this.appendMessage('✅ 已连接到MUD服务器', 'system');
@@ -1294,6 +1283,7 @@
 
                 switch (data.module) {
                     case 'Char.Vitals':
+                        this._vitalsReceived = true;
                         this.updateCharacterStatus(data.data);
                         break;
                     case 'Room.Info':
@@ -1305,37 +1295,85 @@
             }
 
             updateCharacterStatus(vitals) {
-                const setBar = (barId, valId, cur, max) => {
-                    const bar = document.getElementById(barId);
-                    const val = document.getElementById(valId);
-                    if (!bar || !val) return;
-                    const pct = max > 0 ? Math.min(100, (cur / max) * 100) : 0;
-                    bar.style.width = pct + '%';
-                    bar.style.backgroundColor = pct < 30 ? '#e74c3c' : pct < 60 ? '#f39c12' : '#2ecc71';
-                    val.textContent = cur + '/' + max;
-                };
-                setBar('hpBar', 'hpVal', vitals.hp || 0, vitals.max_hp || 0);
-                setBar('jingBar', 'jingVal', vitals.jing || 0, vitals.max_jing || 0);
-                setBar('jingliBar', 'jingliVal', vitals.jingli || 0, vitals.max_jingli || 0);
-                setBar('neiliBar', 'neiliVal', vitals.neili || 0, vitals.max_neili || 0);
-                setBar('foodBar', 'foodVal', vitals.food || 0, vitals.max_food || 0);
-                setBar('waterBar', 'waterVal', vitals.water || 0, vitals.max_water || 0);
-                const expEl = document.getElementById('expVal');
-                if (expEl) expEl.textContent = (vitals.exp || 0).toLocaleString();
-                const potEl = document.getElementById('potVal');
-                if (potEl) potEl.textContent = vitals.pot || 0;
+                const statsLine = document.getElementById('statsLine');
+                if (!statsLine) return;
+
+                // 合并增量数据，避免部分字段缺失时被归零
+                this._lastVitals = Object.assign(this._lastVitals || {}, vitals);
+                const v = this._lastVitals;
+
+                const fmt = (cur, max) => (cur || 0) + '/' + (max || 0);
+                const items = [
+                    { label: '气血', val: fmt(v.hp, v.max_hp), cls: '' },
+                    { label: '精',   val: fmt(v.jing, v.max_jing), cls: '' },
+                    { label: '精力', val: fmt(v.jingli, v.max_jingli), cls: '' },
+                    { label: '内力', val: fmt(v.neili, v.max_neili), cls: '' },
+                    { label: '食物', val: fmt(v.food, v.max_food), cls: '' },
+                    { label: '水',   val: fmt(v.water, v.max_water), cls: '' },
+                    { label: '经验', val: (v.exp || 0).toLocaleString(), cls: 'exp' },
+                    { label: '潜能', val: String(v.pot || 0), cls: 'pot' },
+                ];
+
+                statsLine.innerHTML = items.map((item, i) => {
+                    const sep = i < items.length - 1 ? '<span class="stat-sep">|</span>' : '';
+                    return '<span class="stat-item"><span class="label">' + item.label + '</span> <span class="val ' + item.cls + '">' + item.val + '</span></span>' + sep;
+                }).join('');
+
                 document.getElementById('statusBar').classList.add('visible');
             }
 
             updateRoomInfo(roomInfo) {
                 const roomBar = document.getElementById('roomInfoBar');
                 if (!roomBar) return;
-                let html = '房间: <strong>' + (roomInfo.name || '未知') + '</strong>';
-                if (roomInfo.area) html += ' [' + roomInfo.area + ']';
+                let html = '<span class="room-name">' + (roomInfo.name || '未知') + '</span>';
+                if (roomInfo.area) html += ' <span class="room-area">[' + roomInfo.area + ']</span>';
                 if (roomInfo.exits && roomInfo.exits.length > 0) {
-                    html += '<span class="room-exits">出口: ' + roomInfo.exits.join(', ') + '</span>';
+                    html += '<span class="room-exits">→ ' + roomInfo.exits.join(', ') + '</span>';
                 }
                 roomBar.innerHTML = html;
+            }
+
+            // 从 hp 命令输出中解析属性值，更新状态栏
+            parseHpOutput(text) {
+                // 去除 ANSI 转义码
+                const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
+                const stats = {};
+                const labelMap = {
+                    '气血': 'hp', '精气': 'jing', '精力': 'jingli',
+                    '内力': 'neili', '食物': 'food', '饮水': 'water',
+                    '潜能': 'pot', '经验': 'exp'
+                };
+
+                // 匹配 【 标 签 】  数值/ 最大值 格式
+                const re = /【\s*([^】]+?)\s*】\s+(-+|\d+)\s*\/\s*(-+|\d+)/g;
+                let m;
+                while ((m = re.exec(clean)) !== null) {
+                    const label = m[1].replace(/\s+/g, '');
+                    const key = labelMap[label];
+                    if (key) {
+                        const cur = m[2] === '---' ? 0 : parseInt(m[2]);
+                        const max = m[3] === '---' ? 0 : parseInt(m[3]);
+                        if (!isNaN(cur)) stats[key] = cur;
+                        if (!isNaN(max)) stats['max_' + key] = max;
+                    }
+                }
+
+                // 匹配单独数值：【 潜 能 】  211  或  【 经 验 】  171
+                const re2 = /【\s*([^】]+?)\s*】\s+(\d+)/g;
+                while ((m = re2.exec(clean)) !== null) {
+                    const label = m[1].replace(/\s+/g, '');
+                    const key = labelMap[label];
+                    if (key && stats[key] === undefined) {
+                        stats[key] = parseInt(m[2]);
+                    }
+                }
+
+                // 仅接受完整 hp 输出（气血+精气必然同时存在），
+                // 避免其他含【标签】数字的文本部分匹配后覆盖状态栏
+                if (stats.hp !== undefined && stats.jing !== undefined) {
+                    this._vitalsReceived = true;
+                    this.updateCharacterStatus(stats);
+                }
             }
 
             initTelnetNegotiation() {
@@ -1490,7 +1528,7 @@
                         break;
                     case TELNET.GMCP:
                         this.sendTelnetCommand(TELNET.WILL, TELNET.GMCP);
-                        this.initGMCP();
+                        this.ensureGMCPInit();
                         break;
                     default:
                         this.sendTelnetCommand(TELNET.WONT, option);
@@ -1503,11 +1541,17 @@
 
             handleTelnetWill(option) {
                 switch (option) {
+                    case TELNET.GMCP:
+                        // 服务器支持GMCP，客户端确认并初始化（缺少此分支会回DONT导致服务端禁用GMCP）
+                        this.sendTelnetCommand(TELNET.DO, TELNET.GMCP);
+                        this.ensureGMCPInit();
+                        break;
                     case TELNET.SUPPRESS_GO_AHEAD:
                         this.sendTelnetCommand(TELNET.DO, TELNET.SUPPRESS_GO_AHEAD);
                         break;
                     case TELNET.ECHO:
-                        this.sendTelnetCommand(TELNET.DO, TELNET.ECHO);
+                        // 拒绝服务端回显，由客户端本地回显（服务端WebSocket驱动实际不回显）
+                        this.sendTelnetCommand(TELNET.DONT, TELNET.ECHO);
                         break;
                     case TELNET.MSP:
                         // 服务器支持MSP，客户端确认
@@ -1571,12 +1615,23 @@
                 this.sendSubnegotiation(TELNET.NAWS, bytes);
             }
 
+            // GMCP 初始化只执行一次（服务端 WILL GMCP 和 DO GMCP 都会触发）
+            ensureGMCPInit() {
+                if (this._gmcpInitSent) return;
+                this._gmcpInitSent = true;
+                this.initGMCP();
+            }
+
             initGMCP() {
                 this.sendGMCP('Client.GUI', {
                     version: '1.0.0',
                     type: 'websocket',
                     client: 'FluffOS-WebClient'
                 });
+
+                // 请求服务端推送角色状态和房间信息
+                this.sendGMCP('Char.Vitals.Get', {});
+                this.sendGMCP('Room.Info.Get', {});
 
                 this.sendWindowSize();
             }
@@ -1591,7 +1646,6 @@
             handleGMCPData(data) {
                 try {
                     const text = new TextDecoder().decode(Uint8Array.from(data));
-                    console.log('📡 子协商 GMCP:', text);
 
                     const spaceIndex = text.indexOf(' ');
                     const module = spaceIndex > -1 ? text.substring(0, spaceIndex) : text;
@@ -1642,6 +1696,24 @@
             }
 
             appendMessage(message, className = '') {
+                // 检测登录完成：进入游戏后自动 look 的房间描述是可靠信号
+                // 避免在登录界面误发 hp 等游戏指令
+                if (!this._loginDone && /这里明显的出口是|这里唯一的出口是|这里没有任何明显的出路/.test(message)) {
+                    this._loginDone = true;
+                    if (!this._vitalsReceived && !this._hpFallbackSent) {
+                        this._hpFallbackSent = true;
+                        setTimeout(() => {
+                            if (this.connected && !this._vitalsReceived) {
+                                console.warn('GMCP未生效，发送hp作为兑底');
+                                this.sendCommand('hp\n');
+                            }
+                        }, 1500);
+                    }
+                }
+
+                // 解析 hp 命令输出，更新状态栏（GMCP 的可靠补充）
+                this.parseHpOutput(message);
+
                 const div = document.createElement('div');
                 div.className = 'message ' + className;
                 const html = this.parseANSI(message);
@@ -1737,10 +1809,11 @@
             handleSendCommand() {
                 const command = this.commandInput.value;
 
-                // ASCII 模式本地回显 (Telnet 模式由服务端回显)
-                if (this.protocolType === 'ascii' && command.trim() && this.connected) {
+                // 本地回显（ASCII 和 Telnet 模式均由客户端回显）
+                if (command.trim() && this.connected) {
                     if (this._expectPassword) {
                         this.appendMessage('> ***', 'system');
+                        this._expectPassword = false; // 密码已发送，重置标记
                     } else {
                         this.appendMessage('> ' + command);
                     }
