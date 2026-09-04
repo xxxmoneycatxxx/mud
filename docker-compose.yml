@@ -1,0 +1,51 @@
+###############################################################################
+# FluffOS MUD Docker Compose 配置
+#
+# 启动:     docker compose up -d
+# 查看日志: docker compose logs -f
+# 停止:     docker compose down
+# 重建镜像: docker compose up -d --build
+#
+# 开发模式 (挂载源码热更新):
+#   docker compose --profile dev up
+###############################################################################
+
+services:
+  # ---- 生产模式 ----
+  mud:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fluffos-mud
+    ports:
+      - "5566:5566"   # Telnet
+      - "6666:6666"   # Telnet
+      - "8888:8888"   # WebSocket
+    volumes:
+      - .:/mud:rw
+    environment:
+      - TZ=Asia/Shanghai
+      - LANG=zh_CN.UTF-8
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # ---- 开发模式 (调试模式启动) ----
+  mud-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fluffos-mud-dev
+    profiles: ["dev"]
+    ports:
+      - "5566:5566"
+      - "6666:6666"
+      - "8888:8888"
+    volumes:
+      - .:/mud:rw
+    environment:
+      - TZ=Asia/Shanghai
+      - LANG=zh_CN.UTF-8
+    command: ["config.cfg", "-d"]
+    stdin_open: true
+    tty: true
