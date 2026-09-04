@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MUD游戏客户端 - FluffOS</title>
+    <title>WEB MUD CLIENT - FluffOS</title>
     <style>
         * {
             margin: 0;
@@ -309,6 +309,104 @@
             opacity: 0.7;
         }
 
+        /* ===== 状态栏 ===== */
+        .status-bar {
+            display: none;
+            background: linear-gradient(180deg, #0d1a0d 0%, #0a120a 100%);
+            border-bottom: 1px solid #0f0;
+            padding: 6px 15px;
+            font-size: 11px;
+            color: #ccc;
+        }
+        .status-bar.visible { display: block; }
+        .stat-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+            flex-wrap: wrap;
+        }
+        .stat-label {
+            min-width: 32px;
+            color: #888;
+            text-align: right;
+        }
+        .stat-bar-bg {
+            flex: 1;
+            max-width: 120px;
+            height: 10px;
+            background: #222;
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+        }
+        .stat-bar-fill {
+            height: 100%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+            border-radius: 2px;
+        }
+        .stat-value {
+            min-width: 60px;
+            font-size: 10px;
+            color: #aaa;
+        }
+        .room-info-bar {
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px solid #1a2a1a;
+            color: #0f0;
+            font-size: 11px;
+        }
+        .room-exits {
+            color: #888;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+
+        /* ===== 快捷命令栏 ===== */
+        .quick-commands {
+            display: none;
+            background: linear-gradient(90deg, #111 0%, #0a0a0a 100%);
+            border-top: 1px solid #333;
+            padding: 6px 15px;
+            gap: 4px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .quick-commands.visible { display: flex; }
+        .qc-btn {
+            background: #1a1a1a;
+            color: #0f0;
+            border: 1px solid #333;
+            border-radius: 3px;
+            padding: 3px 10px;
+            cursor: pointer;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .qc-btn:hover {
+            background: #0f0;
+            color: #000;
+            border-color: #0f0;
+        }
+        .qc-btn.dir {
+            background: #1a2a1a;
+            border-color: #0a0;
+            min-width: 28px;
+            text-align: center;
+        }
+        .qc-btn.dir:hover {
+            background: #0a0;
+            color: #000;
+        }
+        .qc-separator {
+            width: 1px;
+            height: 20px;
+            background: #333;
+            margin: 0 4px;
+        }
+
         @media (max-width: 768px) {
             body {
                 font-size: 12px;
@@ -335,7 +433,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>🎮 MUD游戏客户端</h1>
+        <h1>WEB MUD CLIENT</h1>
     </div>
 
     <div class="status-container">
@@ -343,6 +441,41 @@
             <div class="status-indicator"></div>
             <span>等待连接配置...</span>
         </div>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="status-bar" id="statusBar">
+        <div class="stat-row">
+            <span class="stat-label">气血</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" id="hpBar"></div></div>
+            <span class="stat-value" id="hpVal">--/--</span>
+            <span class="stat-label">精</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" id="jingBar"></div></div>
+            <span class="stat-value" id="jingVal">--/--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">精力</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" id="jingliBar"></div></div>
+            <span class="stat-value" id="jingliVal">--/--</span>
+            <span class="stat-label">内力</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" id="neiliBar"></div></div>
+            <span class="stat-value" id="neiliVal">--/--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">食物</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" id="foodBar"></div></div>
+            <span class="stat-value" id="foodVal">--/--</span>
+            <span class="stat-label">水</span>
+            <div class="stat-bar-bg"><div class="stat-bar-fill" id="waterBar"></div></div>
+            <span class="stat-value" id="waterVal">--/--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">经验</span>
+            <span class="stat-value" id="expVal" style="min-width:auto;color:#ffd93d;">--</span>
+            <span class="stat-label">潜能</span>
+            <span class="stat-value" id="potVal" style="min-width:auto;color:#ff6b6b;">--</span>
+        </div>
+        <div class="room-info-bar" id="roomInfoBar">房间: --</div>
     </div>
 
     <div class="connection-panel" id="connectionPanel">
@@ -394,6 +527,9 @@
         </div>
         <button class="send-btn" id="sendBtn" disabled>发送</button>
     </div>
+
+    <!-- 快捷命令栏 -->
+    <div class="quick-commands" id="quickCommands"></div>
 
     <script>
         // Telnet协议常量
@@ -771,9 +907,61 @@
             init() {
                 this.retryCount = 0;
                 this.maxRetries = 3;
+                // 从 localStorage 恢复命令历史
+                try {
+                    const saved = localStorage.getItem('mud_command_history');
+                    if (saved) this.history = JSON.parse(saved);
+                } catch (e) { /* 解析失败则使用空历史 */ }
                 this.setupConnectionUI();
                 this.setupEventListeners();
                 this.setupTerminalFeatures();
+                this.setupQuickCommands();
+            }
+
+            setupQuickCommands() {
+                const qcContainer = document.getElementById('quickCommands');
+                if (!qcContainer) return;
+
+                const dirs = [
+                    { label: 'N', cmd: 'north' },
+                    { label: 'S', cmd: 'south' },
+                    { label: 'E', cmd: 'east' },
+                    { label: 'W', cmd: 'west' },
+                    { label: 'U', cmd: 'up' },
+                    { label: 'D', cmd: 'down' },
+                ];
+                const actions = [
+                    { label: 'look', cmd: 'look' },
+                    { label: 'score', cmd: 'score' },
+                    { label: 'i', cmd: 'i' },
+                    { label: 'hp', cmd: 'hp' },
+                ];
+
+                dirs.forEach(d => {
+                    const btn = document.createElement('button');
+                    btn.className = 'qc-btn dir';
+                    btn.textContent = d.label;
+                    btn.addEventListener('click', () => {
+                        this.commandInput.value = d.cmd;
+                        this.handleSendCommand();
+                    });
+                    qcContainer.appendChild(btn);
+                });
+
+                const sep = document.createElement('div');
+                sep.className = 'qc-separator';
+                qcContainer.appendChild(sep);
+
+                actions.forEach(a => {
+                    const btn = document.createElement('button');
+                    btn.className = 'qc-btn';
+                    btn.textContent = a.label;
+                    btn.addEventListener('click', () => {
+                        this.commandInput.value = a.cmd;
+                        this.handleSendCommand();
+                    });
+                    qcContainer.appendChild(btn);
+                });
             }
 
             setupConnectionUI() {
@@ -786,8 +974,15 @@
 
                 this.setDefaultConfig();
 
-                this.connectBtn.addEventListener('click', () => this.handleConnect());
+                this.connectBtn.addEventListener('click', () => { this.handleConnect(); });
                 this.defaultBtn.addEventListener('click', () => this.setDefaultConfig());
+
+                // 一键本地连接按钮
+                const localBtn = document.createElement('button');
+                localBtn.className = 'connect-btn secondary';
+                localBtn.textContent = '本地连接';
+                localBtn.addEventListener('click', () => { this.setLocalConfig(); this.handleConnect(); });
+                this.connectBtn.parentNode.insertBefore(localBtn, this.connectBtn.nextSibling);
 
                 [this.addressInput, this.portInput].forEach(input => {
                     input.addEventListener('keydown', (e) => {
@@ -839,6 +1034,12 @@
                 // 清空终端缓冲区，避免残留消息
                 this.terminal.innerHTML = '';
 
+                // 隐藏状态栏和快捷命令
+                const statusBar = document.getElementById('statusBar');
+                const quickCmds = document.getElementById('quickCommands');
+                if (statusBar) statusBar.classList.remove('visible');
+                if (quickCmds) quickCmds.classList.remove('visible');
+
                 this.connected = false;
                 console.log('🔧 连接已强制清理');
             }
@@ -874,10 +1075,48 @@
             }
 
             setDefaultConfig() {
-                this.protocolSelect.value = 'wss://';
-                this.addressInput.value = 'mud.ren';
-                this.portInput.value = '8888';
-                this.subprotocolSelect.value = 'ascii';
+                // 从 localStorage 恢复上次配置
+                const saved = localStorage.getItem('mud_client_config');
+                if (saved) {
+                    try {
+                        const cfg = JSON.parse(saved);
+                        this.protocolSelect.value = cfg.protocol || 'wss://';
+                        this.addressInput.value = cfg.address || 'mud.ren';
+                        this.portInput.value = cfg.port || '8888';
+                        this.subprotocolSelect.value = cfg.subprotocol || 'ascii';
+                        return;
+                    } catch (e) { /* 解析失败则使用默认值 */ }
+                }
+
+                // 检测本地环境，自动切换为本地配置
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]') {
+                    this.protocolSelect.value = 'ws://';
+                    this.addressInput.value = 'localhost';
+                    this.portInput.value = '8000';
+                    this.subprotocolSelect.value = 'telnet';
+                } else {
+                    this.protocolSelect.value = 'wss://';
+                    this.addressInput.value = 'mud.ren';
+                    this.portInput.value = '8888';
+                    this.subprotocolSelect.value = 'telnet';
+                }
+            }
+
+            saveConfig() {
+                localStorage.setItem('mud_client_config', JSON.stringify({
+                    protocol: this.protocolSelect.value,
+                    address: this.addressInput.value,
+                    port: this.portInput.value,
+                    subprotocol: this.subprotocolSelect.value
+                }));
+            }
+
+            setLocalConfig() {
+                this.protocolSelect.value = 'ws://';
+                this.addressInput.value = 'localhost';
+                this.portInput.value = '8000';
+                this.subprotocolSelect.value = 'telnet';
+                this.saveConfig();
             }
 
             handleConnect() {
@@ -900,6 +1139,7 @@
                 const wsUrl = `${protocol}${address}:${port}`;
                 const protocols = subprotocol ? [subprotocol] : [];
 
+                this.saveConfig();
                 this.connect(wsUrl, protocols);
             }
 
@@ -928,6 +1168,12 @@
 
                         this.connectionPanel.style.display = 'none';
                         this.terminal.style.display = 'block';
+
+                        // 显示状态栏和快捷命令
+                        const statusBar = document.getElementById('statusBar');
+                        const quickCmds = document.getElementById('quickCommands');
+                        if (statusBar) statusBar.classList.add('visible');
+                        if (quickCmds) quickCmds.classList.add('visible');
 
                         // 启动心跳检测
                         this.startHeartbeat();
@@ -963,6 +1209,12 @@
 
                         this.connectionPanel.style.display = 'block';
                         this.terminal.style.display = 'none';
+
+                        // 隐藏状态栏和快捷命令
+                        const statusBar = document.getElementById('statusBar');
+                        const quickCmds = document.getElementById('quickCommands');
+                        if (statusBar) statusBar.classList.remove('visible');
+                        if (quickCmds) quickCmds.classList.remove('visible');
 
                         this.appendMessage('🔌 连接已断开', 'error');
 
@@ -1022,32 +1274,37 @@
             }
 
             updateCharacterStatus(vitals) {
-                // 这里可以更新角色状态显示，例如创建状态栏
-                // 示例：更新一个假设的状态栏元素
-                console.log('角色状态更新:', vitals);
-
-                // 实际实现时，可以更新HTML元素
-                // const statusBar = document.getElementById('status-bar');
-                // if (statusBar) {
-                //     statusBar.innerHTML = `
-                //         <div>HP: ${vitals.hp}/${vitals.max_hp}</div>
-                //         <div>MP: ${vitals.mp}/${vitals.max_mp}</div>
-                //     `;
-                // }
+                const setBar = (barId, valId, cur, max) => {
+                    const bar = document.getElementById(barId);
+                    const val = document.getElementById(valId);
+                    if (!bar || !val) return;
+                    const pct = max > 0 ? Math.min(100, (cur / max) * 100) : 0;
+                    bar.style.width = pct + '%';
+                    bar.style.backgroundColor = pct < 30 ? '#e74c3c' : pct < 60 ? '#f39c12' : '#2ecc71';
+                    val.textContent = cur + '/' + max;
+                };
+                setBar('hpBar', 'hpVal', vitals.hp || 0, vitals.max_hp || 0);
+                setBar('jingBar', 'jingVal', vitals.jing || 0, vitals.max_jing || 0);
+                setBar('jingliBar', 'jingliVal', vitals.jingli || 0, vitals.max_jingli || 0);
+                setBar('neiliBar', 'neiliVal', vitals.neili || 0, vitals.max_neili || 0);
+                setBar('foodBar', 'foodVal', vitals.food || 0, vitals.max_food || 0);
+                setBar('waterBar', 'waterVal', vitals.water || 0, vitals.max_water || 0);
+                const expEl = document.getElementById('expVal');
+                if (expEl) expEl.textContent = (vitals.exp || 0).toLocaleString();
+                const potEl = document.getElementById('potVal');
+                if (potEl) potEl.textContent = vitals.pot || 0;
+                document.getElementById('statusBar').classList.add('visible');
             }
 
             updateRoomInfo(roomInfo) {
-                // 这里可以更新房间信息显示
-                console.log('房间信息更新:', roomInfo);
-
-                // 实际实现时，可以更新房间名称、出口等信息
-                // const roomDisplay = document.getElementById('room-info');
-                // if (roomDisplay) {
-                //     roomDisplay.innerHTML = `
-                //         <div class="room-name">${roomInfo.name}</div>
-                //         <div class="room-exits">出口: ${roomInfo.exits.join(', ')}</div>
-                //     `;
-                // }
+                const roomBar = document.getElementById('roomInfoBar');
+                if (!roomBar) return;
+                let html = '房间: <strong>' + (roomInfo.name || '未知') + '</strong>';
+                if (roomInfo.area) html += ' [' + roomInfo.area + ']';
+                if (roomInfo.exits && roomInfo.exits.length > 0) {
+                    html += '<span class="room-exits">出口: ' + roomInfo.exits.join(', ') + '</span>';
+                }
+                roomBar.innerHTML = html;
             }
 
             initTelnetNegotiation() {
@@ -1364,6 +1621,12 @@
                 let openSpans = 0;
 
                 result = result.replace(/\x1b\[([0-9;]*)m/g, (match, codes) => {
+                    // 空码 \x1b[m 等同于重置
+                    if (!codes || codes === '') {
+                        const closeTags = '</span>'.repeat(openSpans);
+                        openSpans = 0;
+                        return closeTags;
+                    }
                     const codeArray = codes.split(';').map(Number);
                     let styles = [];
 
@@ -1374,6 +1637,10 @@
                                 openSpans = 0;
                                 return closeTags;
                             case 1: styles.push('font-weight:bold'); break;
+                            case 2: styles.push('opacity:0.6'); break;
+                            case 3: styles.push('font-style:italic'); break;
+                            case 4: styles.push('text-decoration:underline'); break;
+                            case 5: styles.push('animation:blink 1s infinite'); break;
                             case 31: styles.push('color:red'); break;
                             case 32: styles.push('color:green'); break;
                             case 33: styles.push('color:yellow'); break;
@@ -1381,10 +1648,28 @@
                             case 35: styles.push('color:magenta'); break;
                             case 36: styles.push('color:cyan'); break;
                             case 37: styles.push('color:white'); break;
+                            case 41: styles.push('background-color:red'); break;
+                            case 42: styles.push('background-color:green'); break;
+                            case 43: styles.push('background-color:yellow'); break;
+                            case 44: styles.push('background-color:blue'); break;
+                            case 45: styles.push('background-color:magenta'); break;
+                            case 46: styles.push('background-color:cyan'); break;
+                            case 47: styles.push('background-color:white'); break;
                             case 91: styles.push('color:lightcoral'); break;
                             case 92: styles.push('color:lightgreen'); break;
                             case 93: styles.push('color:gold'); break;
                             case 94: styles.push('color:lightblue'); break;
+                            case 95: styles.push('color:violet'); break;
+                            case 96: styles.push('color:aqua'); break;
+                            case 97: styles.push('color:#fff'); break;
+                            case 100: styles.push('background-color:#555'); break;
+                            case 101: styles.push('background-color:#e74c3c'); break;
+                            case 102: styles.push('background-color:#2ecc71'); break;
+                            case 103: styles.push('background-color:#f1c40f'); break;
+                            case 104: styles.push('background-color:#3498db'); break;
+                            case 105: styles.push('background-color:#9b59b6'); break;
+                            case 106: styles.push('background-color:#1abc9c'); break;
+                            case 107: styles.push('background-color:#ecf0f1'); break;
                         }
                     }
 
@@ -1457,6 +1742,10 @@
                     if (this.history.length > 100) {
                         this.history.shift();
                     }
+                    // 持久化到 localStorage
+                    try {
+                        localStorage.setItem('mud_command_history', JSON.stringify(this.history));
+                    } catch (e) { /* 存储空间不足时忽略 */ }
                 }
             }
 
