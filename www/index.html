@@ -1074,7 +1074,7 @@
             }
 
             // ===== 帮助浏览模态框（导航型：选中主题即在终端执行 help <主题>）=====
-            // 分类树预解析自服务端 /help/topics；原型内嵌，日后可在此改为 GMCP Help.Topics 动态拉取
+            // 分类树优先由服务端 GMCP Help.Topics 动态下发（见 applyHelpTopics）；下方内嵌数据为 GMCP 未就绪时的回退快照
             getHelpTree() {
                 if (!this._helpTree) {
                     this._helpTree = [
@@ -1087,6 +1087,48 @@
                     ];
                 }
                 return this._helpTree;
+            }
+
+            // 应用服务端 GMCP Help.Topics 推送：names→链接白名单，index(/help/topics 原文)→分类树
+            applyHelpTopics(data) {
+                if (!data) return;
+                if (Array.isArray(data.names) && data.names.length) {
+                    this._helpTopicSet = new Set(data.names);
+                }
+                if (typeof data.index === 'string' && data.index) {
+                    const tree = this.parseHelpTopics(data.index);
+                    if (tree.length) this._helpTree = tree;
+                }
+                // 若模态框正开着，实时刷新
+                if (this.helpOverlay && this.helpOverlay.classList.contains('visible')) {
+                    this.renderHelpCats();
+                    this.renderHelpTopics();
+                }
+            }
+
+            // 解析 /help/topics 原文（含 $XXX$ 彩色标记与 ┃〖〗【】 边框）为分类树 [{cat, topics:[[name,desc]]}]
+            parseHelpTopics(text) {
+                const tree = [];
+                let cur = null;
+                const pairRe = /〖\s*([A-Za-z0-9_.\-]+)\s*〗\s*([^〖〗]*)/g;
+                text.split('\n').forEach(raw => {
+                    const line = raw.replace(/\$[A-Z_]+\$/g, '').replace(/[┃│|\r]/g, ' ');
+                    const cat = line.match(/【([^】]+)】/);
+                    if (cat && line.indexOf('〖') === -1) {
+                        cur = { cat: cat[1].trim(), topics: [] };
+                        tree.push(cur);
+                        return;
+                    }
+                    if (cur && line.indexOf('〖') !== -1) {
+                        let m;
+                        pairRe.lastIndex = 0;
+                        while ((m = pairRe.exec(line)) !== null) {
+                            cur.topics.push([m[1].trim(), m[2].trim()]);
+                        }
+                    }
+                });
+                // 过滤无主题的空分类（如标题行“【本游戏的说明文件】”）
+                return tree.filter(c => c.topics.length > 0);
             }
 
             setupHelpModal() {
@@ -1541,6 +1583,9 @@
                         break;
                     case 'Room.Info':
                         this.updateRoomInfo(data.data);
+                        break;
+                    case 'Help.Topics':
+                        this.applyHelpTopics(data.data);
                         break;
                     case 'Client.GUI':
                         break;
@@ -2048,8 +2093,8 @@
                 return result;
             }
 
-            // 已知帮助主题白名单：提取自 /help 文档的交叉引用目标（已剔除 me/xxxx 等非主题噪声）
-            // 供 linkifyHelpRefs 校验，避免聊天里的 "help me" 等英文短语被误渲染；日后可由 GMCP Help.Topics 动态下发
+            // 已知帮助主题白名单：供 linkifyHelpRefs 校验，避免聊天里的 "help me" 等英文短语被误渲染
+            // 运行时由服务端 GMCP Help.Topics 的 names（/help 文件 + 玩家命令）覆盖（见 applyHelpTopics）；下方为回退快照
             getHelpTopicSet() {
                 if (!this._helpTopicSet) {
                     this._helpTopicSet = new Set([

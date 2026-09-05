@@ -147,6 +147,48 @@ private void send_room_info()
     }
 }
 
+// 构建并发送帮助主题索引：/help/topics 原文 + 有效主题名（/help 文档 + 玩家命令）
+// 客户端据此动态填充帮助模态框分类树与交叉引用链接白名单（见 www/index.html applyHelpTopics）
+private void send_help_topics()
+{
+    object me = this_object();
+    string index, verb;
+    string *names;
+    string *files;
+    string *p;
+    int i, j;
+
+    if (!has_gmcp())
+    {
+        log_gmcp("send_help_topics: has_gmcp() = false, skipped");
+        return;
+    }
+
+    index = read_file("/help/topics");
+
+    // 有效主题名 = /help 目录文档名 + 玩家可用命令名（对应 cmds/usr/help.c 的解析顺序）
+    names = ({});
+
+    files = get_dir("/help/");
+    if (files)
+        for (i = 0; i < sizeof(files); i++)
+            names += ({ files[i] });
+
+    p = me->query_path();
+    if (p)
+        for (i = 0; i < sizeof(p); i++)
+        {
+            files = get_dir(p[i]);
+            if (!files)
+                continue;
+            for (j = 0; j < sizeof(files); j++)
+                if (sscanf(files[j], "%s.c", verb))
+                    names += ({ verb });
+        }
+
+    sendGMCP((["index": index || "", "names": names]), "Help", "Topics");
+}
+
 protected void init_gmcp()
 {
     if (!has_gmcp())
@@ -163,9 +205,10 @@ protected void init_gmcp()
         sendGMCP((["url":env("Map")]), "Client", "Map");
     }
 
-    // 登录完成后延迟推送角色状态和房间信息（等待GMCP通道就绪）
+    // 登录完成后延迟推送角色状态、房间信息与帮助主题索引（等待GMCP通道就绪）
     call_out("send_char_vitals", 1);
     call_out("send_room_info", 1);
+    call_out("send_help_topics", 1);
 
     if (wizardp(this_player()))
     {
@@ -193,5 +236,9 @@ void gmcp(string req)
     else if (module == "Room.Info.Get" || module == "Room.Info")
     {
         send_room_info();
+    }
+    else if (module == "Help.Topics.Get" || module == "Help.Topics")
+    {
+        send_help_topics();
     }
 }
