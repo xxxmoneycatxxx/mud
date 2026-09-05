@@ -40,100 +40,6 @@
         .status.disconnected { color: #f00; }
         .status.connecting { color: #ff0; }
 
-.connection-panel {
-            background: linear-gradient(135deg, #111 0%, #1a1a1a 100%);
-            border: 1px solid #333;
-            border-radius: 8px;
-            margin: 15px;
-            padding: 20px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-
-        .panel-header {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .panel-header h3 {
-            color: #0f0;
-            font-size: 16px;
-            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
-        }
-
-        .panel-content {
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 15px;
-            align-items: center;
-        }
-
-        .form-group {
-            display: contents;
-        }
-
-        .form-group label {
-            color: #ccc;
-            font-size: 12px;
-            text-align: right;
-            padding-right: 10px;
-        }
-
-        .form-group input,
-        .form-group select {
-            background-color: #222;
-            color: #0f0;
-            border: 1px solid #444;
-            border-radius: 4px;
-            padding: 8px 12px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
-            font-size: 13px;
-            outline: none;
-            transition: all 0.3s ease;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus {
-            border-color: #0f0;
-            box-shadow: 0 0 8px rgba(0, 255, 0, 0.3);
-            background-color: #333;
-        }
-
-        .panel-actions {
-            grid-column: 1 / -1;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 15px;
-        }
-
-        .connect-btn {
-            background: linear-gradient(135deg, #0f0 0%, #0a0 100%);
-            color: #000;
-            border: none;
-            border-radius: 4px;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-family: 'Consolas', 'Monaco', 'Courier New', 'Fira Code', monospace;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 5px rgba(0, 255, 0, 0.3);
-        }
-
-        .connect-btn:hover {
-            background: linear-gradient(135deg, #0a0 0%, #0f0 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 255, 0, 0.4);
-        }
-
-        .connect-btn.secondary {
-            background: linear-gradient(135deg, #333 0%, #555 100%);
-            color: #ccc;
-        }
-
-        .connect-btn.secondary:hover {
-            background: linear-gradient(135deg, #555 0%, #777 100%);
-        }
-
         .terminal {
             flex: 1;
             padding: 15px;
@@ -146,7 +52,7 @@
             background-image:
                 linear-gradient(rgba(0, 255, 0, 0.03) 1px, transparent 1px);
             background-size: 100% 20px;
-            display: none; /* 初始隐藏 */
+            display: block;
         }
 
         .terminal::-webkit-scrollbar {
@@ -528,37 +434,7 @@
         <div class="room-info-bar" id="roomInfoBar">房间: --</div>
     </div>
 
-    <div class="connection-panel" id="connectionPanel">
-        <div class="panel-header">
-            <h3>🔌 连接配置</h3>
-        </div>
-        <div class="panel-content">
-            <div class="form-group">
-                <label>协议:</label>
-                <select id="protocolSelect">
-                    <option value="wss://">wss:// (安全WebSocket)</option>
-                    <option value="ws://">ws:// (WebSocket)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>地址:</label>
-                <input type="text" id="addressInput" placeholder="mud.ren" value="mud.ren">
-            </div>
-            <div class="form-group">
-                <label>端口:</label>
-                <input type="number" id="portInput" placeholder="8888" value="8888" min="1" max="65535">
-            </div>
-            <div class="panel-actions">
-                <button class="connect-btn" id="connectBtn">连接</button>
-                <button class="connect-btn secondary" id="defaultBtn">默认配置</button>
-            </div>
-            <div style="text-align: center; margin-top: 15px; font-size: 11px; color: #666; width: 100%; grid-column: 1 / -1;">
-                Powered by <a href="https://bbs.mud.ren" target="_blank" style="color: #0f0; text-decoration: none;">mud.ren</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="terminal" id="terminal">欢迎使用MUD游戏Web客户端！正在连接到MUD……</div>
+    <div class="terminal" id="terminal">正在连接到 MUD……</div>
 
     <div class="input-area">
         <div class="input-container">
@@ -574,7 +450,7 @@
         <div class="quick-commands" id="quickCommands"></div>
         <div class="status-container">
             <div class="status connecting" id="status">
-                <span>等待连接配置...</span>
+                <span>正在连接...</span>
             </div>
         </div>
     </div>
@@ -966,7 +842,6 @@
                 this.commandInput = document.getElementById('commandInput');
                 this.sendBtn = document.getElementById('sendBtn');
                 this.status = document.getElementById('status');
-                this.connectionPanel = document.getElementById('connectionPanel');
                 this.history = [];
                 this.historyIndex = -1;
                 this.currentInput = '';
@@ -1016,13 +891,14 @@
                     const saved = localStorage.getItem('mud_command_history');
                     if (saved) this.history = JSON.parse(saved);
                 } catch (e) { /* 解析失败则使用空历史 */ }
-                this.setupConnectionUI();
                 this.setupEventListeners();
                 this.setupTerminalFeatures();
                 this.setupQuickCommands();
                 this.setupRoomExits();
                 this.setupTerminalExits();
                 this.setupHelpModal();
+                // 高度定制客户端：无需首屏配置，加载后直接自动连接
+                this.connect(this.resolveWsUrl());
             }
 
             setupQuickCommands() {
@@ -1330,30 +1206,24 @@
                 return map[dir] || dir;
             }
 
-            setupConnectionUI() {
-                this.protocolSelect = document.getElementById('protocolSelect');
-                this.addressInput = document.getElementById('addressInput');
-                this.portInput = document.getElementById('portInput');
-                this.connectBtn = document.getElementById('connectBtn');
-                this.defaultBtn = document.getElementById('defaultBtn');
+            // 计算 WebSocket 连接地址：优先 localStorage 覆盖（调试用），否则按当前页面来源自动推导
+            // web 客户端与 MUD 同源部署，故直接连回提供本页面的主机（https 页面用 wss，否则 ws）
+            resolveWsUrl() {
+                try {
+                    const saved = localStorage.getItem('mud_client_config');
+                    if (saved) {
+                        const cfg = JSON.parse(saved);
+                        if (cfg && cfg.address) {
+                            const protocol = cfg.protocol || (location.protocol === 'https:' ? 'wss://' : 'ws://');
+                            const port = cfg.port || '8888';
+                            return `${protocol}${cfg.address}:${port}`;
+                        }
+                    }
+                } catch (e) { /* 无效配置则回退到自动推导 */ }
 
-                this.setDefaultConfig();
-
-                this.connectBtn.addEventListener('click', () => { this.handleConnect(); });
-                this.defaultBtn.addEventListener('click', () => this.setDefaultConfig());
-
-                // 一键本地连接按钮
-                const localBtn = document.createElement('button');
-                localBtn.className = 'connect-btn secondary';
-                localBtn.textContent = '本地连接';
-                localBtn.addEventListener('click', () => { this.setLocalConfig(); this.handleConnect(); });
-                this.connectBtn.parentNode.insertBefore(localBtn, this.connectBtn.nextSibling);
-
-                [this.addressInput, this.portInput].forEach(input => {
-                    input.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter') this.handleConnect();
-                    });
-                });
+                const secure = location.protocol === 'https:';
+                const host = location.hostname || 'localhost';
+                return `${secure ? 'wss://' : 'ws://'}${host}:8888`;
             }
 
             setupTerminalFeatures() {
@@ -1450,67 +1320,6 @@
                 }
             }
 
-            setDefaultConfig() {
-                // 从 localStorage 恢复上次配置
-                const saved = localStorage.getItem('mud_client_config');
-                if (saved) {
-                    try {
-                        const cfg = JSON.parse(saved);
-                        this.protocolSelect.value = cfg.protocol || 'wss://';
-                        this.addressInput.value = cfg.address || 'mud.ren';
-                        this.portInput.value = cfg.port || '8888';
-                        return;
-                    } catch (e) { /* 解析失败则使用默认值 */ }
-                }
-
-                // 检测本地环境，自动切换为本地配置
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '[::1]') {
-                    this.protocolSelect.value = 'ws://';
-                    this.addressInput.value = 'localhost';
-                    this.portInput.value = '8888';
-                } else {
-                    this.protocolSelect.value = 'wss://';
-                    this.addressInput.value = 'mud.ren';
-                    this.portInput.value = '8888';
-                }
-            }
-
-            saveConfig() {
-                localStorage.setItem('mud_client_config', JSON.stringify({
-                    protocol: this.protocolSelect.value,
-                    address: this.addressInput.value,
-                    port: this.portInput.value
-                }));
-            }
-
-            setLocalConfig() {
-                this.protocolSelect.value = 'ws://';
-                this.addressInput.value = 'localhost';
-                this.portInput.value = '8888';
-                this.saveConfig();
-            }
-
-            handleConnect() {
-                const protocol = this.protocolSelect.value;
-                const address = this.addressInput.value.trim();
-                const port = this.portInput.value;
-
-                if (!address) {
-                    alert('请输入服务器地址');
-                    return;
-                }
-
-                if (!port || port < 1 || port > 65535) {
-                    alert('请输入有效的端口号（1-65535）');
-                    return;
-                }
-
-                const wsUrl = `${protocol}${address}:${port}`;
-
-                this.saveConfig();
-                this.connect(wsUrl);
-            }
-
             connect(wsUrl) {
                 try {
                     // 先强制清理之前的连接
@@ -1536,9 +1345,6 @@
                         this.commandInput.disabled = false;
                         this.sendBtn.disabled = false;
 
-                        this.connectionPanel.style.display = 'none';
-                        this.terminal.style.display = 'block';
-
                         // 显示状态栏和快捷命令
                         const statusBar = document.getElementById('statusBar');
                         const quickCmds = document.getElementById('quickCommands');
@@ -1548,8 +1354,7 @@
                         // 启动心跳检测
                         this.startHeartbeat();
 
-                        this.appendMessage('✅ Telnet协议已激活，正在协商...', 'system');
-                        // 延迟初始化Telnet协商，确保连接稳定
+                        // 延迟初始化 Telnet 协商，确保连接稳定（协商过程不再打扰用户，仅出错时提示）
                         this.cleanupTimeout = setTimeout(() => {
                             this.initTelnetNegotiation();
                             // 连接 GMCPHandler 回调，将数据流转到 UI 更新
@@ -1576,9 +1381,6 @@
                         this.commandInput.disabled = true;
                         this.sendBtn.disabled = true;
 
-                        this.connectionPanel.style.display = 'block';
-                        this.terminal.style.display = 'none';
-
                         // 隐藏状态栏和快捷命令
                         const statusBar = document.getElementById('statusBar');
                         const quickCmds = document.getElementById('quickCommands');
@@ -1596,8 +1398,7 @@
                             this.retryCount++;
                             setTimeout(() => {
                                 this.appendMessage(`🔄 正在重连...(${this.retryCount}/${this.maxRetries})`, 'system');
-                                const wsUrl = `${this.protocolSelect.value}${this.addressInput.value}:${this.portInput.value}`;
-                                this.connect(wsUrl);
+                                this.connect(this.resolveWsUrl());
                             }, 2000 * this.retryCount);
                         }
                     };
@@ -1751,8 +1552,6 @@
 
                 // 发送窗口大小
                 this.sendWindowSize();
-
-                this.appendMessage('✅ Telnet协商完成', 'system');
             }
 
             handleTelnetData(data) {
