@@ -53,7 +53,7 @@ private void gmcp_enable()
 }
 
 // 构建并发送角色状态
-private void send_char_vitals()
+protected void send_char_vitals()
 {
     object ob = this_object();
 
@@ -113,7 +113,7 @@ void gmcp_vitals_update()
 }
 
 // 构建并发送房间信息
-private void send_room_info()
+protected void send_room_info()
 {
     object ob = environment(this_object());
     if (!ob) return;
@@ -149,7 +149,7 @@ private void send_room_info()
 
 // 构建并发送帮助主题索引：/help/topics 原文 + 有效主题名（/help 文档 + 玩家命令）
 // 客户端据此动态填充帮助模态框分类树与交叉引用链接白名单（见 www/index.html applyHelpTopics）
-private void send_help_topics()
+protected void send_help_topics()
 {
     object me = this_object();
     string index, verb;
@@ -190,7 +190,7 @@ private void send_help_topics()
 }
 
 // 全文搜索帮助文档：遍历 /help/ 所有文件，返回包含关键字的主题名列表
-private void send_help_search(string keyword)
+protected void send_help_search(string keyword)
 {
     string *files;
     string *matches;
@@ -203,8 +203,12 @@ private void send_help_search(string keyword)
         return;
     }
 
+    log_gmcp("send_help_search: keyword=" + keyword);
+
     matches = ({});
     files = get_dir("/help/");
+    log_gmcp("send_help_search: files=" + (files ? sizeof(files) : 0));
+    
     if (files)
         for (i = 0; i < sizeof(files); i++)
         {
@@ -213,6 +217,7 @@ private void send_help_search(string keyword)
                 matches += ({ files[i] });
         }
 
+    log_gmcp("send_help_search: matches=" + sizeof(matches));
     sendGMCP((["matches": matches, "keyword": keyword]), "Help", "Search");
 }
 
