@@ -189,6 +189,33 @@ private void send_help_topics()
     sendGMCP((["index": index || "", "names": names]), "Help", "Topics");
 }
 
+// 全文搜索帮助文档：遍历 /help/ 所有文件，返回包含关键字的主题名列表
+private void send_help_search(string keyword)
+{
+    string *files;
+    string *matches;
+    string content;
+    int i;
+
+    if (!has_gmcp())
+    {
+        log_gmcp("send_help_search: has_gmcp() = false, skipped");
+        return;
+    }
+
+    matches = ({});
+    files = get_dir("/help/");
+    if (files)
+        for (i = 0; i < sizeof(files); i++)
+        {
+            content = read_file("/help/" + files[i]);
+            if (content && strsrch(content, keyword) != -1)
+                matches += ({ files[i] });
+        }
+
+    sendGMCP((["matches": matches, "keyword": keyword]), "Help", "Search");
+}
+
 protected void init_gmcp()
 {
     if (!has_gmcp())
@@ -240,5 +267,15 @@ void gmcp(string req)
     else if (module == "Help.Topics.Get" || module == "Help.Topics")
     {
         send_help_topics();
+    }
+    else if (module == "Help.Search.Get")
+    {
+        mapping payload;
+        if (data && (payload = json_decode(data)) && mapp(payload))
+        {
+            string keyword = payload["keyword"];
+            if (stringp(keyword) && keyword != "")
+                send_help_search(keyword);
+        }
     }
 }

@@ -585,7 +585,7 @@
             <div class="help-titlebar">【 江湖帮助 】</div>
             <div class="help-searchbar">
                 <span class="help-prompt">&gt;</span>
-                <input type="text" id="helpSearch" class="help-search" placeholder="搜索主题或说明…（按 / 聚焦）" autocomplete="off">
+                <input type="text" id="helpSearch" class="help-search" placeholder="搜索帮助文档内容…（按 / 聚焦）" autocomplete="off">
             </div>
             <div class="help-content">
                 <div class="help-cats" id="helpCats"></div>
@@ -1156,6 +1156,7 @@
                     if (!el) return;
                     this._helpCat = parseInt(el.dataset.idx, 10) || 0;
                     this.helpSearch.value = '';
+                    this._helpSearchResults = null;
                     this.renderHelpCats();
                     this.renderHelpTopics();
                 });
@@ -1164,8 +1165,11 @@
                     const el = e.target.closest('.help-topic');
                     if (el) this.helpOpenTopic(el.dataset.topic);
                 });
-                // 搜索框实时过滤
-                this.helpSearch.addEventListener('input', () => this.renderHelpTopics());
+                // 搜索框防抖：300ms 后发送 GMCP 全文检索请求
+                this.helpSearch.addEventListener('input', () => {
+                    clearTimeout(this._helpSearchTimer);
+                    this._helpSearchTimer = setTimeout(() => this.searchHelpTopics(), 300);
+                });
 
                 // 键盘：F1 开关、Esc 关闭、/ 聚焦搜索、↑↓ 选择、Enter 查看
                 document.addEventListener('keydown', (e) => {
@@ -1215,6 +1219,7 @@
             openHelpModal() {
                 if (!this.helpOverlay) return;
                 this.helpSearch.value = '';
+                this._helpSearchResults = null;
                 this.helpFooter.textContent = this._helpFooterDefault;
                 this.helpOverlay.classList.add('visible');
                 this.renderHelpCats();
@@ -1236,19 +1241,33 @@
             }
 
             renderHelpTopics() {
-                const tree = this.getHelpTree();
-                const q = (this.helpSearch.value || '').trim().toLowerCase();
+                const q = (this.helpSearch.value || '').trim();
                 this._helpSel = -1;
-                let list = [];
                 if (q) {
-                    // 跨全部分类搜索主题名与说明
-                    tree.forEach(c => c.topics.forEach(t => {
-                        if (t[0].toLowerCase().indexOf(q) !== -1 || t[1].toLowerCase().indexOf(q) !== -1)
-                            list.push(t);
-                    }));
-                } else if (tree[this._helpCat]) {
-                    list = tree[this._helpCat].topics;
+                    // 全文搜索结果（来自 GMCP Help.Search）
+                    if (this._helpSearchResults) {
+                        if (!this._helpSearchResults.length) {
+                            this.helpTopics.innerHTML = '<div class="help-empty">无匹配主题</div>';
+                            return;
+                        }
+                        const tree = this.getHelpTree();
+                        const descMap = {};
+                        tree.forEach(c => c.topics.forEach(t => descMap[t[0]] = t[1]));
+                        this.helpTopics.innerHTML = this._helpSearchResults.map(topic =>
+                            '<div class="help-topic" data-topic="' + topic + '">' +
+                            '<span class="t-name">〖' + topic + '〗</span>' +
+                            (descMap[topic] ? '<span class="t-desc">' + descMap[topic] + '</span>' : '') +
+                            '</div>'
+                        ).join('');
+                    } else {
+                        // 等待 GMCP 响应
+                        this.helpTopics.innerHTML = '<div class="help-empty">搜索中…</div>';
+                    }
+                    return;
                 }
+                // 无搜索：显示当前分类
+                const tree = this.getHelpTree();
+                let list = tree[this._helpCat] ? tree[this._helpCat].topics : [];
                 if (!list.length) {
                     this.helpTopics.innerHTML = '<div class="help-empty">无匹配主题</div>';
                     return;
@@ -1258,6 +1277,30 @@
                     '<span class="t-name">〖' + t[0] + '〗</span>' +
                     '<span class="t-desc">' + t[1] + '</span></div>'
                 ).join('');
+            }
+
+            searchHelpTopics() {
+                const q = (this.helpSearch.value || '').trim();
+                if (!q) {
+                    this._helpSearchResults = null;
+                    this.renderHelpTopics();
+                    return;
+                }
+                // 发送 GMCP 全文检索请求
+                if (this.connected && this.sendGMCP) {
+                    this.sendGMCP('Help.Search.Get', { keyword: q });
+                }
+                // 显示等待状态
+                this.helpTopics.innerHTML = '<div class="help-empty">搜索中…</div>';
+            }
+
+            applyHelpSearchResults(data) {
+                if (!data || !Array.isArray(data.matches)) return;
+                // 仅当当前搜索关键字与返回匹配时才应用（避免过期响应覆盖）
+                const q = (this.helpSearch.value || '').trim();
+                if (data.keyword !== q) return;
+                this._helpSearchResults = data.matches;
+                this.renderHelpTopics();
             }
 
             helpOpenTopic(topic) {
@@ -1586,6 +1629,9 @@
                         break;
                     case 'Help.Topics':
                         this.applyHelpTopics(data.data);
+                        break;
+                    case 'Help.Search':
+                        this.applyHelpSearchResults(data.data);
                         break;
                     case 'Client.GUI':
                         break;
