@@ -341,6 +341,20 @@
             text-decoration: none;
         }
 
+        /* 文档内交叉引用 help <主题> 可点击链接（琥珀色，区别于绿色出口） */
+        .help-link {
+            color: #ffd93d;
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            text-underline-offset: 2px;
+        }
+        .help-link:hover {
+            color: #ff0;
+            background: #3a3a1a;
+            text-decoration: none;
+        }
+
         /* ===== 底部条：快捷命令 + 连接状态 ===== */
         .bottom-bar {
             display: flex;
@@ -1046,11 +1060,11 @@
                 });
             }
 
-            // 终端 look 输出中的出口链接点击委托（历史消息同样生效）
+            // 终端可点击链接委托：look/l 出口（点击移动）+ 文档内 help 交叉引用（点击查阅），历史消息同样生效
             setupTerminalExits() {
                 if (!this.terminal) return;
                 this.terminal.addEventListener('click', (e) => {
-                    const link = e.target.closest('.exit-link');
+                    const link = e.target.closest('.exit-link, .help-link');
                     if (!link || !this.connected) return;
                     const cmd = link.getAttribute('data-cmd');
                     if (!cmd) return;
@@ -1965,6 +1979,10 @@
                 if (/这里明显的出口是|这里唯一的出口是/.test(message)) {
                     html = this.linkifyRoomExits(html);
                 }
+                // 文档正文中的 help <主题> 交叉引用渲染成可点击链接（点击查阅）
+                if (/\bhelp\s+[a-z]/.test(html)) {
+                    html = this.linkifyHelpRefs(html);
+                }
                 div.innerHTML = html;
                 this.terminal.appendChild(div);
 
@@ -2028,6 +2046,34 @@
                 }
 
                 return result;
+            }
+
+            // 已知帮助主题白名单：提取自 /help 文档的交叉引用目标（已剔除 me/xxxx 等非主题噪声）
+            // 供 linkifyHelpRefs 校验，避免聊天里的 "help me" 等英文短语被误渲染；日后可由 GMCP Help.Topics 动态下发
+            getHelpTopicSet() {
+                if (!this._helpTopicSet) {
+                    this._helpTopicSet = new Set([
+                        'attribute','backup','bai','beg','board','cha','changelog','channels','check','closed',
+                        'cmdtrade','commands','cut','dazuo','dugu-jiujian','emei','enable','enchase','feature','force',
+                        'freequest','gift','gumu','here','herohall','huanjing','intro','invade','item','jifen',
+                        'jiuyang-shengong','jiuyin-shengong','kuihua-mogong','league','liandan','liumai-shenjian','ma_cd','make','map','map_all',
+                        'map_bj','map_ca','map_dl','map_dln','map_fs','map_gw','map_hg','map_hz','map_ly','map_xi',
+                        'map_yz','newbie','news','pig_cmds','quest','quest2','rank','reborn','reply','ride',
+                        'rideto','say','schedule','set','settings','shaolin_master','shaolin_skill','skills','skills_all','skills_unarmed',
+                        'skills_weapon','snoop','sp_skills','taixuan-gong','team','tutorial','unset','whatsnew','work','xue','yun',
+                    ]);
+                }
+                return this._helpTopicSet;
+            }
+
+            // 将文档正文中的 help <主题> 交叉引用渲染为可点击链接（点击在终端查阅该主题）
+            // 仅当 <主题> 命中白名单时才成链，避免聊天中的 "help me/him/..." 等被误判
+            linkifyHelpRefs(html) {
+                const valid = this.getHelpTopicSet();
+                return html.replace(/\bhelp\s+([a-z][a-z0-9_\-]*(?:\.[a-z0-9]+)*)/g,
+                    (m, topic) => valid.has(topic)
+                        ? '<a class="help-link" data-cmd="help ' + topic + '">' + m + '</a>'
+                        : m);
             }
 
             // 将 look 出口句中的方向词渲染为可点击链接（data-cmd 为英文方向命令）
