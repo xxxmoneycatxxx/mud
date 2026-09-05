@@ -957,6 +957,8 @@
             constructor() {
                 this.ws = null;
                 this.telnet = null;
+                // 持久化 UTF-8 解码器：以流式模式跨 WebSocket 帧重组被拆分的多字节字符，避免中文乱码
+                this.decoder = new TextDecoder('utf-8');
                 this.connected = false;
                 this.terminal = document.getElementById('terminal');
                 this.commandInput = document.getElementById('commandInput');
@@ -1392,6 +1394,9 @@
                     this.telnet = null;
                 }
 
+                // 重置解码器，丢弃上一连接可能残留的半截多字节序列
+                this.decoder = new TextDecoder('utf-8');
+
                 // 清空终端缓冲区，避免残留消息
                 this.terminal.innerHTML = '';
 
@@ -1815,7 +1820,9 @@
                 }
 
                 if (result.length > 0) {
-                    const text = new TextDecoder().decode(Uint8Array.from(result));
+                    // stream:true 让解码器缓存帧尾残缺的多字节序列，与下一帧拼接后再输出，
+                    // 从根本上避免中文（UTF-8 三字节）被跨帧拆分导致的 "?" 乱码
+                    const text = this.decoder.decode(Uint8Array.from(result), { stream: true });
                     this.handleMessage(text);
                 }
             }
