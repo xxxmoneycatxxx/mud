@@ -147,77 +147,39 @@ protected void send_room_info()
     }
 }
 
-// 构建并发送帮助主题索引：/help/topics 原文 + 有效主题名（/help 文档 + 玩家命令）
+// 构建并发送帮助主题索引：委托 helpd 执行（gmcp 回调上下文中 read_file/get_dir 权限不足）
 // 客户端据此动态填充帮助模态框分类树与交叉引用链接白名单（见 www/index.html applyHelpTopics）
 protected void send_help_topics()
 {
     object me = this_object();
-    string index, verb;
+    string index;
     string *names;
-    string *files;
     string *p;
-    int i, j;
 
     if (!has_gmcp())
-    {
-        log_gmcp("send_help_topics: has_gmcp() = false, skipped");
         return;
-    }
 
-    index = read_file("/help/topics");
-
-    // 有效主题名 = /help 目录文档名 + 玩家可用命令名（对应 cmds/usr/help.c 的解析顺序）
-    names = ({});
-
-    files = get_dir("/help/");
-    if (files)
-        for (i = 0; i < sizeof(files); i++)
-            names += ({ files[i] });
-
+    // 委托 helpd 读取 /help/topics 原文和主题名列表（daemon 上下文有完整文件权限）
+    index = (string)call_other("/adm/daemons/helpd", "query_topics_index");
     p = me->query_path();
-    if (p)
-        for (i = 0; i < sizeof(p); i++)
-        {
-            files = get_dir(p[i]);
-            if (!files)
-                continue;
-            for (j = 0; j < sizeof(files); j++)
-                if (sscanf(files[j], "%s.c", verb))
-                    names += ({ verb });
-        }
+    names = (string *)call_other("/adm/daemons/helpd", "query_topic_names", p || ({}));
+    if (!names) names = ({});
 
     sendGMCP((["index": index || "", "names": names]), "Help", "Topics");
 }
 
-// 全文搜索帮助文档：遍历 /help/ 所有文件，返回包含关键字的主题名列表
+// 全文搜索帮助文档：委托 helpd 执行（gmcp 回调上下文中 read_file/get_dir 权限不足）
 protected void send_help_search(string keyword)
 {
-    string *files;
     string *matches;
-    string content;
-    int i;
 
     if (!has_gmcp())
-    {
-        log_gmcp("send_help_search: has_gmcp() = false, skipped");
         return;
-    }
 
-    log_gmcp("send_help_search: keyword=" + keyword);
+    // 委托 helpd 执行搜索（daemon 上下文有完整文件访问权限）
+    matches = (string *)call_other("/adm/daemons/helpd", "search_help", keyword);
+    if (!matches) matches = ({});
 
-    matches = ({});
-    files = get_dir("/help/");
-    log_gmcp("send_help_search: files=" + (files ? sizeof(files) : 0));
-    
-    if (files)
-        for (i = 0; i < sizeof(files); i++)
-        {
-            content = read_file("/help/" + files[i]);
-            if (content && strsrch(content, keyword) != -1)
-                matches += ({ files[i] });
-        }
-
-    log_gmcp("send_help_search: matches=" + sizeof(matches));
     sendGMCP((["matches": matches, "keyword": keyword]), "Help", "Search");
 }
 
