@@ -959,6 +959,8 @@
                 this.telnet = null;
                 // 持久化 UTF-8 解码器：以流式模式跨 WebSocket 帧重组被拆分的多字节字符，避免中文乱码
                 this.decoder = new TextDecoder('utf-8');
+                // 持久化 telnet 解析状态：让 IAC 命令与 SB..SE 子协商（含 GMCP）能跨 WebSocket 帧续接，避免半截包被丢弃或泄露成乱码
+                this._tn = { iac: false, sub: false, subType: null, subBuffer: [], cmd: null, needType: false, needOption: false };
                 this.connected = false;
                 this.terminal = document.getElementById('terminal');
                 this.commandInput = document.getElementById('commandInput');
@@ -1397,6 +1399,9 @@
                 // 重置解码器，丢弃上一连接可能残留的半截多字节序列
                 this.decoder = new TextDecoder('utf-8');
 
+                // 重置 telnet 解析状态，避免上一连接半截的 IAC/子协商影响新连接
+                this._tn = { iac: false, sub: false, subType: null, subBuffer: [], cmd: null, needType: false, needOption: false };
+
                 // 清空终端缓冲区，避免残留消息
                 this.terminal.innerHTML = '';
 
@@ -1769,49 +1774,62 @@
             }
 
             processTelnetBytes(bytes) {
+                // 解析状态保存在 this._tn（实例字段），可跨 WebSocket 帧续接：
+                // 无论 IAC 命令还是 SB..SE 子协商（含 GMCP）被拆分到相邻帧，都能正确重组，
+                // 不会丢包，也不会把半截 JSON 当成文本泄露到终端。
+                const st = this._tn;
                 const result = [];
                 let i = 0;
-                let inTelnet = false;
-                let subnegotiation = false;
-                let subnegotiationType = null;
-                let subBuffer = [];
 
                 while (i < bytes.length) {
                     const byte = bytes[i];
 
-                    if (byte === TELNET.IAC) {
-                        if (i + 1 < bytes.length) {
-                            const next = bytes[i + 1];
-
-                            if (next === TELNET.IAC) {
-                                // 转义的IAC
-                                result.push(TELNET.IAC);
-                                i += 2;
-                            } else if (next === TELNET.SB) {
-                                // 子协商开始
-                                subnegotiation = true;
-                                subBuffer = [];
-                                i += 2;
-
-                                if (i < bytes.length) {
-                                    subnegotiationType = bytes[i];
-                                    i++;
-                                }
-                            } else if (next === TELNET.SE) {
-                                // 子协商结束
-                                subnegotiation = false;
-                                this.handleSubnegotiation(subnegotiationType, subBuffer);
-                                i += 2;
-                            } else {
-                                // 标准Telnet命令
-                                this.handleTelnetCommand(next, bytes[i + 2]);
-                                i += 3;
-                            }
+                    if (st.iac) {
+                        // 上一字节是 IAC，本字节决定其含义
+                        st.iac = false;
+                        i++;
+                        if (byte === TELNET.IAC) {
+                            // IAC IAC -> 字面 0xFF 数据字节
+                            if (st.sub) st.subBuffer.push(TELNET.IAC);
+                            else result.push(TELNET.IAC);
+                        } else if (byte === TELNET.SB) {
+                            // 子协商开始，等待下一字节作为类型
+                            st.sub = true;
+                            st.subBuffer = [];
+                            st.subType = null;
+                            st.needType = true;
+                        } else if (byte === TELNET.SE) {
+                            // 子协商结束，派发完整缓冲区
+                            st.sub = false;
+                            st.needType = false;
+                            this.handleSubnegotiation(st.subType, st.subBuffer);
+                            st.subType = null;
+                            st.subBuffer = [];
+                        } else if (byte === TELNET.DO || byte === TELNET.DONT ||
+                                   byte === TELNET.WILL || byte === TELNET.WONT) {
+                            // 三字节命令，等待下一字节作为 option
+                            st.cmd = byte;
+                            st.needOption = true;
                         } else {
-                            i++;
+                            // 两字节命令（GA/NOP/EOR 等），立即处理，不误吃后续数据字节
+                            this.handleTelnetCommand(byte, null);
                         }
-                    } else if (subnegotiation) {
-                        subBuffer.push(byte);
+                    } else if (st.needType) {
+                        // SB 之后的第一个字节是子协商类型（如 GMCP=201）
+                        st.subType = byte;
+                        st.needType = false;
+                        i++;
+                    } else if (st.needOption) {
+                        // 三字节命令的 option 字节
+                        this.handleTelnetCommand(st.cmd, byte);
+                        st.cmd = null;
+                        st.needOption = false;
+                        i++;
+                    } else if (byte === TELNET.IAC) {
+                        st.iac = true;
+                        i++;
+                    } else if (st.sub) {
+                        st.subBuffer.push(byte);
                         i++;
                     } else {
                         result.push(byte);
