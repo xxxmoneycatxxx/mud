@@ -27,6 +27,7 @@
 
         .status-container {
             flex-shrink: 0;
+            margin-left: auto;
             margin-right: 15px;
             font-size: 11px;
         }
@@ -372,6 +373,113 @@
             color: #000;
             border-color: #0f0;
         }
+        /* 帮助按钮：底部条最左、常驻（不随连接状态隐藏） */
+        .help-btn {
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+
+        /* ===== 帮助浏览模态框：复古 ASCII 风格（方框+磷光绿+等宽，无圆角无投影）===== */
+        .help-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.72);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        .help-overlay.visible { display: flex; }
+        .help-modal {
+            width: min(720px, 92vw);
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            background: #0a0a0a;
+            border: 1px solid #0f0;
+            box-shadow: 0 0 24px rgba(0, 255, 0, 0.25);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            color: #0f0;
+            outline: none;
+        }
+        .help-titlebar {
+            text-align: center;
+            padding: 6px;
+            color: #ff0;
+            font-weight: bold;
+            letter-spacing: 3px;
+            border-bottom: 1px solid #1a3a1a;
+        }
+        .help-searchbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-bottom: 1px solid #1a3a1a;
+        }
+        .help-prompt { color: #4f4; }
+        .help-search {
+            flex: 1;
+            background: transparent;
+            border: none;
+            border-bottom: 1px dashed #2a2a2a;
+            color: #0f0;
+            font-family: inherit;
+            font-size: 13px;
+            outline: none;
+        }
+        .help-content {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+        }
+        .help-cats {
+            width: 148px;
+            flex-shrink: 0;
+            overflow-y: auto;
+            border-right: 1px solid #1a3a1a;
+            padding: 6px 0;
+        }
+        .help-cat {
+            padding: 4px 10px;
+            color: #4f4;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .help-cat:hover { background: #16241a; }
+        .help-cat.active {
+            background: #0f0;
+            color: #000;
+            font-weight: bold;
+        }
+        .help-topics {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 0;
+        }
+        .help-topic {
+            display: flex;
+            gap: 10px;
+            padding: 3px 12px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .help-topic:hover,
+        .help-topic.sel {
+            background: #16301a;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+        }
+        .help-topic .t-name { color: #4f4; min-width: 120px; }
+        .help-topic .t-desc { color: #888; }
+        .help-empty { padding: 14px; color: #666; text-align: center; }
+        .help-statusbar {
+            padding: 5px 10px;
+            border-top: 1px solid #1a3a1a;
+            color: #777;
+            font-size: 11px;
+            text-align: center;
+        }
 
         @media (max-width: 768px) {
             body {
@@ -446,13 +554,30 @@
         <button class="send-btn" id="sendBtn" disabled>发送</button>
     </div>
 
-    <!-- 底部条：快捷命令 + 连接状态 -->
+    <!-- 底部条：帮助按钮 + 快捷命令 + 连接状态 -->
     <div class="bottom-bar">
+        <button class="qc-btn help-btn" id="helpBtn" title="浏览帮助文档 (F1)">帮助</button>
         <div class="quick-commands" id="quickCommands"></div>
         <div class="status-container">
             <div class="status connecting" id="status">
                 <span>等待连接配置...</span>
             </div>
+        </div>
+    </div>
+
+    <!-- 帮助浏览模态框：复古 ASCII 风格，导航型（选中主题即在终端执行 help <主题>） -->
+    <div class="help-overlay" id="helpOverlay">
+        <div class="help-modal" id="helpModal" tabindex="-1">
+            <div class="help-titlebar">【 江湖帮助 】</div>
+            <div class="help-searchbar">
+                <span class="help-prompt">&gt;</span>
+                <input type="text" id="helpSearch" class="help-search" placeholder="搜索主题或说明…（按 / 聚焦）" autocomplete="off">
+            </div>
+            <div class="help-content">
+                <div class="help-cats" id="helpCats"></div>
+                <div class="help-topics" id="helpTopics"></div>
+            </div>
+            <div class="help-statusbar" id="helpFooter">↑↓ 选择 · Enter 查看 · / 搜索 · Esc 关闭</div>
         </div>
     </div>
 
@@ -879,6 +1004,7 @@
                 this.setupQuickCommands();
                 this.setupRoomExits();
                 this.setupTerminalExits();
+                this.setupHelpModal();
             }
 
             setupQuickCommands() {
@@ -931,6 +1057,162 @@
                     this.commandInput.value = cmd;
                     this.handleSendCommand();
                 });
+            }
+
+            // ===== 帮助浏览模态框（导航型：选中主题即在终端执行 help <主题>）=====
+            // 分类树预解析自服务端 /help/topics；原型内嵌，日后可在此改为 GMCP Help.Topics 动态拉取
+            getHelpTree() {
+                if (!this._helpTree) {
+                    this._helpTree = [
+                        { cat: '游戏概况', topics: [['intro','泥潭总体简介'],['feature','泥潭特殊总汇']] },
+                        { cat: '游戏介绍', topics: [['skills','武功说明总汇'],['newbie','泥潭新手指南'],['closed','宗师闭关说明'],['combine','物品合成说明'],['poison','泥潭毒功说明'],['changelog','重要更新说明'],['settings','环境变量设置'],['channels','交流频道说明'],['room','住房系统说明'],['event','特殊事件介绍'],['schedule','计划练功介绍'],['trade','商业系统说明'],['reborn','转世重生介绍'],['weapon','武器纹身说明'],['item','任务奖励物品'],['product','生产系统介绍'],['marry','婚姻系统说明'],['gift','天赋属性介绍'],['league.2','结义联盟说明'],['force','内功简介说明'],['sp_skills','超级武功介绍'],['maps','泥潭地图总册']] },
+                        { cat: '游戏指令', topics: [['cmds','泥潭常用指令'],['cmdtalk','聊天命令详析'],['cmdaction','冒险命令详析'],['cmdsystem','系统命令详析'],['cmdskill','武功命令详析'],['cmdspecial','特殊命令详析'],['cmdtrade','商业指令详析'],['commands','泥潭命令列表']] },
+                        { cat: '任务说明', topics: [['work','初级工作介绍'],['freequest','自由任务简介'],['quest','门派任务简介'],['challenge','挑战任务简介'],['mirror','宝镜任务简介'],['invade','外敌任务介绍'],['huanjing','心魔幻境介绍'],['tutorial','新手引导任务']] },
+                        { cat: '门派介绍', topics: [['shaolin','少林派介绍'],['wudang','武当派介绍'],['emei','峨嵋派介绍'],['huashan','华山派介绍'],['gaibang','丐帮之介绍'],['taohua','桃花岛介绍'],['xingxiu','星宿派介绍'],['xiaoyao','逍遥派介绍'],['gumu','古墓派介绍'],['quanzhen','全真派介绍'],['xuanming','玄冥谷介绍'],['kunlun','昆仑派介绍'],['mingjiao','明教之介绍'],['riyue','日月神教介绍'],['lingjiu','灵鹫宫介绍'],['song','嵩山派介绍'],['dalunsi','大轮寺介绍'],['tiezhang','铁掌帮介绍'],['honghua','红花会介绍'],['xuedao','血刀门介绍'],['wudu','五毒教介绍'],['meizhuang','梅庄之介绍'],['zhenyuan','镇远镖局介绍'],['hengshan','衡山派介绍'],['jueqing','绝情谷介绍']] },
+                        { cat: '世家介绍', topics: [['ouyang','欧阳世家介绍'],['hu','关外胡家介绍'],['murong','慕容世家介绍'],['duan','段氏皇族介绍'],['miao','中原苗家介绍']] },
+                    ];
+                }
+                return this._helpTree;
+            }
+
+            setupHelpModal() {
+                const helpBtn = document.getElementById('helpBtn');
+                this.helpOverlay = document.getElementById('helpOverlay');
+                this.helpModal = document.getElementById('helpModal');
+                this.helpCats = document.getElementById('helpCats');
+                this.helpTopics = document.getElementById('helpTopics');
+                this.helpSearch = document.getElementById('helpSearch');
+                this.helpFooter = document.getElementById('helpFooter');
+                if (!helpBtn || !this.helpOverlay) return;
+
+                this._helpCat = 0;
+                this._helpSel = -1;
+                this._helpFooterDefault = this.helpFooter.textContent;
+
+                helpBtn.addEventListener('click', () => this.openHelpModal());
+                // 点击遮罩空白处关闭
+                this.helpOverlay.addEventListener('click', (e) => {
+                    if (e.target === this.helpOverlay) this.closeHelpModal();
+                });
+                // 分类切换（事件委托）
+                this.helpCats.addEventListener('click', (e) => {
+                    const el = e.target.closest('.help-cat');
+                    if (!el) return;
+                    this._helpCat = parseInt(el.dataset.idx, 10) || 0;
+                    this.helpSearch.value = '';
+                    this.renderHelpCats();
+                    this.renderHelpTopics();
+                });
+                // 主题点击（事件委托）
+                this.helpTopics.addEventListener('click', (e) => {
+                    const el = e.target.closest('.help-topic');
+                    if (el) this.helpOpenTopic(el.dataset.topic);
+                });
+                // 搜索框实时过滤
+                this.helpSearch.addEventListener('input', () => this.renderHelpTopics());
+
+                // 键盘：F1 开关、Esc 关闭、/ 聚焦搜索、↑↓ 选择、Enter 查看
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'F1') {
+                        e.preventDefault();
+                        if (this.helpOverlay.classList.contains('visible')) this.closeHelpModal();
+                        else this.openHelpModal();
+                        return;
+                    }
+                    if (!this.helpOverlay.classList.contains('visible')) return;
+                    if (e.key === 'Escape') { this.closeHelpModal(); return; }
+                    if (e.key === '/' && document.activeElement !== this.helpSearch) {
+                        e.preventDefault();
+                        this.helpSearch.focus();
+                        return;
+                    }
+                    // 搜索框内：Enter 打开首个匹配，其余键（含↑↓）交给输入框
+                    if (document.activeElement === this.helpSearch) {
+                        if (e.key === 'Enter') {
+                            const first = this.helpTopics.querySelector('.help-topic');
+                            if (first) { e.preventDefault(); this.helpOpenTopic(first.dataset.topic); }
+                        }
+                        return;
+                    }
+                    const items = this.helpTopics.querySelectorAll('.help-topic');
+                    if (!items.length) return;
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        this._helpSel = Math.min(this._helpSel + 1, items.length - 1);
+                        this.highlightHelpTopic(items);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        this._helpSel = Math.max(this._helpSel - 1, 0);
+                        this.highlightHelpTopic(items);
+                    } else if (e.key === 'Enter' && this._helpSel >= 0 && items[this._helpSel]) {
+                        e.preventDefault();
+                        this.helpOpenTopic(items[this._helpSel].dataset.topic);
+                    }
+                });
+            }
+
+            highlightHelpTopic(items) {
+                items.forEach((el, i) => el.classList.toggle('sel', i === this._helpSel));
+                if (items[this._helpSel]) items[this._helpSel].scrollIntoView({ block: 'nearest' });
+            }
+
+            openHelpModal() {
+                if (!this.helpOverlay) return;
+                this.helpSearch.value = '';
+                this.helpFooter.textContent = this._helpFooterDefault;
+                this.helpOverlay.classList.add('visible');
+                this.renderHelpCats();
+                this.renderHelpTopics();
+                this.helpModal.focus();
+            }
+
+            closeHelpModal() {
+                if (!this.helpOverlay) return;
+                this.helpOverlay.classList.remove('visible');
+                if (this.commandInput) this.commandInput.focus();
+            }
+
+            renderHelpCats() {
+                this.helpCats.innerHTML = this.getHelpTree().map((c, i) =>
+                    '<div class="help-cat' + (i === this._helpCat ? ' active' : '') +
+                    '" data-idx="' + i + '">【' + c.cat + '】</div>'
+                ).join('');
+            }
+
+            renderHelpTopics() {
+                const tree = this.getHelpTree();
+                const q = (this.helpSearch.value || '').trim().toLowerCase();
+                this._helpSel = -1;
+                let list = [];
+                if (q) {
+                    // 跨全部分类搜索主题名与说明
+                    tree.forEach(c => c.topics.forEach(t => {
+                        if (t[0].toLowerCase().indexOf(q) !== -1 || t[1].toLowerCase().indexOf(q) !== -1)
+                            list.push(t);
+                    }));
+                } else if (tree[this._helpCat]) {
+                    list = tree[this._helpCat].topics;
+                }
+                if (!list.length) {
+                    this.helpTopics.innerHTML = '<div class="help-empty">无匹配主题</div>';
+                    return;
+                }
+                this.helpTopics.innerHTML = list.map(t =>
+                    '<div class="help-topic" data-topic="' + t[0] + '">' +
+                    '<span class="t-name">〖' + t[0] + '〗</span>' +
+                    '<span class="t-desc">' + t[1] + '</span></div>'
+                ).join('');
+            }
+
+            helpOpenTopic(topic) {
+                if (!topic) return;
+                if (!this.connected) {
+                    this.helpFooter.textContent = '请先连接游戏，再查看帮助文档';
+                    return;
+                }
+                this.closeHelpModal();
+                this.commandInput.value = 'help ' + topic;
+                this.handleSendCommand();
             }
 
             // 方向命令 → 紧凑中文标签（未收录的自定义出口原样显示）
