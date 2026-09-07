@@ -116,23 +116,44 @@ AdvancedMUDClient.prototype.updateCharacterStatus = function (vitals) {
     this._lastVitals = Object.assign(this._lastVitals || {}, vitals);
     const v = this._lastVitals;
 
-    const fmt = (cur, max) => (cur || 0) + '/' + (max || 0);
-    const items = [
-        { label: '气血', val: fmt(v.hp, v.max_hp), cls: '' },
-        { label: '精', val: fmt(v.jing, v.max_jing), cls: '' },
-        { label: '精力', val: fmt(v.jingli, v.max_jingli), cls: '' },
-        { label: '内力', val: fmt(v.neili, v.max_neili), cls: '' },
-        { label: '食物', val: fmt(v.food, v.max_food), cls: '' },
-        { label: '水', val: fmt(v.water, v.max_water), cls: '' },
+    const stats = [
+        { label: '气血', cur: v.hp, max: v.max_hp, cls: '' },
+        { label: '精气', cur: v.jing, max: v.max_jing, cls: '' },
+        { label: '精力', cur: v.jingli, max: v.max_jingli, cls: '' },
+        { label: '内力', cur: v.neili, max: v.max_neili, cls: '' },
+        { label: '食物', cur: v.food, max: v.max_food, cls: '' },
+        { label: '水',   cur: v.water, max: v.max_water, cls: '' },
+    ];
+    const texts = [
         { label: '经验', val: (v.exp || 0).toLocaleString(), cls: 'exp' },
         { label: '潜能', val: String(v.pot || 0), cls: 'pot' },
     ];
 
-    statsLine.innerHTML = items.map((item, i) => {
-        const sep = i < items.length - 1 ? '<span class="stat-sep">|</span>' : '';
-        return '<span class="stat-item"><span class="label">' + item.label + '</span> <span class="val ' + item.cls + '">' + item.val + '</span></span>' + sep;
-    }).join('');
+    let html = '';
 
+    // Gauge 进度条
+    stats.forEach(function (s) {
+        const cur = s.cur || 0;
+        const max = s.max || 0;
+        const pct = max > 0 ? Math.min(100, Math.round(cur / max * 100)) : 0;
+        const color = pct > 60 ? 'green' : pct > 30 ? 'amber' : 'red';
+        const critical = (s.label === '气血' && pct <= 30 && max > 0) ? ' critical' : '';
+        html += '<div class="stat-gauge' + critical + '">'
+            + '<span class="gauge-label">' + s.label + '</span>'
+            + '<div class="gauge-track"><div class="gauge-fill ' + color + '" style="width:' + pct + '%"></div></div>'
+            + '<span class="gauge-text">' + cur + '/' + max + '</span>'
+            + '</div>';
+    });
+
+    // 纯文本项（经验/潜能）
+    texts.forEach(function (t) {
+        html += '<div class="stat-text">'
+            + '<span class="label">' + t.label + '</span>'
+            + '<span class="val ' + t.cls + '">' + t.val + '</span>'
+            + '</div>';
+    });
+
+    statsLine.innerHTML = html;
     document.getElementById('statusBar').classList.add('visible');
 };
 

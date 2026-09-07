@@ -163,40 +163,82 @@ body {
     opacity: 0.7;
 }
 
-/* ===== 状态栏（紧凑单行） ===== */
+/* ===== 状态栏（Gauge 可视化） ===== */
 .status-bar {
     display: none;
     background: #0a0f0a;
     border-bottom: 1px solid #1a3a1a;
-    padding: 4px 12px;
+    padding: 6px 12px;
     font-size: 12px;
     color: #aaa;
-    white-space: nowrap;
-    overflow: hidden;
 }
-.status-bar.visible { display: flex; align-items: center; gap: 0; }
+.status-bar.visible { display: flex; align-items: flex-start; gap: 0; flex-wrap: wrap; }
 .stats-line {
     display: flex;
-    align-items: center;
-    gap: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 4px 6px;
     flex: 1;
     min-width: 0;
+}
+/* 单个 Gauge 容器 */
+.stat-gauge {
+    display: flex;
+    flex-direction: column;
+    min-width: 90px;
+    flex: 1 1 100px;
+    max-width: 160px;
+}
+.stat-gauge .gauge-label {
+    font-size: 10px;
+    color: #666;
+    line-height: 1.2;
+    margin-bottom: 1px;
+}
+/* 进度条轨道 */
+.stat-gauge .gauge-track {
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 1px;
     overflow: hidden;
+    border: 1px solid #222;
 }
-.stat-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    margin-right: 2px;
+/* 进度条填充 */
+.stat-gauge .gauge-fill {
+    height: 100%;
+    border-radius: 0;
+    transition: width 0.3s ease, background-color 0.5s ease;
 }
-.stat-item .label { color: #666; }
-.stat-item .val { color: #2ecc71; font-weight: bold; }
-.stat-item .val.exp { color: #ffd93d; }
-.stat-item .val.pot { color: #ff6b6b; }
-.stat-sep {
-    color: #333;
-    margin: 0 4px;
-    user-select: none;
+/* 颜色随百分比变化：>60% 磷光绿，30-60% 琥珀，<30% 红 */
+.stat-gauge .gauge-fill.green  { background: #2a8a2a; }
+.stat-gauge .gauge-fill.amber  { background: #8a7a2a; }
+.stat-gauge .gauge-fill.red    { background: #8a2a2a; }
+/* 数值文本 */
+.stat-gauge .gauge-text {
+    font-size: 10px;
+    color: #555;
+    line-height: 1.2;
+    margin-top: 1px;
+    font-variant-numeric: tabular-nums;
+}
+/* 无进度条的纯文本项（经验/潜能） */
+.stat-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 60px;
+    padding: 0 4px;
+}
+.stat-text .label { font-size: 10px; color: #666; line-height: 1.2; }
+.stat-text .val   { font-size: 11px; font-weight: bold; line-height: 1.2; margin-top: 1px; }
+.stat-text .val.exp { color: #ffd93d; }
+.stat-text .val.pot { color: #ff6b6b; }
+/* 低血量脉冲动画 */
+@keyframes gauge-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+.stat-gauge.critical .gauge-fill {
+    animation: gauge-pulse 1.5s ease-in-out infinite;
 }
 .room-info-bar {
     color: #0f0;
@@ -414,5 +456,21 @@ body {
     .command-input {
         font-size: 12px;
         padding: 8px 35px 8px 10px;
+    }
+
+    .stat-gauge {
+        min-width: 70px;
+        flex-basis: 80px;
+        max-width: 120px;
+    }
+    .stat-gauge .gauge-label,
+    .stat-gauge .gauge-text {
+        font-size: 9px;
+    }
+    .stat-text {
+        min-width: 50px;
+    }
+    .stat-text .val {
+        font-size: 10px;
     }
 }
