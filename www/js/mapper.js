@@ -49,6 +49,7 @@ class Mapper {
         this._saveTimer = null;
         this.highlightPath = null;    // 寻路高亮：hash 数组或 null
         this._fullscreen = false;     // 全屏模式状态
+        this._currentFloor = 0;       // 当前显示楼层（z 坐标）
 
         // 渲染参数
         this.cellSize = 44;
@@ -183,6 +184,15 @@ class Mapper {
 
             this.currentHash = hash;
             this._computePositions();
+
+            // 自动切换楼层：玩家移动到新楼层时自动跟随
+            if (this._zCoords) {
+                const curZ = this._zCoords.get(hash) || 0;
+                if (curZ !== this._currentFloor) {
+                    this._currentFloor = curZ;
+                }
+            }
+
             this.render();
             this._scheduleSave();
             // 通知 pathfinder 同步增量数据（仅当 pathfinder 使用 mapper 回退模式时生效）
@@ -193,12 +203,16 @@ class Mapper {
     }
 
     // BFS 从当前房间出发，为可达房间分配网格坐标
+    // 同时追踪 z 坐标（up/down 改变楼层）
     // 检测坐标冲突时，将冲突房间及其连通子树整体平移到最近的空闲格
     _computePositions() {
         if (!this.currentHash || !this.rooms.has(this.currentHash)) return;
 
         this.positions.clear();
         this.positions.set(this.currentHash, { x: 0, y: 0 });
+
+        const zCoords = new Map();
+        zCoords.set(this.currentHash, 0);
 
         const queue = [this.currentHash];
         const visited = new Set([this.currentHash]);
@@ -207,6 +221,7 @@ class Mapper {
             const hash = queue.shift();
             const room = this.rooms.get(hash);
             const pos = this.positions.get(hash);
+            const z = zCoords.get(hash) || 0;
             if (!room || !pos) continue;
 
             for (const dir of room.exits) {
@@ -217,6 +232,11 @@ class Mapper {
                 const offset = DIR_OFFSETS[dir] || { dx: 0, dy: 0 };
                 let nx = pos.x + offset.dx;
                 let ny = pos.y + offset.dy;
+                // up/down 改变楼层 z 坐标
+                let nz = z;
+                if (dir === 'up' || dir === 'leave') nz = z + 1;
+                else if (dir === 'down' || dir === 'enter') nz = z - 1;
+                zCoords.set(targetHash, nz);
 
                 // 检测坐标冲突：该格位已被其他房间占据
                 const occupantKey = this._findOccupant(nx, ny);
@@ -264,6 +284,8 @@ class Mapper {
                 queue.push(targetHash);
             }
         }
+
+        this._zCoords = zCoords;
     }
 
     // 查找占据指定格位的房间 hash，无则返回 null
@@ -291,6 +313,25 @@ class Mapper {
             }
         }
         return null;
+    }
+
+    // 切换显示楼层
+    setFloor(floor) {
+        const range = this._getFloorRange();
+        this._currentFloor = Math.max(range.min, Math.min(range.max, floor));
+        this.render();
+    }
+
+    // 获取已发现房间的楼层范围 { min, max }
+    _getFloorRange() {
+        let min = 0, max = 0;
+        if (this._zCoords) {
+            for (const z of this._zCoords.values()) {
+                if (z < min) min = z;
+                if (z > max) max = z;
+            }
+        }
+        return { min, max };
     }
 
     _reverseDir(dir) {
@@ -336,9 +377,12 @@ class Mapper {
         const centerY = H / 2;
         const radius = this.viewRadius;
 
-        // 收集视口范围内的房间
+        // 收集视口范围内当前楼层的房间
+        const curZ = (this._zCoords && this._zCoords.get(this.currentHash)) || 0;
         const visibleRooms = [];
         for (const [hash, pos] of this.positions) {
+            const z = (this._zCoords && this._zCoords.get(hash)) || 0;
+            if (z !== this._currentFloor) continue;
             const dx = pos.x - curPos.x;
             const dy = pos.y - curPos.y;
             if (Math.abs(dx) <= radius && Math.abs(dy) <= radius) {
@@ -576,7 +620,7 @@ class Mapper {
             if (oldName) oldName.remove();
         }
 
-        // 扩展栏：up/down/in/out/enter/leave
+        // 扩展栏：up/down/in/out/enter/leave + 楼层切换
         const EXTRA_DIRS = ['up', 'down', 'in', 'out', 'enter', 'leave'];
         const extra = document.getElementById('moveExtra');
         if (!extra) return;
@@ -590,6 +634,47 @@ class Mapper {
             btn.title = '移动: ' + dir;
             extra.appendChild(btn);
         });
+
+        // 楼层切换按钮（发现多层时显示）
+        const floorRange = this._getFloorRange();
+        if (floorRange.min < floorRange.max) {
+            const sep = document.createElement('span');
+            sep.className = 'move-floor-sep';
+            sep.textContent = '|';
+            extra.appendChild(sep);
+
+            const upBtn = document.createElement('button');
+            upBtn.className = 'move-floor-btn';
+            upBtn.textContent = '▲';
+            upBtn.title = '上一层楼';
+            upBtn.disabled = this._currentFloor >= floorRange.max;
+            upBtn.addEventListener('click', () => this.setFloor(this._currentFloor + 1));
+            extra.appendChild(upBtn);
+
+            const indicator = document.createElement('span');
+            indicator.className = 'move-floor-ind';
+            indicator.textContent = 'F' + this._currentFloor;
+            extra.appendChild(indicator);
+
+            const downBtn = document.createElement('button');
+            downBtn.className = 'move-floor-btn';
+            downBtn.textContent = '▼';
+            downBtn.title = '下一层楼';
+            downBtn.disabled = this._currentFloor <= floorRange.min;
+            downBtn.addEventListener('click', () => this.setFloor(this._currentFloor - 1));
+            extra.appendChild(downBtn);
+        }
+
+        // 同步更新 minimap header 楼层指示器
+        const floorInd = document.getElementById('minimapFloorInd');
+        if (floorInd) {
+            if (floorRange.min < floorRange.max) {
+                floorInd.textContent = 'F' + this._currentFloor;
+                floorInd.style.display = '';
+            } else {
+                floorInd.style.display = 'none';
+            }
+        }
 
         // 更新探索进度
         this._updateProgress();
@@ -703,9 +788,11 @@ class Mapper {
         const centerX = W / 2;
         const centerY = H / 2;
 
-        // 收集可见房间
+        // 收集当前楼层可见房间
         const visibleRooms = [];
         for (const [hash, pos] of this.positions) {
+            const z = (this._zCoords && this._zCoords.get(hash)) || 0;
+            if (z !== this._currentFloor) continue;
             const dx = pos.x - curPos.x;
             const dy = pos.y - curPos.y;
             if (Math.abs(dx) <= radius && Math.abs(dy) <= radius) {

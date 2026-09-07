@@ -467,6 +467,48 @@ body {
     border-color: #ff0;
 }
 
+/* ===== 楼层切换 ===== */
+.minimap-floor {
+    color: #886;
+    font-size: 10px;
+    font-weight: bold;
+    background: rgba(50, 50, 20, 0.4);
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid #333;
+    flex-shrink: 0;
+}
+.move-floor-sep {
+    color: #333;
+    margin: 0 2px;
+    font-size: 11px;
+}
+.move-floor-btn {
+    background: #0a0f0a;
+    color: #886;
+    border: 1px solid #333;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.move-floor-btn:hover:not(:disabled) {
+    background: #333;
+    color: #ff0;
+    border-color: #ff0;
+}
+.move-floor-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+.move-floor-ind {
+    color: #886;
+    font-size: 10px;
+    font-weight: bold;
+    margin: 0 2px;
+}
+
 /* ===== 探索进度栏 ===== */
 .minimap-progress {
     padding: 2px 8px;
