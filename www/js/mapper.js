@@ -47,6 +47,8 @@ class Mapper {
         this.ctx = null;
         this.mapUrl = null;
         this._saveTimer = null;
+        this.highlightPath = null;    // 寻路高亮：hash 数组或 null
+        this._fullscreen = false;     // 全屏模式状态
 
         // 渲染参数
         this.cellSize = 44;
@@ -304,10 +306,31 @@ class Mapper {
             }
         }
 
+        // 绘制寻路高亮路径
+        if (this.highlightPath && this.highlightPath.length > 1) {
+            ctx.save();
+            ctx.strokeStyle = '#ff0';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([4, 3]);
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath();
+            let started = false;
+            for (const hash of this.highlightPath) {
+                const vr = visibleRooms.find(v => v.hash === hash);
+                if (!vr) { started = false; continue; }
+                if (!started) { ctx.moveTo(vr.screenX, vr.screenY); started = true; }
+                else ctx.lineTo(vr.screenX, vr.screenY);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
         // 绘制房间方块
         for (const vr of visibleRooms) {
             const half = rs / 2;
             const explored = vr.room && vr.room.name;
+            const roomType = explored ? this._getRoomType(vr.room.name) : null;
+            const typeColor = roomType ? this._getRoomTypeColor(roomType) : null;
 
             if (vr.isCurrent) {
                 ctx.shadowColor = '#0f0';
@@ -316,13 +339,21 @@ class Mapper {
                 ctx.fillRect(vr.screenX - half, vr.screenY - half, rs, rs);
                 ctx.shadowBlur = 0;
             } else if (explored) {
-                ctx.strokeStyle = '#0a0';
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = typeColor || '#0a0';
+                ctx.lineWidth = typeColor ? 2 : 1;
                 ctx.strokeRect(vr.screenX - half, vr.screenY - half, rs, rs);
             } else {
                 ctx.fillStyle = '#060';
                 ctx.beginPath();
                 ctx.arc(vr.screenX, vr.screenY, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 特殊房间标记：右上角小圆点
+            if (typeColor && !vr.isCurrent) {
+                ctx.fillStyle = typeColor;
+                ctx.beginPath();
+                ctx.arc(vr.screenX + half + 2, vr.screenY - half - 2, 2.5, 0, Math.PI * 2);
                 ctx.fill();
             }
 
@@ -363,6 +394,9 @@ class Mapper {
 
         // 同步更新九宫格移动面板
         this._renderMovePanel();
+
+        // 全屏模式时同步刷新大地图
+        if (this._fullscreen) this._renderFullscreenCanvas();
     }
 
     _drawPlaceholder(ctx, W, H) {
@@ -434,14 +468,25 @@ class Mapper {
 
             // 已探索的目标房间标记
             const targetHash = curRoom.connections[dir];
-            const explored = hasExit && targetHash && this.rooms.has(targetHash) && this.rooms.get(targetHash).name;
+            const targetRoom = hasExit && targetHash ? this.rooms.get(targetHash) : null;
+            const explored = !!targetRoom && targetRoom.name;
             cell.classList.toggle('explored', !!explored);
+
+            // 特殊房间类型标记
+            const roomType = explored ? this._getRoomType(targetRoom.name) : null;
+            const typeColor = roomType ? this._getRoomTypeColor(roomType) : null;
+            if (typeColor) {
+                cell.style.setProperty('--type-dot', typeColor);
+                cell.classList.add('has-type');
+            } else {
+                cell.style.removeProperty('--type-dot');
+                cell.classList.remove('has-type');
+            }
 
             // 更新房间名称
             const nameEl = cell.querySelector('.move-name');
             if (nameEl) {
                 if (explored) {
-                    const targetRoom = this.rooms.get(targetHash);
                     nameEl.textContent = this._truncate(targetRoom.name || '', 4);
                 } else {
                     nameEl.textContent = DIR_SHORT[dir] || '';
@@ -473,6 +518,287 @@ class Mapper {
             btn.title = '移动: ' + dir;
             extra.appendChild(btn);
         });
+
+        // 更新探索进度
+        this._updateProgress();
+    }
+
+    // 设置寻路高亮路径（hash 数组）
+    setHighlightPath(hashes) {
+        this.highlightPath = hashes && hashes.length > 0 ? hashes : null;
+        this.render();
+    }
+
+    // 更新面板底部探索进度
+    _updateProgress() {
+        const el = document.getElementById('minimapProgress');
+        if (!el) return;
+
+        const explored = this.rooms.size;
+        if (explored === 0) { el.textContent = ''; return; }
+
+        // 如果有 pathfinder 全量数据，显示百分比
+        if (typeof pathfinder !== 'undefined' && pathfinder.loaded && pathfinder._source === 'full') {
+            const total = pathfinder.rooms.size;
+            const pct = total > 0 ? Math.round(explored / total * 100) : 0;
+            el.textContent = '已探索 ' + explored + '/' + total + ' (' + pct + '%)';
+        } else {
+            el.textContent = '已探索 ' + explored + ' 个房间';
+        }
+    }
+
+    // ===== 特殊房间类型识别 =====
+
+    // 根据房间名称识别特殊类型，返回类型字符串或 null
+    _getRoomType(name) {
+        if (!name) return null;
+        if (/\u5546\u5e97|\u94c1\u5320|\u5f53\u94fa|\u836f\u5e97|\u5e03\u5e84|\u7c73\u94fa|\u5175\u5668\u5e97|\u996d\u9986|\u9152\u697c|\u8336\u9986|\u5f53\u94fa|\u5546\u5e97/.test(name)) return 'shop';
+        if (/\u94f6\u884c|\u94b1\u5e84|\u8d4c\u573a/.test(name)) return 'bank';
+        if (/\u5ba2\u6808|\u6808|\u5bbf|\u5bfa\u9662|\u5e99|\u89c2|\u5bfa/.test(name)) return 'inn';
+        if (/\u6d3e|\u5b97|\u5c71\u5be8|\u603b\u575b|\u5206\u575b|\u5206\u5802|\u5927\u6bbf|\u5c0f\u7b51/.test(name)) return 'sect';
+        if (/\u5730\u7262|\u7252\u7262|\u76d1\u7262/.test(name)) return 'jail';
+        if (/\u5c71\u6d1e|\u6d1e\u7a74|\u5ca9\u6d1e|\u5730\u4e0b|\u5e9f\u5f03|\u8352\u539f|\u6cfd\u5730|\u6df1\u6e0a|\u8ff7\u5bab|\u5bc6\u5ba4/.test(name)) return 'dungeon';
+        return null;
+    }
+
+    // 特殊房间类型 → 标记颜色
+    _getRoomTypeColor(type) {
+        const colors = {
+            'shop': '#ff0',      // 黄色：商店
+            'bank': '#ffd700',   // 金色：银行
+            'inn': '#4af',       // 蓝色：客栈/寺庙
+            'sect': '#f4f',      // 紫色：门派
+            'jail': '#f44',      // 红色：监狱
+            'dungeon': '#f80',   // 橙色：副本/洞穴
+        };
+        return colors[type] || null;
+    }
+
+    // ===== 全屏地图 =====
+
+    // 进入全屏模式
+    enterFullscreen() {
+        if (this._fullscreen) return;
+        this._fullscreen = true;
+
+        const overlay = document.getElementById('mapFullscreen');
+        const fsCanvas = document.getElementById('mapFsCanvas');
+        const fsTitle = document.getElementById('mapFsTitle');
+        if (!overlay || !fsCanvas) return;
+
+        // 设置全屏 canvas 尺寸
+        const headerH = overlay.querySelector('.map-fs-header').offsetHeight || 40;
+        fsCanvas.width = window.innerWidth;
+        fsCanvas.height = window.innerHeight - headerH;
+
+        // 更新标题
+        const curRoom = this.currentHash ? this.rooms.get(this.currentHash) : null;
+        if (fsTitle) fsTitle.textContent = (curRoom && curRoom.name) || '地图';
+
+        overlay.classList.add('active');
+        this._renderFullscreenCanvas();
+    }
+
+    // 退出全屏模式
+    exitFullscreen() {
+        if (!this._fullscreen) return;
+        this._fullscreen = false;
+
+        const overlay = document.getElementById('mapFullscreen');
+        if (overlay) overlay.classList.remove('active');
+    }
+
+    // 渲染全屏 canvas（更大视口 + 更大格子）
+    _renderFullscreenCanvas() {
+        if (!this._fullscreen) return;
+        const fsCanvas = document.getElementById('mapFsCanvas');
+        if (!fsCanvas) return;
+        const ctx = fsCanvas.getContext('2d');
+        const W = fsCanvas.width;
+        const H = fsCanvas.height;
+
+        // 全屏参数：更大 cellSize 和 viewRadius
+        const cs = 60;
+        const rs = 18;
+        const radius = Math.ceil(Math.max(W, H) / cs / 2) + 1;
+
+        ctx.clearRect(0, 0, W, H);
+
+        if (!this.currentHash || !this.rooms.has(this.currentHash)) return;
+        const curPos = this.positions.get(this.currentHash);
+        if (!curPos) return;
+
+        const centerX = W / 2;
+        const centerY = H / 2;
+
+        // 收集可见房间
+        const visibleRooms = [];
+        for (const [hash, pos] of this.positions) {
+            const dx = pos.x - curPos.x;
+            const dy = pos.y - curPos.y;
+            if (Math.abs(dx) <= radius && Math.abs(dy) <= radius) {
+                visibleRooms.push({
+                    hash,
+                    screenX: centerX + dx * cs,
+                    screenY: centerY - dy * cs,
+                    room: this.rooms.get(hash),
+                    isCurrent: hash === this.currentHash,
+                });
+            }
+        }
+
+        // 绘制连接线
+        ctx.lineWidth = 1.5;
+        const drawn = new Set();
+        for (const vr of visibleRooms) {
+            if (!vr.room) continue;
+            for (const dir of vr.room.exits) {
+                const targetHash = vr.room.connections[dir];
+                if (!targetHash) continue;
+                const targetVR = visibleRooms.find(v => v.hash === targetHash);
+                if (!targetVR) continue;
+                const edgeKey = vr.hash < targetHash ? vr.hash + '|' + targetHash : targetHash + '|' + vr.hash;
+                if (drawn.has(edgeKey)) continue;
+                drawn.add(edgeKey);
+                ctx.strokeStyle = DIR_COLORS[dir] || '#060';
+                ctx.beginPath();
+                ctx.moveTo(vr.screenX, vr.screenY);
+                ctx.lineTo(targetVR.screenX, targetVR.screenY);
+                ctx.stroke();
+            }
+        }
+
+        // 绘制寻路高亮路径
+        if (this.highlightPath && this.highlightPath.length > 1) {
+            ctx.save();
+            ctx.strokeStyle = '#ff0';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([6, 4]);
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath();
+            let started = false;
+            for (const hash of this.highlightPath) {
+                const vr = visibleRooms.find(v => v.hash === hash);
+                if (!vr) { started = false; continue; }
+                if (!started) { ctx.moveTo(vr.screenX, vr.screenY); started = true; }
+                else ctx.lineTo(vr.screenX, vr.screenY);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 绘制房间方块 + 特殊房间标记 + 标签
+        for (const vr of visibleRooms) {
+            const half = rs / 2;
+            const explored = vr.room && vr.room.name;
+            const roomType = explored ? this._getRoomType(vr.room.name) : null;
+            const typeColor = roomType ? this._getRoomTypeColor(roomType) : null;
+
+            if (vr.isCurrent) {
+                ctx.shadowColor = '#0f0';
+                ctx.shadowBlur = 8;
+                ctx.fillStyle = '#0f0';
+                ctx.fillRect(vr.screenX - half, vr.screenY - half, rs, rs);
+                ctx.shadowBlur = 0;
+            } else if (explored) {
+                ctx.strokeStyle = typeColor || '#0a0';
+                ctx.lineWidth = typeColor ? 2 : 1;
+                ctx.strokeRect(vr.screenX - half, vr.screenY - half, rs, rs);
+            } else {
+                ctx.fillStyle = '#060';
+                ctx.beginPath();
+                ctx.arc(vr.screenX, vr.screenY, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 特殊房间标记：小圆点
+            if (typeColor && !vr.isCurrent) {
+                ctx.fillStyle = typeColor;
+                ctx.beginPath();
+                ctx.arc(vr.screenX + half + 3, vr.screenY - half - 3, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 标签
+            if (vr.isCurrent || explored) {
+                ctx.fillStyle = vr.isCurrent ? '#fff' : '#aaa';
+                ctx.font = (vr.isCurrent ? 'bold ' : '') + '12px Consolas, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                const label = this._truncate(vr.room ? vr.room.name : '', 10);
+                ctx.fillText(label, vr.screenX, vr.screenY + half + 3);
+            }
+        }
+
+        // 区域名（右下角）
+        const curRoom = this.rooms.get(this.currentHash);
+        if (curRoom && curRoom.area) {
+            ctx.fillStyle = '#444';
+            ctx.font = '11px Consolas, monospace';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(curRoom.area, W - 10, H - 6);
+        }
+
+        // 指南针
+        this._drawCompassOn(ctx, 24, 24, 16);
+
+        // 图例（右下角）
+        this._drawLegend(ctx, W, H);
+    }
+
+    // 在指定 ctx 上绘制指南针
+    _drawCompassOn(ctx, cx, cy, r) {
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = '#0a0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#0f0';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - r + 3);
+        ctx.lineTo(cx - 4, cy - 3);
+        ctx.lineTo(cx + 4, cy - 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('N', cx, cy - r - 2);
+        ctx.restore();
+    }
+
+    // 绘制图例（全屏模式右下角）
+    _drawLegend(ctx, W, H) {
+        const items = [
+            { color: '#ff0', label: '商店' },
+            { color: '#ffd700', label: '银行' },
+            { color: '#4af', label: '客栈/寺庙' },
+            { color: '#f4f', label: '门派' },
+            { color: '#f80', label: '洞穴/副本' },
+        ];
+        const x = W - 90;
+        let y = H - 20 - items.length * 16;
+        ctx.save();
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = 'rgba(10,15,10,0.8)';
+        ctx.fillRect(x - 8, y - 4, 92, items.length * 16 + 8);
+        ctx.globalAlpha = 1;
+        ctx.font = '10px Consolas, monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        for (const item of items) {
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.arc(x + 4, y + 6, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#aaa';
+            ctx.fillText(item.label, x + 14, y + 6);
+            y += 16;
+        }
+        ctx.restore();
     }
 
     // 完全重置（仅在新会话开始时调用，如清除缓存）

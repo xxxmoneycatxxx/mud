@@ -60,6 +60,105 @@ AdvancedMUDClient.prototype.setupRoomExits = function () {
             }
         });
     }
+
+    // 小地图面板拖拽（鼠标 + 触摸）
+    const panel = document.getElementById('minimapPanel');
+    const header = document.querySelector('.minimap-header');
+    if (panel && header) {
+        let dragging = false;
+        let offsetX = 0, offsetY = 0;
+
+        const onStart = (clientX, clientY) => {
+            const rect = panel.getBoundingClientRect();
+            // 从 right 定位切换到 left 定位
+            panel.style.left = rect.left + 'px';
+            panel.style.top = rect.top + 'px';
+            panel.style.right = 'auto';
+            offsetX = clientX - rect.left;
+            offsetY = clientY - rect.top;
+            dragging = true;
+            panel.classList.add('dragging');
+        };
+
+        const onMove = (clientX, clientY) => {
+            if (!dragging) return;
+            const x = clientX - offsetX;
+            const y = clientY - offsetY;
+            // 限制在视口内
+            const maxX = window.innerWidth - panel.offsetWidth;
+            const maxY = window.innerHeight - panel.offsetHeight;
+            panel.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+            panel.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+        };
+
+        const onEnd = () => {
+            if (!dragging) return;
+            dragging = false;
+            panel.classList.remove('dragging');
+        };
+
+        // 鼠标事件
+        header.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.minimap-toggle')) return; // 点击折叠按钮不拖拽
+            e.preventDefault();
+            onStart(e.clientX, e.clientY);
+        });
+        document.addEventListener('mousemove', (e) => onMove(e.clientX, e.clientY));
+        document.addEventListener('mouseup', onEnd);
+
+        // 触摸事件
+        header.addEventListener('touchstart', (e) => {
+            if (e.target.closest('.minimap-toggle')) return;
+            const t = e.touches[0];
+            onStart(t.clientX, t.clientY);
+        }, { passive: true });
+        document.addEventListener('touchmove', (e) => {
+            if (!dragging) return;
+            const t = e.touches[0];
+            onMove(t.clientX, t.clientY);
+        }, { passive: true });
+        document.addEventListener('touchend', onEnd);
+    }
+
+    // 地图全屏：双击小地图进入，双击全屏 canvas 或 Esc 或关闭按钮退出
+    const miniCanvas = document.getElementById('minimapContent');
+    const fsOverlay = document.getElementById('mapFullscreen');
+    const fsCanvas = document.getElementById('mapFsCanvas');
+    const fsClose = document.getElementById('mapFsClose');
+
+    if (miniCanvas) {
+        miniCanvas.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            if (typeof mapper !== 'undefined') mapper.enterFullscreen();
+        });
+    }
+    if (fsCanvas) {
+        fsCanvas.addEventListener('dblclick', () => {
+            if (typeof mapper !== 'undefined') mapper.exitFullscreen();
+        });
+    }
+    if (fsClose) {
+        fsClose.addEventListener('click', () => {
+            if (typeof mapper !== 'undefined') mapper.exitFullscreen();
+        });
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && typeof mapper !== 'undefined' && mapper._fullscreen) {
+            mapper.exitFullscreen();
+        }
+    });
+    // 窗口大小变化时重新渲染全屏 canvas
+    window.addEventListener('resize', () => {
+        if (typeof mapper !== 'undefined' && mapper._fullscreen) {
+            const header = fsOverlay ? fsOverlay.querySelector('.map-fs-header') : null;
+            const headerH = header ? header.offsetHeight : 40;
+            if (fsCanvas) {
+                fsCanvas.width = window.innerWidth;
+                fsCanvas.height = window.innerHeight - headerH;
+            }
+            mapper._renderFullscreenCanvas();
+        }
+    });
 };
 
 // 终端可点击链接委托：look/l 出口（点击移动）+ 文档内 help 交叉引用（点击查阅），历史消息同样生效
@@ -708,6 +807,18 @@ AdvancedMUDClient.prototype._startPathwalk = function (targetHash, targetName) {
     this.addToHistory('gtr ' + targetName);
     this.appendMessage('自动寻路到「' + targetName + '」，共 ' + path.length + ' 步', 'system');
 
+    // 计算路径上的房间 hash 序列，用于 canvas 高亮显示
+    const pathHashes = [mapper.currentHash];
+    let cur = mapper.currentHash;
+    for (const dir of path) {
+        const room = mapper.rooms.get(cur);
+        const next = room && room.connections[dir];
+        if (!next) break;
+        pathHashes.push(next);
+        cur = next;
+    }
+    mapper.setHighlightPath(pathHashes);
+
     pathfinder.startWalk(
         path,
         // onStep
@@ -717,6 +828,7 @@ AdvancedMUDClient.prototype._startPathwalk = function (targetHash, targetName) {
         },
         // onComplete
         (success) => {
+            mapper.setHighlightPath(null);
             if (success) {
                 this.appendMessage('已到达「' + targetName + '」', 'system');
             } else {

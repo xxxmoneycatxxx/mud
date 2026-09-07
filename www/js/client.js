@@ -132,6 +132,7 @@ class AdvancedMUDClient {
 
         // 停止自动行走
         if (typeof pathfinder !== 'undefined') pathfinder.stopWalk();
+        if (typeof mapper !== 'undefined') mapper.setHighlightPath(null);
 
         console.log('🔧 连接已强制清理');
     }

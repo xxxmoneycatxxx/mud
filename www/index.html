@@ -39,7 +39,17 @@
                 </div>
                 <div class="move-extra" id="moveExtra"></div>
             </div>
+            <div class="minimap-progress" id="minimapProgress"></div>
         </div>
+    </div>
+
+    <!-- 地图全屏覆盖层 -->
+    <div class="map-fullscreen" id="mapFullscreen">
+        <div class="map-fs-header">
+            <span class="map-fs-title" id="mapFsTitle">地图</span>
+            <button class="map-fs-close" id="mapFsClose" title="退出全屏 (Esc 或双击)">✕</button>
+        </div>
+        <canvas id="mapFsCanvas"></canvas>
     </div>
 
     <div class="input-area">

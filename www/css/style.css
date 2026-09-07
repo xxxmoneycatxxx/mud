@@ -294,8 +294,14 @@ body {
     justify-content: space-between;
     padding: 4px 8px;
     border-bottom: 1px solid #1a3a1a;
-    cursor: default;
+    cursor: grab;
     user-select: none;
+}
+.minimap-header:active {
+    cursor: grabbing;
+}
+.minimap-panel.dragging {
+    transition: none !important;
 }
 .minimap-title {
     color: #0f0;
@@ -343,6 +349,7 @@ body {
     max-height: 240px;
     overflow: hidden;
     background: transparent;
+    cursor: pointer;
 }
 
 /* ===== 九宫格移动面板 ===== */
@@ -417,6 +424,20 @@ body {
 .move-cell.has-exit.explored .move-name {
     color: #0f0;
 }
+/* 特殊房间标记：左上角小圆点 */
+.move-cell.has-type::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--type-dot, #ff0);
+}
+.move-cell {
+    position: relative;
+}
 /* 扩展栏：up/down/in/out/enter/leave */
 .move-extra {
     display: flex;
@@ -444,6 +465,74 @@ body {
     background: #333;
     color: #ff0;
     border-color: #ff0;
+}
+
+/* ===== 探索进度栏 ===== */
+.minimap-progress {
+    padding: 2px 8px;
+    border-top: 1px solid #111;
+    font-size: 9px;
+    color: #555;
+    text-align: center;
+    user-select: none;
+}
+.minimap-progress:empty {
+    display: none;
+    padding: 0;
+    border: none;
+}
+
+/* ===== 地图全屏覆盖层 ===== */
+.map-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 200;
+    background: rgba(5, 10, 5, 0.97);
+    display: none;
+    flex-direction: column;
+}
+.map-fullscreen.active {
+    display: flex;
+}
+.map-fs-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: rgba(10, 20, 10, 0.9);
+    border-bottom: 1px solid #1a3a1a;
+    flex-shrink: 0;
+}
+.map-fs-title {
+    color: #0f0;
+    font-weight: bold;
+    font-size: 13px;
+}
+.map-fs-close {
+    background: none;
+    border: 1px solid #333;
+    color: #888;
+    font-size: 16px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+}
+.map-fs-close:hover {
+    color: #f44;
+    border-color: #f44;
+}
+#mapFsCanvas {
+    flex: 1;
+    display: block;
+    cursor: crosshair;
 }
 
 /* ===== 底部条：快捷命令 + 连接状态 ===== */
