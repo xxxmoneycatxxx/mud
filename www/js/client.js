@@ -142,6 +142,9 @@ class AdvancedMUDClient {
         // 断连不清地图——保持探索数据，重连后服务端会推送新房间信息自然更新
         // mapper.reset() 仅在用户主动清除缓存时触发
 
+        // 停止自动行走
+        if (typeof pathfinder !== 'undefined') pathfinder.stopWalk();
+
         console.log('🔧 连接已强制清理');
     }
 

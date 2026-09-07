@@ -183,6 +183,8 @@ class Mapper {
             this._computePositions();
             this.render();
             this._scheduleSave();
+            // 通知 pathfinder 同步增量数据（仅当 pathfinder 使用 mapper 回退模式时生效）
+            if (typeof pathfinder !== 'undefined') pathfinder.refreshFromMapper();
         } catch (e) {
             console.warn('Mapper: updateRoom 异常', e);
         }

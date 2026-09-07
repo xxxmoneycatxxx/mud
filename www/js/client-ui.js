@@ -599,8 +599,15 @@ AdvancedMUDClient.prototype.handleSendCommand = function () {
     }
 
     if (command) {
-        this.addToHistory(command);
-        this.sendCommand(command);
+        // 拦截 gtr 命令，路由到寻路组件
+        if (/^gtr\s+/i.test(command)) {
+            const keyword = command.replace(/^gtr\s+/i, '').trim();
+            if (keyword) this._handleGotoRoom(keyword);
+            else this.appendMessage('用法: gtr 房间名|房间hash', 'system');
+        } else {
+            this.addToHistory(command);
+            this.sendCommand(command);
+        }
     } else {
         this.sendCommand('\n');
     }
@@ -620,6 +627,115 @@ AdvancedMUDClient.prototype.addToHistory = function (command) {
             localStorage.setItem('mud_command_history', JSON.stringify(this.history));
         } catch (e) { /* 存储空间不足时忽略 */ }
     }
+};
+
+// ===== 自动寻路 (gtr) =====
+
+AdvancedMUDClient.prototype._handleGotoRoom = async function (keyword) {
+    if (typeof pathfinder === 'undefined') {
+        this.appendMessage('寻路组件未加载', 'system');
+        return;
+    }
+
+    // 停止当前行走
+    if (pathfinder.isWalking()) {
+        pathfinder.stopWalk();
+        this.appendMessage('已停止自动行走', 'system');
+        return;
+    }
+
+    // 确保地图数据已加载
+    if (!pathfinder.loaded) {
+        this.appendMessage('正在加载地图数据...', 'system');
+        const ok = await pathfinder.ensureLoaded();
+        if (!ok) {
+            this.appendMessage('地图数据不可用（需先探索一些房间）', 'system');
+            return;
+        }
+        if (pathfinder._source === 'mapper') {
+            this.appendMessage('全量地图未导出，使用已探索数据寻路（范围有限）', 'system');
+        }
+    }
+
+    // 先尝试按 hash 精确匹配
+    const byHash = pathfinder.getRoom(keyword);
+    if (byHash) {
+        this._startPathwalk(byHash.hash, byHash.name);
+        return;
+    }
+
+    // 按名称搜索
+    const results = pathfinder.searchRoom(keyword);
+    if (results.length === 0) {
+        this.appendMessage('未找到匹配「' + keyword + '」的房间', 'system');
+        return;
+    }
+
+    if (results.length === 1) {
+        this._startPathwalk(results[0].hash, results[0].name);
+        return;
+    }
+
+    // 多个匹配，显示可点击列表
+    this.appendMessage('找到 ' + results.length + ' 个匹配房间：', 'system');
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    let html = '';
+    const maxShow = Math.min(results.length, 20);
+    for (let i = 0; i < maxShow; i++) {
+        const r = results[i];
+        html += '<div class="message system">'
+            + '<a class="exit-link" data-cmd="gtr ' + esc(r.hash) + '">'
+            + esc(r.name) + '</a>'
+            + ' <span style="color:#666">[' + esc(r.area) + ']</span>'
+            + '</div>';
+    }
+    if (results.length > maxShow) {
+        html += '<div class="message system" style="color:#666">... 还有 ' + (results.length - maxShow) + ' 个结果</div>';
+    }
+    // 直接插入终端，渲染为可点击链接
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    while (container.firstChild) {
+        this.terminal.appendChild(container.firstChild);
+    }
+    this.terminal.scrollTop = this.terminal.scrollHeight;
+};
+
+AdvancedMUDClient.prototype._startPathwalk = function (targetHash, targetName) {
+    if (!mapper || !mapper.currentHash) {
+        this.appendMessage('当前位置未知，无法寻路', 'system');
+        return;
+    }
+
+    const path = pathfinder.findPath(mapper.currentHash, targetHash);
+    if (!path) {
+        this.appendMessage('无法找到通往「' + targetName + '」的路径', 'system');
+        return;
+    }
+    if (path.length === 0) {
+        this.appendMessage('你已经在「' + targetName + '」', 'system');
+        return;
+    }
+
+    this.addToHistory('gtr ' + targetName);
+    this.appendMessage('自动寻路到「' + targetName + '」，共 ' + path.length + ' 步', 'system');
+
+    pathfinder.startWalk(
+        path,
+        // onStep
+        (index, dir, total) => {
+            const dirLabel = (typeof DIR_SHORT !== 'undefined' ? DIR_SHORT[dir] : dir) || dir;
+            this.appendMessage('  [' + (index + 1) + '/' + total + '] ' + dirLabel, 'system');
+        },
+        // onComplete
+        (success) => {
+            if (success) {
+                this.appendMessage('已到达「' + targetName + '」', 'system');
+            } else {
+                this.appendMessage('自动行走已中断', 'system');
+            }
+        }
+    );
 };
 
 AdvancedMUDClient.prototype.navigateHistory = function (direction) {

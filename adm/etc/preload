@@ -20,6 +20,7 @@
 /adm/daemons/messaged
 /adm/daemons/backupd
 /adm/daemons/mapd
+/adm/daemons/map_export_d
 /adm/daemons/familyd
 /adm/daemons/questd
 /adm/daemons/cpud
