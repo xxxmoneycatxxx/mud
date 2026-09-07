@@ -660,6 +660,9 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
     // 触发器匹配：自动执行命令（仙丹拾取等）
     this._processTriggers(message);
 
+    // 速走智能中断：遇敌暂停、事件结束恢复
+    this._checkSpeedwalkTriggers(message);
+
     const div = document.createElement('div');
     div.className = 'message ' + className;
     let html = this.parseANSI(message);
@@ -680,6 +683,25 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
     }
 
     this.terminal.scrollTop = this.terminal.scrollHeight;
+};
+
+// 速走智能中断：遇敌自动暂停，事件结束自动恢复
+AdvancedMUDClient.prototype._checkSpeedwalkTriggers = function (message) {
+    if (typeof pathfinder === 'undefined') return;
+
+    // 遇敌自动暂停速走（与 Mudlet pauseSpeedWalk 触发器对齐）
+    if (pathfinder.isWalking() && /看起来.+想杀死你！$/.test(message)) {
+        pathfinder.pauseWalk();
+        this.appendMessage('⚠ 速走已暂停（检测到敌人）', 'system');
+        return;
+    }
+
+    // 叫船等待中，上岸后恢复速走（与 Mudlet doSpeedWalk 触发器对齐）
+    if (pathfinder.isPaused() && /到啦，上岸吧/.test(message)) {
+        pathfinder.resumeWalk(1000);
+        this.appendMessage('▶ 速走已恢复（已上岸）', 'system');
+        return;
+    }
 };
 
 // 触发器处理：遍历规则表，匹配则自动发送命令

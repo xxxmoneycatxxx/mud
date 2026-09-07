@@ -16,6 +16,10 @@ class Pathfinder {
         this._walkIndex = 0;
         this._walkCallback = null;
         this.walkDelay = 600;     // 每步移动间隔（毫秒）
+        // 速走暂停/恢复：遇敌自动暂停，事件结束后恢复
+        this._pausedPath = null;
+        this._pausedIndex = 0;
+        this._pausedCallback = null;
     }
 
     // ===== 地图加载 =====
@@ -242,10 +246,88 @@ class Pathfinder {
         const wasWalking = !!this._walkPath;
         this._walkPath = null;
         this._walkIndex = 0;
+        // 停止行走时同时清除暂停状态（彻底取消）
+        this._pausedPath = null;
+        this._pausedIndex = 0;
         if (wasWalking && this._walkCallback) {
             this._walkCallback(false);
             this._walkCallback = null;
         }
+    }
+
+    // 暂停自动行走（遇敌等场景，保留进度以便恢复）
+    pauseWalk() {
+        if (!this._walkPath) return false;
+        if (this._walkTimer) {
+            clearTimeout(this._walkTimer);
+            this._walkTimer = null;
+        }
+        // 保存当前进度
+        this._pausedPath = this._walkPath;
+        this._pausedIndex = this._walkIndex;
+        this._pausedCallback = this._walkCallback;
+        // 清除活跃状态（isWalking() 返回 false）
+        this._walkPath = null;
+        this._walkIndex = 0;
+        this._walkCallback = null;
+        console.log('Pathfinder: 速走已暂停，剩余', this._pausedPath.length - this._pausedIndex, '步');
+        return true;
+    }
+
+    // 恢复暂停的速走
+    // resumeDelay: 恢复前等待毫秒数（默认 0 立即恢复）
+    resumeWalk(resumeDelay) {
+        if (!this._pausedPath) return false;
+        const path = this._pausedPath;
+        const startIndex = this._pausedIndex;
+        const onComplete = this._pausedCallback;
+        this._pausedPath = null;
+        this._pausedIndex = 0;
+        this._pausedCallback = null;
+
+        if (startIndex >= path.length) {
+            if (onComplete) onComplete(true);
+            return true;
+        }
+
+        console.log('Pathfinder: 速走恢复，从第', startIndex + 1, '步继续，剩余', path.length - startIndex, '步');
+
+        const delay = resumeDelay || 0;
+        const doResume = () => {
+            this._walkPath = path;
+            this._walkIndex = startIndex;
+            this._walkCallback = onComplete;
+
+            const step = () => {
+                if (this._walkIndex >= this._walkPath.length) {
+                    this._walkPath = null;
+                    this._walkIndex = 0;
+                    if (onComplete) onComplete(true);
+                    return;
+                }
+                const dir = this._walkPath[this._walkIndex];
+                // onStep 回调在 startWalk 中传入，此处直接发送命令
+                if (typeof client !== 'undefined' && client.connected) {
+                    client.sendCommand(dir);
+                }
+                this._walkIndex++;
+                this._walkTimer = setTimeout(step, this.walkDelay);
+            };
+
+            step();
+        };
+
+        if (delay > 0) {
+            this._walkTimer = setTimeout(doResume, delay);
+        } else {
+            doResume();
+        }
+        return true;
+    }
+
+    // 是否处于暂停状态
+    isPaused() {
+        return !!this._pausedPath;
     }
 
     // 是否正在行走
