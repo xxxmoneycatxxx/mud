@@ -37,18 +37,27 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
     });
 };
 
-// 房间出口按钮点击委托：点击即移动（按钮由 updateRoomInfo 动态重建）
+// 小地图出口按钮点击委托 + 折叠/展开切换
 AdvancedMUDClient.prototype.setupRoomExits = function () {
-    const roomBar = document.getElementById('roomInfoBar');
-    if (!roomBar) return;
-    roomBar.addEventListener('click', (e) => {
-        const btn = e.target.closest('.exit-btn');
-        if (!btn || !this.connected) return;
-        const cmd = btn.getAttribute('data-cmd');
-        if (!cmd) return;
-        this.commandInput.value = cmd;
-        this.handleSendCommand();
-    });
+    const exitsContainer = document.getElementById('minimapExits');
+    if (exitsContainer) {
+        exitsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.exit-btn');
+            if (!btn || !this.connected) return;
+            const cmd = btn.getAttribute('data-cmd');
+            if (!cmd) return;
+            this.commandInput.value = cmd;
+            this.handleSendCommand();
+        });
+    }
+
+    // 折叠/展开按钮
+    const toggleBtn = document.getElementById('minimapToggle');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            this.toggleMinimap();
+        });
+    }
 };
 
 // 终端可点击链接委托：look/l 出口（点击移动）+ 文档内 help 交叉引用（点击查阅），历史消息同样生效
@@ -71,27 +80,43 @@ AdvancedMUDClient.prototype.setupTerminalFeatures = function () {
             this.telnet.updateTerminalSize();
         }
     });
+
+    // 标签页切回时重新渲染地图（浏览器可能在隐藏时丢弃 Canvas 绘制）
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && typeof mapper !== 'undefined') {
+            mapper.render();
+        }
+    });
 };
 
 AdvancedMUDClient.prototype.processGMCPData = function (data) {
     if (!data || !data.module) return;
 
-    switch (data.module) {
-        case 'Char.Vitals':
-            this._vitalsReceived = true;
-            this.updateCharacterStatus(data.data);
-            break;
-        case 'Room.Info':
-            this.updateRoomInfo(data.data);
-            break;
-        case 'Help.Topics':
-            this.applyHelpTopics(data.data);
-            break;
-        case 'Help.Search':
-            this.applyHelpSearchResults(data.data);
-            break;
-        case 'Client.GUI':
-            break;
+    try {
+        switch (data.module) {
+            case 'Char.Vitals':
+                this._vitalsReceived = true;
+                this.updateCharacterStatus(data.data);
+                break;
+            case 'Room.Info':
+                this.updateRoomInfo(data.data);
+                break;
+            case 'Client.Map':
+                if (data.data && data.data.url) {
+                    mapper.setMapUrl(data.data.url);
+                }
+                break;
+            case 'Help.Topics':
+                this.applyHelpTopics(data.data);
+                break;
+            case 'Help.Search':
+                this.applyHelpSearchResults(data.data);
+                break;
+            case 'Client.GUI':
+                break;
+        }
+    } catch (e) {
+        console.warn('GMCP处理异常:', data.module, e);
     }
 };
 
@@ -158,19 +183,60 @@ AdvancedMUDClient.prototype.updateCharacterStatus = function (vitals) {
 };
 
 AdvancedMUDClient.prototype.updateRoomInfo = function (roomInfo) {
-    const roomBar = document.getElementById('roomInfoBar');
-    if (!roomBar) return;
+    const panel = document.getElementById('minimapPanel');
+    const title = document.getElementById('minimapTitle');
+    const exits = document.getElementById('minimapExits');
+    if (!panel || !title || !exits) return;
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    let html = '<span class="room-name">' + esc(roomInfo.name || '未知') + '</span>';
-    if (roomInfo.area) html += ' <span class="room-area">[' + esc(roomInfo.area) + ']</span>';
+
+    // 更新标题：房间名 + 区域
+    let titleText = esc(roomInfo.name || '未知');
+    if (roomInfo.area) titleText += ' <span style="color:#888;font-weight:normal;font-size:11px;">[' + esc(roomInfo.area) + ']</span>';
+    title.innerHTML = titleText;
+
+    // 更新出口按钮
+    exits.innerHTML = '';
     if (roomInfo.exits && roomInfo.exits.length > 0) {
-        html += '<span class="room-exits">';
         roomInfo.exits.forEach(dir => {
-            html += '<button class="exit-btn" data-cmd="' + esc(dir) + '" title="移动: ' + esc(dir) + '">' + esc(this.dirLabel(dir)) + '</button>';
+            const btn = document.createElement('button');
+            btn.className = 'exit-btn';
+            btn.setAttribute('data-cmd', esc(dir));
+            btn.title = '移动: ' + esc(dir);
+            btn.textContent = this.dirLabel(dir);
+            exits.appendChild(btn);
         });
-        html += '</span>';
     }
-    roomBar.innerHTML = html;
+
+    // 新房间到达，清空小地图内容
+    this.clearMinimap();
+
+    // 将房间数据喂给地图组件，构建房间图并渲染
+    mapper.updateRoom(roomInfo);
+
+    // 显示面板
+    panel.classList.add('visible');
+};
+
+// ===== 小地图 =====
+
+// 清空小地图内容（新房间到达时调用）
+AdvancedMUDClient.prototype.clearMinimap = function () {
+    // Canvas 内容由 mapper.render() 管理，此处无需手动清空
+};
+
+// 切换小地图折叠/展开
+AdvancedMUDClient.prototype.toggleMinimap = function () {
+    const panel = document.getElementById('minimapPanel');
+    const toggle = document.getElementById('minimapToggle');
+    if (!panel) return;
+    panel.classList.toggle('collapsed');
+    if (toggle) {
+        toggle.textContent = panel.classList.contains('collapsed') ? '+' : '\u2212';
+    }
+    // 展开时重新渲染地图（折叠期间 Canvas 不可见，可能未渲染）
+    if (!panel.classList.contains('collapsed') && typeof mapper !== 'undefined') {
+        mapper.render();
+    }
 };
 
 // 从 hp 命令输出中解析属性值，更新状态栏
@@ -520,10 +586,10 @@ AdvancedMUDClient.prototype.setupEventListeners = function () {
 };
 
 AdvancedMUDClient.prototype.handleSendCommand = function () {
-    const command = this.commandInput.value;
+    const command = this.commandInput.value.trim();
 
     // 本地回显（ASCII 和 Telnet 模式均由客户端回显）
-    if (command.trim() && this.connected) {
+    if (command && this.connected) {
         if (this._expectPassword) {
             this.appendMessage('> ***', 'system');
             this._expectPassword = false; // 密码已发送，重置标记
@@ -532,7 +598,7 @@ AdvancedMUDClient.prototype.handleSendCommand = function () {
         }
     }
 
-    if (command.trim()) {
+    if (command) {
         this.addToHistory(command);
         this.sendCommand(command);
     } else {

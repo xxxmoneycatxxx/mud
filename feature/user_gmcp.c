@@ -123,9 +123,25 @@ protected void send_room_info()
         log_gmcp("send_room_info: has_gmcp() = false, skipped");
         return;
     }
+
+    mapping exits = ob->query("exits") || ([]);
+    mapping exit_targets = ([]);
+    foreach (string dir, string target in exits)
+    {
+        if (stringp(target))
+        {
+#if defined(__PACKAGE_CRYPTO__) && efun_defined(hash)
+            exit_targets[dir] = hash("md5", target);
+#else
+            exit_targets[dir] = sha1(target);
+#endif
+        }
+    }
+
     mapping room_info = ([
         "name" : remove_ansi(ob->query("short") || ob->query("name") || ""),
-        "exits": keys(ob->query("exits") || ([])),
+        "exits": keys(exits),
+        "exit_targets": exit_targets,
         "area" : ob->query("outdoors") || explode(base_name(ob), "/")[1],
 #if defined(__PACKAGE_CRYPTO__) && efun_defined(hash)
         "hash" : hash("md5", base_name(ob))
@@ -244,5 +260,13 @@ void gmcp(string req)
             if (stringp(keyword) && keyword != "")
                 send_help_search(keyword);
         }
+    }
+    // Web 客户端刷新重连后发送 Client.GUI，此时玩家环境已完全恢复
+    // 延迟重推房间信息、状态和帮助，确保地图等组件能正常渲染
+    else if (module == "Client.GUI")
+    {
+        call_out("send_char_vitals", 1);
+        call_out("send_room_info", 1);
+        call_out("send_help_topics", 1);
     }
 }

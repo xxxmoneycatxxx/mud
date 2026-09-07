@@ -12,10 +12,21 @@
         <div class="stats-line" id="statsLine">
             <span style="color:#666;">气血 --/--</span>
         </div>
-        <div class="room-info-bar" id="roomInfoBar">房间: --</div>
     </div>
 
     <div class="terminal" id="terminal">正在连接到 MUD……</div>
+
+    <!-- 小地图浮动面板：房间信息 + Canvas 地图 -->
+    <div class="minimap-panel" id="minimapPanel">
+        <div class="minimap-header">
+            <span class="minimap-title" id="minimapTitle">房间: --</span>
+            <button class="minimap-toggle" id="minimapToggle" title="收起/展开小地图">−</button>
+        </div>
+        <div class="minimap-body" id="minimapBody">
+            <div class="minimap-exits" id="minimapExits"></div>
+            <canvas class="minimap-content" id="minimapContent" width="280" height="220"></canvas>
+        </div>
+    </div>
 
     <div class="input-area">
         <div class="input-container">
@@ -52,9 +63,10 @@
         </div>
     </div>
 
-    <!-- 脚本按依赖顺序加载：常量 → 类定义 → 原型扩展 → 实例化 -->
+    <!-- 脚本按依赖顺序加载：常量 → 地图 → 类定义 → 原型扩展 → 实例化 -->
     <script src="js/telnet.js"></script>
     <script src="js/ansi.js"></script>
+    <script src="js/mapper.js"></script>
     <script src="js/client.js"></script>
     <script src="js/client-ui.js"></script>
     <script src="js/help.js"></script>

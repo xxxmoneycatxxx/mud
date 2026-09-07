@@ -241,16 +241,9 @@ body {
     animation: gauge-pulse 1.5s ease-in-out infinite;
 }
 .room-info-bar {
-    color: #0f0;
-    font-size: 12px;
-    margin-left: 8px;
-    padding-left: 8px;
-    border-left: 1px solid #1a3a1a;
-    flex-shrink: 0;
+    /* 已迁移至浮动小地图面板 .minimap-panel */
+    display: none;
 }
-.room-info-bar .room-name { font-weight: bold; }
-.room-info-bar .room-area { color: #888; }
-.room-info-bar .room-exits { color: #666; margin-left: 4px; }
 /* 房间出口可点击按钮（点击移动） */
 .exit-btn {
     background: #1a2a1a;
@@ -294,6 +287,92 @@ body {
     color: #ff0;
     background: #3a3a1a;
     text-decoration: none;
+}
+
+/* ===== 小地图浮动面板 ===== */
+.minimap-panel {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 50;
+    background: rgba(10, 15, 10, 0.92);
+    border: 1px solid #1a3a1a;
+    border-radius: 4px;
+    min-width: 180px;
+    max-width: 320px;
+    font-size: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+    display: none;
+}
+.minimap-panel.visible { display: block; }
+.minimap-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    border-bottom: 1px solid #1a3a1a;
+    cursor: default;
+    user-select: none;
+}
+.minimap-title {
+    color: #0f0;
+    font-weight: bold;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+.minimap-toggle {
+    background: none;
+    border: 1px solid #333;
+    color: #888;
+    font-size: 14px;
+    line-height: 1;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 2px;
+    margin-left: 6px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.minimap-toggle:hover {
+    color: #0f0;
+    border-color: #0f0;
+}
+.minimap-body {
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+}
+.minimap-panel.collapsed .minimap-body {
+    max-height: 0;
+    padding: 0;
+}
+.minimap-exits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 4px 8px;
+    border-bottom: 1px solid #111;
+    min-height: 0;
+}
+.minimap-exits:empty {
+    display: none;
+    padding: 0;
+    border: none;
+}
+.minimap-content {
+    display: block;
+    margin: 0;
+    padding: 4px;
+    max-height: 240px;
+    overflow: hidden;
+    background: transparent;
 }
 
 /* ===== 底部条：快捷命令 + 连接状态 ===== */
@@ -472,5 +551,14 @@ body {
     }
     .stat-text .val {
         font-size: 10px;
+    }
+
+    .minimap-panel {
+        max-width: 240px;
+        min-width: 140px;
+        font-size: 11px;
+    }
+    .minimap-content {
+        max-height: 180px;
     }
 }

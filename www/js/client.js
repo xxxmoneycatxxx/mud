@@ -28,6 +28,11 @@ class AdvancedMUDClient {
         // ANSI 颜色码映射表 (与服务端 ansi.h 对齐)
         this._ansiColorMap = ANSI_COLOR_MAP;
 
+        // 初始化地图组件 Canvas
+        if (typeof mapper !== 'undefined') {
+            mapper.init(document.getElementById('minimapContent'));
+        }
+
         this.init();
     }
 
@@ -133,6 +138,10 @@ class AdvancedMUDClient {
         this._hpFallbackSent = false;
         this._lastVitals = null;
         this.connected = false;
+
+        // 断连不清地图——保持探索数据，重连后服务端会推送新房间信息自然更新
+        // mapper.reset() 仅在用户主动清除缓存时触发
+
         console.log('🔧 连接已强制清理');
     }
 
@@ -227,11 +236,13 @@ class AdvancedMUDClient {
                 this.commandInput.disabled = true;
                 this.sendBtn.disabled = true;
 
-                // 隐藏状态栏和快捷命令
+                // 隐藏状态栏、快捷命令和小地图
                 const statusBar = document.getElementById('statusBar');
                 const quickCmds = document.getElementById('quickCommands');
+                const minimap = document.getElementById('minimapPanel');
                 if (statusBar) statusBar.classList.remove('visible');
                 if (quickCmds) quickCmds.classList.remove('visible');
+                if (minimap) minimap.classList.remove('visible');
 
                 this.appendMessage('🔌 连接已断开', 'error');
 
