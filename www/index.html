@@ -23,8 +23,22 @@
             <button class="minimap-toggle" id="minimapToggle" title="收起/展开小地图">−</button>
         </div>
         <div class="minimap-body" id="minimapBody">
-            <div class="minimap-exits" id="minimapExits"></div>
             <canvas class="minimap-content" id="minimapContent" width="280" height="220"></canvas>
+            <!-- 九宫格移动面板：8 方向 + 扩展栏 -->
+            <div class="move-panel" id="movePanel">
+                <div class="move-grid">
+                    <div class="move-cell" data-dir="northwest"><span class="move-dir">↖</span><span class="move-name">西北</span></div>
+                    <div class="move-cell" data-dir="north"><span class="move-dir">↑</span><span class="move-name">北</span></div>
+                    <div class="move-cell" data-dir="northeast"><span class="move-dir">↗</span><span class="move-name">东北</span></div>
+                    <div class="move-cell" data-dir="west"><span class="move-dir">←</span><span class="move-name">西</span></div>
+                    <div class="move-cell move-center" id="moveCenter"><span class="move-dir">●</span></div>
+                    <div class="move-cell" data-dir="east"><span class="move-dir">→</span><span class="move-name">东</span></div>
+                    <div class="move-cell" data-dir="southwest"><span class="move-dir">↙</span><span class="move-name">西南</span></div>
+                    <div class="move-cell" data-dir="south"><span class="move-dir">↓</span><span class="move-name">南</span></div>
+                    <div class="move-cell" data-dir="southeast"><span class="move-dir">↘</span><span class="move-name">东南</span></div>
+                </div>
+                <div class="move-extra" id="moveExtra"></div>
+            </div>
         </div>
     </div>
 

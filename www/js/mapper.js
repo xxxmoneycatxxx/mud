@@ -360,6 +360,9 @@ class Mapper {
 
         // 指南针
         this._drawCompass(ctx, 18, 18);
+
+        // 同步更新九宫格移动面板
+        this._renderMovePanel();
     }
 
     _drawPlaceholder(ctx, W, H) {
@@ -407,6 +410,69 @@ class Mapper {
         ctx.textBaseline = 'bottom';
         ctx.fillText('N', cx, cy - r - 1);
         ctx.restore();
+    }
+
+    // 更新九宫格移动面板：根据当前房间出口激活/禁用方向格子
+    _renderMovePanel() {
+        const panel = document.getElementById('movePanel');
+        if (!panel) return;
+
+        const curRoom = this.currentHash ? this.rooms.get(this.currentHash) : null;
+        if (!curRoom) {
+            panel.style.display = 'none';
+            return;
+        }
+        panel.style.display = '';
+
+        // 8 方向格子：根据出口激活/禁用
+        const cells = panel.querySelectorAll('.move-cell[data-dir]');
+        const exits = new Set(curRoom.exits || []);
+        cells.forEach(cell => {
+            const dir = cell.getAttribute('data-dir');
+            const hasExit = exits.has(dir);
+            cell.classList.toggle('has-exit', hasExit);
+
+            // 已探索的目标房间标记
+            const targetHash = curRoom.connections[dir];
+            const explored = hasExit && targetHash && this.rooms.has(targetHash) && this.rooms.get(targetHash).name;
+            cell.classList.toggle('explored', !!explored);
+
+            // 更新房间名称
+            const nameEl = cell.querySelector('.move-name');
+            if (nameEl) {
+                if (explored) {
+                    const targetRoom = this.rooms.get(targetHash);
+                    nameEl.textContent = this._truncate(targetRoom.name || '', 4);
+                } else {
+                    nameEl.textContent = DIR_SHORT[dir] || '';
+                }
+            }
+        });
+
+        // 中心格：当前房间名
+        const center = document.getElementById('moveCenter');
+        if (center) {
+            const dirSpan = center.querySelector('.move-dir');
+            if (dirSpan) dirSpan.textContent = '●';
+            // 移除可能残留的 move-name
+            const oldName = center.querySelector('.move-name');
+            if (oldName) oldName.remove();
+        }
+
+        // 扩展栏：up/down/in/out/enter/leave
+        const EXTRA_DIRS = ['up', 'down', 'in', 'out', 'enter', 'leave'];
+        const extra = document.getElementById('moveExtra');
+        if (!extra) return;
+        extra.innerHTML = '';
+        EXTRA_DIRS.forEach(dir => {
+            if (!exits.has(dir)) return;
+            const btn = document.createElement('button');
+            btn.className = 'move-extra-btn';
+            btn.setAttribute('data-dir', dir);
+            btn.textContent = DIR_SHORT[dir] || dir;
+            btn.title = '移动: ' + dir;
+            extra.appendChild(btn);
+        });
     }
 
     // 完全重置（仅在新会话开始时调用，如清除缓存）

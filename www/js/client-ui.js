@@ -1,17 +1,5 @@
 // ===== UI 事件、命令处理、消息显示、ANSI 解析 — AdvancedMUDClient 原型扩展 =====
 
-// 方向命令 → 紧凑中文标签（未收录的自定义出口原样显示）
-AdvancedMUDClient.prototype.dirLabel = function (dir) {
-    const map = {
-        'north': '北', 'south': '南', 'east': '东', 'west': '西',
-        'up': '上', 'down': '下',
-        'northeast': '东北', 'northwest': '西北',
-        'southeast': '东南', 'southwest': '西南',
-        'in': '进', 'out': '出', 'enter': '进入', 'leave': '离开'
-    };
-    return map[dir] || dir;
-};
-
 AdvancedMUDClient.prototype.setupQuickCommands = function () {
     const qcContainer = document.getElementById('quickCommands');
     if (!qcContainer) return;
@@ -37,25 +25,39 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
     });
 };
 
-// 小地图出口按钮点击委托 + 折叠/展开切换
+// 小地图折叠/展开切换 + 九宫格移动面板点击委托
 AdvancedMUDClient.prototype.setupRoomExits = function () {
-    const exitsContainer = document.getElementById('minimapExits');
-    if (exitsContainer) {
-        exitsContainer.addEventListener('click', (e) => {
-            const btn = e.target.closest('.exit-btn');
-            if (!btn || !this.connected) return;
-            const cmd = btn.getAttribute('data-cmd');
-            if (!cmd) return;
-            this.commandInput.value = cmd;
-            this.handleSendCommand();
-        });
-    }
-
     // 折叠/展开按钮
     const toggleBtn = document.getElementById('minimapToggle');
     if (toggleBtn) {
         toggleBtn.addEventListener('click', () => {
             this.toggleMinimap();
+        });
+    }
+
+    // 九宫格移动面板点击委托
+    const movePanel = document.getElementById('movePanel');
+    if (movePanel) {
+        movePanel.addEventListener('click', (e) => {
+            // 九宫格方向格子
+            const cell = e.target.closest('.move-cell.has-exit[data-dir]');
+            if (cell && this.connected) {
+                const dir = cell.getAttribute('data-dir');
+                if (dir) {
+                    this.commandInput.value = dir;
+                    this.handleSendCommand();
+                    return;
+                }
+            }
+            // 扩展栏按钮 (up/down/in/out/enter/leave)
+            const extraBtn = e.target.closest('.move-extra-btn');
+            if (extraBtn && this.connected) {
+                const dir = extraBtn.getAttribute('data-dir');
+                if (dir) {
+                    this.commandInput.value = dir;
+                    this.handleSendCommand();
+                }
+            }
         });
     }
 };
@@ -185,27 +187,13 @@ AdvancedMUDClient.prototype.updateCharacterStatus = function (vitals) {
 AdvancedMUDClient.prototype.updateRoomInfo = function (roomInfo) {
     const panel = document.getElementById('minimapPanel');
     const title = document.getElementById('minimapTitle');
-    const exits = document.getElementById('minimapExits');
-    if (!panel || !title || !exits) return;
+    if (!panel || !title) return;
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     // 更新标题：房间名 + 区域
     let titleText = esc(roomInfo.name || '未知');
     if (roomInfo.area) titleText += ' <span style="color:#888;font-weight:normal;font-size:11px;">[' + esc(roomInfo.area) + ']</span>';
     title.innerHTML = titleText;
-
-    // 更新出口按钮
-    exits.innerHTML = '';
-    if (roomInfo.exits && roomInfo.exits.length > 0) {
-        roomInfo.exits.forEach(dir => {
-            const btn = document.createElement('button');
-            btn.className = 'exit-btn';
-            btn.setAttribute('data-cmd', esc(dir));
-            btn.title = '移动: ' + esc(dir);
-            btn.textContent = this.dirLabel(dir);
-            exits.appendChild(btn);
-        });
-    }
 
     // 新房间到达，清空小地图内容
     this.clearMinimap();

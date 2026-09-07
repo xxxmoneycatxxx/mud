@@ -244,23 +244,6 @@ body {
     /* 已迁移至浮动小地图面板 .minimap-panel */
     display: none;
 }
-/* 房间出口可点击按钮（点击移动） */
-.exit-btn {
-    background: #1a2a1a;
-    color: #4f4;
-    border: 1px solid #0a0;
-    border-radius: 3px;
-    padding: 0 5px;
-    margin-left: 3px;
-    font-size: 11px;
-    line-height: 16px;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.exit-btn:hover {
-    background: #0a0;
-    color: #000;
-}
 /* 终端 look 输出中的可点击出口 */
 .exit-link {
     color: #4f4;
@@ -353,19 +336,6 @@ body {
     max-height: 0;
     padding: 0;
 }
-.minimap-exits {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    padding: 4px 8px;
-    border-bottom: 1px solid #111;
-    min-height: 0;
-}
-.minimap-exits:empty {
-    display: none;
-    padding: 0;
-    border: none;
-}
 .minimap-content {
     display: block;
     margin: 0;
@@ -373,6 +343,107 @@ body {
     max-height: 240px;
     overflow: hidden;
     background: transparent;
+}
+
+/* ===== 九宫格移动面板 ===== */
+.move-panel {
+    padding: 6px 8px;
+    border-top: 1px solid #1a3a1a;
+}
+.move-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    max-width: 240px;
+    margin: 0 auto;
+}
+.move-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 2px;
+    min-height: 36px;
+    background: #0a0f0a;
+    border: 1px solid #1a2a1a;
+    border-radius: 3px;
+    cursor: default;
+    opacity: 0.3;
+    transition: all 0.15s;
+    user-select: none;
+}
+.move-cell.has-exit {
+    opacity: 1;
+    cursor: pointer;
+    border-color: #0a0;
+}
+.move-cell.has-exit:hover {
+    background: #0a0;
+    color: #000;
+}
+.move-cell.has-exit:hover .move-dir {
+    color: #000;
+}
+.move-cell.has-exit:hover .move-name {
+    color: #000;
+}
+.move-cell.move-center {
+    opacity: 1;
+    background: #0a1a0a;
+    border-color: #0f0;
+    cursor: default;
+}
+.move-dir {
+    font-size: 14px;
+    line-height: 1;
+    color: #0a0;
+}
+.move-cell.has-exit .move-dir {
+    color: #4f4;
+}
+.move-name {
+    font-size: 9px;
+    color: #666;
+    line-height: 1.2;
+    margin-top: 1px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.move-cell.has-exit .move-name {
+    color: #8a8;
+}
+.move-cell.has-exit.explored .move-name {
+    color: #0f0;
+}
+/* 扩展栏：up/down/in/out/enter/leave */
+.move-extra {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    justify-content: center;
+    margin-top: 4px;
+    min-height: 0;
+}
+.move-extra:empty {
+    display: none;
+    margin: 0;
+}
+.move-extra-btn {
+    background: #0a0f0a;
+    color: #886;
+    border: 1px solid #333;
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.move-extra-btn:hover {
+    background: #333;
+    color: #ff0;
+    border-color: #ff0;
 }
 
 /* ===== 底部条：快捷命令 + 连接状态 ===== */
@@ -560,5 +631,15 @@ body {
     }
     .minimap-content {
         max-height: 180px;
+    }
+    .move-cell {
+        min-height: 30px;
+        padding: 2px 1px;
+    }
+    .move-dir {
+        font-size: 12px;
+    }
+    .move-name {
+        font-size: 8px;
     }
 }

@@ -54,18 +54,6 @@ class AdvancedMUDClient {
         this.connect(this.resolveWsUrl());
     }
 
-    // 方向命令 → 紧凑中文标签（未收录的自定义出口原样显示）
-    dirLabel(dir) {
-        const map = {
-            'north': '北', 'south': '南', 'east': '东', 'west': '西',
-            'up': '上', 'down': '下',
-            'northeast': '东北', 'northwest': '西北',
-            'southeast': '东南', 'southwest': '西南',
-            'in': '进', 'out': '出', 'enter': '进入', 'leave': '离开'
-        };
-        return map[dir] || dir;
-    }
-
     // 计算 WebSocket 连接地址：优先 localStorage 覆盖（调试用），否则按当前页面来源自动推导
     // web 客户端与 MUD 同源部署，故直接连回提供本页面的主机（https 页面用 wss，否则 ws）
     resolveWsUrl() {
