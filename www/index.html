@@ -88,6 +88,23 @@
         </div>
     </div>
 
+    <!-- 设置面板：触发器管理等 -->
+    <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-modal">
+            <div class="settings-titlebar">
+                <span>【 设置 】</span>
+                <button class="settings-close" id="settingsClose" title="关闭 (Esc)">✕</button>
+            </div>
+            <div class="settings-body">
+                <div class="settings-section">
+                    <div class="settings-section-title">自动触发器</div>
+                    <div class="settings-triggers" id="settingsTriggers"></div>
+                </div>
+            </div>
+            <div class="settings-footer">Esc 关闭</div>
+        </div>
+    </div>
+
     <!-- 脚本按依赖顺序加载：常量 → 地图 → 寻路 → 类定义 → 原型扩展 → 实例化 -->
     <script src="js/telnet.js"></script>
     <script src="js/ansi.js"></script>

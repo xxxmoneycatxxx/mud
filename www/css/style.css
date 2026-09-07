@@ -774,3 +774,137 @@ body {
         font-size: 8px;
     }
 }
+
+/* ===== 设置面板 ===== */
+.settings-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+}
+.settings-overlay.visible { display: flex; }
+.settings-modal {
+    width: min(420px, 88vw);
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    background: #0a0a0a;
+    border: 1px solid #0f0;
+    box-shadow: 0 0 24px rgba(0, 255, 0, 0.25);
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    color: #0f0;
+}
+.settings-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: center;
+    padding: 6px 10px;
+    color: #ff0;
+    font-weight: bold;
+    letter-spacing: 3px;
+    border-bottom: 1px solid #1a3a1a;
+}
+.settings-close {
+    background: none;
+    border: 1px solid #333;
+    color: #888;
+    font-size: 14px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 3px;
+}
+.settings-close:hover { color: #f00; border-color: #f00; }
+.settings-body {
+    padding: 10px;
+    overflow-y: auto;
+    flex: 1;
+}
+.settings-section-title {
+    color: #886;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #1a1a1a;
+}
+.settings-footer {
+    padding: 4px 10px;
+    font-size: 9px;
+    color: #555;
+    text-align: center;
+    border-top: 1px solid #1a3a1a;
+}
+
+/* 触发器列表项 */
+.trigger-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 4px;
+    border-bottom: 1px solid #111;
+}
+.trigger-item:last-child { border-bottom: none; }
+.trigger-info {
+    flex: 1;
+    min-width: 0;
+}
+.trigger-name {
+    color: #0f0;
+    font-size: 12px;
+    font-weight: bold;
+}
+.trigger-detail {
+    color: #555;
+    font-size: 10px;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* 开关按钮 */
+.trigger-toggle {
+    position: relative;
+    width: 36px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+.trigger-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.trigger-toggle .slider {
+    position: absolute;
+    inset: 0;
+    background: #333;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.trigger-toggle .slider::before {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    left: 2px;
+    top: 2px;
+    background: #888;
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+}
+.trigger-toggle input:checked + .slider {
+    background: #060;
+}
+.trigger-toggle input:checked + .slider::before {
+    transform: translateX(18px);
+    background: #0f0;
+}

@@ -25,6 +25,20 @@ class AdvancedMUDClient {
         this._hpFallbackSent = false;   // hp 兑底是否已发送
         this._lastVitals = null;        // 最近一次状态栏数据（合并用）
 
+        // 轻量触发器规则表：pattern 匹配消息时自动执行 command
+        // 新增规则只需往数组加一条，支持 cooldown 防刷
+        this._triggers = [
+            {
+                name: '仙丹自动拾取',
+                pattern: /"啪"的一声一颗仙丹掉到你面前。/,
+                command: 'get dan',
+                enabled: true,
+                cooldown: 0,
+                _lastFired: 0,
+            },
+        ];
+        this._loadTriggerStates();
+
         // ANSI 颜色码映射表 (与服务端 ansi.h 对齐)
         this._ansiColorMap = ANSI_COLOR_MAP;
 
@@ -421,5 +435,26 @@ class AdvancedMUDClient {
         } catch (e) {
             console.warn('GMCP解析错误:', e);
         }
+    }
+
+    // 触发器启用状态持久化：保存到 localStorage
+    _saveTriggerStates() {
+        try {
+            const states = this._triggers.map(t => ({ name: t.name, enabled: t.enabled }));
+            localStorage.setItem('mud_trigger_states', JSON.stringify(states));
+        } catch (e) { /* 存储失败忽略 */ }
+    }
+
+    // 触发器启用状态恢复：从 localStorage 加载
+    _loadTriggerStates() {
+        try {
+            const saved = localStorage.getItem('mud_trigger_states');
+            if (!saved) return;
+            const states = JSON.parse(saved);
+            for (const s of states) {
+                const trigger = this._triggers.find(t => t.name === s.name);
+                if (trigger) trigger.enabled = s.enabled;
+            }
+        } catch (e) { /* 解析失败忽略 */ }
     }
 }

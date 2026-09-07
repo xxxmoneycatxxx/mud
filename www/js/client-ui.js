@@ -4,25 +4,120 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
     const qcContainer = document.getElementById('quickCommands');
     if (!qcContainer) return;
 
-    // 方向移动改由房间信息栏的可点击出口承担（点击移动），
-    // 此处只保留与当前房间无关的通用动作键
+    // 通用动作键：中文标签 + tooltip 显示实际命令
+    // look 保留（房间描述常用），hp 移除（Gauge 已可视化显示）
     const actions = [
-        { label: 'look', cmd: 'look' },
-        { label: 'score', cmd: 'score' },
-        { label: 'i', cmd: 'i' },
-        { label: 'hp', cmd: 'hp' },
+        { label: 'look', cmd: 'look', title: '查看周围' },
+        { label: '资料', cmd: 'score', title: '角色属性' },
+        { label: '物品', cmd: 'i', title: '背包物品' },
+        { label: '技能', cmd: 'cha', title: '技能熟练' },
+        { label: '任务', cmd: 'quest', title: '任务列表' },
+        { label: '玩家', cmd: 'who', title: '在线玩家' },
     ];
 
     actions.forEach(a => {
         const btn = document.createElement('button');
         btn.className = 'qc-btn';
         btn.textContent = a.label;
+        btn.title = a.title + ' (' + a.cmd + ')';
         btn.addEventListener('click', () => {
             this.commandInput.value = a.cmd;
             this.handleSendCommand();
         });
         qcContainer.appendChild(btn);
     });
+
+    // 设置按钮：打开设置面板
+    const settingsBtn = document.createElement('button');
+    settingsBtn.className = 'qc-btn qc-settings-btn';
+    settingsBtn.textContent = '⚙';
+    settingsBtn.title = '设置（触发器管理）';
+    settingsBtn.addEventListener('click', () => this._openSettings());
+    qcContainer.appendChild(settingsBtn);
+
+    // 设置面板事件绑定
+    this._setupSettingsEvents();
+};
+
+// 设置面板：事件绑定（只调用一次）
+AdvancedMUDClient.prototype._setupSettingsEvents = function () {
+    const overlay = document.getElementById('settingsOverlay');
+    const closeBtn = document.getElementById('settingsClose');
+    if (!overlay) return;
+
+    // 关闭按钮
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => this._closeSettings());
+    }
+    // 点击背景关闭
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) this._closeSettings();
+    });
+    // Esc 关闭（与帮助面板共用文档级监听）
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.classList.contains('visible')) {
+            this._closeSettings();
+        }
+    });
+};
+
+// 打开设置面板
+AdvancedMUDClient.prototype._openSettings = function () {
+    const overlay = document.getElementById('settingsOverlay');
+    if (!overlay) return;
+    this._renderTriggerList();
+    overlay.classList.add('visible');
+};
+
+// 关闭设置面板
+AdvancedMUDClient.prototype._closeSettings = function () {
+    const overlay = document.getElementById('settingsOverlay');
+    if (overlay) overlay.classList.remove('visible');
+};
+
+// 渲染触发器列表到设置面板
+AdvancedMUDClient.prototype._renderTriggerList = function () {
+    const container = document.getElementById('settingsTriggers');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!this._triggers || this._triggers.length === 0) {
+        container.innerHTML = '<div style="color:#555;font-size:11px;">暂无触发器规则</div>';
+        return;
+    }
+
+    this._triggers.forEach((trigger, index) => {
+        const item = document.createElement('div');
+        item.className = 'trigger-item';
+
+        const info = document.createElement('div');
+        info.className = 'trigger-info';
+        info.innerHTML = '<div class="trigger-name">' + this._escHtml(trigger.name) + '</div>'
+            + '<div class="trigger-detail">' + this._escHtml(trigger.command) + ' · ' + this._escHtml(trigger.pattern.source) + '</div>';
+
+        const toggle = document.createElement('label');
+        toggle.className = 'trigger-toggle';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = trigger.enabled;
+        input.addEventListener('change', () => {
+            trigger.enabled = input.checked;
+            this._saveTriggerStates();
+        });
+        const slider = document.createElement('span');
+        slider.className = 'slider';
+        toggle.appendChild(input);
+        toggle.appendChild(slider);
+
+        item.appendChild(info);
+        item.appendChild(toggle);
+        container.appendChild(item);
+    });
+};
+
+// HTML 转义工具
+AdvancedMUDClient.prototype._escHtml = function (text) {
+    return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 };
 
 // 小地图折叠/展开切换 + 九宫格移动面板点击委托
@@ -562,6 +657,9 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
     // 解析 hp 命令输出，更新状态栏（GMCP 的可靠补充）
     this.parseHpOutput(message);
 
+    // 触发器匹配：自动执行命令（仙丹拾取等）
+    this._processTriggers(message);
+
     const div = document.createElement('div');
     div.className = 'message ' + className;
     let html = this.parseANSI(message);
@@ -582,6 +680,21 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
     }
 
     this.terminal.scrollTop = this.terminal.scrollHeight;
+};
+
+// 触发器处理：遍历规则表，匹配则自动发送命令
+AdvancedMUDClient.prototype._processTriggers = function (message) {
+    if (!this._triggers || !this.connected) return;
+    const now = Date.now();
+    for (const trigger of this._triggers) {
+        if (!trigger.enabled) continue;
+        if (trigger.cooldown > 0 && now - trigger._lastFired < trigger.cooldown) continue;
+        if (trigger.pattern.test(message)) {
+            trigger._lastFired = now;
+            this.sendCommand(trigger.command);
+            console.log('[触发器] ' + trigger.name + ' → ' + trigger.command);
+        }
+    }
 };
 
 AdvancedMUDClient.prototype.parseANSI = function (text) {
