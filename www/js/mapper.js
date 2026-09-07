@@ -2,7 +2,7 @@
 // 利用 Room.Info GMCP 中的 exit_targets 直接构建精确房间图
 // 支持 localStorage 持久化，刷新后地图立即可用
 
-// 方向 → 网格坐标偏移（标准 MUD 方向布局）
+// 方向 → 网格坐标偏移（标准 MUD 方向布局，全部整数避免重叠）
 const DIR_OFFSETS = {
     'north':     { dx:  0, dy:  1 },
     'south':     { dx:  0, dy: -1 },
@@ -12,12 +12,12 @@ const DIR_OFFSETS = {
     'northwest': { dx: -1, dy:  1 },
     'southeast': { dx:  1, dy: -1 },
     'southwest': { dx: -1, dy: -1 },
-    'up':        { dx:  0.6, dy:  0.4 },
-    'down':      { dx:  0.6, dy: -0.4 },
-    'in':        { dx: -0.6, dy:  0.4 },
-    'out':       { dx: -0.6, dy: -0.4 },
-    'enter':     { dx:  0, dy: -0.6 },
-    'leave':     { dx:  0, dy:  0.6 },
+    'up':        { dx:  0, dy:  2 },
+    'down':      { dx:  0, dy: -2 },
+    'in':        { dx: -2, dy:  0 },
+    'out':       { dx:  2, dy:  0 },
+    'enter':     { dx:  0, dy: -2 },
+    'leave':     { dx:  0, dy:  2 },
 };
 
 // 方向 → 连线颜色
@@ -193,6 +193,7 @@ class Mapper {
     }
 
     // BFS 从当前房间出发，为可达房间分配网格坐标
+    // 检测坐标冲突时，将冲突房间及其连通子树整体平移到最近的空闲格
     _computePositions() {
         if (!this.currentHash || !this.rooms.has(this.currentHash)) return;
 
@@ -210,17 +211,86 @@ class Mapper {
 
             for (const dir of room.exits) {
                 const targetHash = room.connections[dir];
-                if (targetHash && !visited.has(targetHash)) {
-                    visited.add(targetHash);
-                    const offset = DIR_OFFSETS[dir] || { dx: 0, dy: 0 };
-                    this.positions.set(targetHash, {
-                        x: pos.x + offset.dx,
-                        y: pos.y + offset.dy,
-                    });
-                    queue.push(targetHash);
+                if (!targetHash || visited.has(targetHash)) continue;
+                visited.add(targetHash);
+
+                const offset = DIR_OFFSETS[dir] || { dx: 0, dy: 0 };
+                let nx = pos.x + offset.dx;
+                let ny = pos.y + offset.dy;
+
+                // 检测坐标冲突：该格位已被其他房间占据
+                const occupantKey = this._findOccupant(nx, ny);
+                if (occupantKey && occupantKey !== targetHash) {
+                    // 收集 targetHash 的整棵 BFS 子树
+                    const block = [];
+                    const blockQ = [targetHash];
+                    const blockSet = new Set([targetHash]);
+                    while (blockQ.length > 0) {
+                        const h = blockQ.shift();
+                        block.push(h);
+                        const r = this.rooms.get(h);
+                        if (!r) continue;
+                        for (const d of r.exits) {
+                            const t = r.connections[d];
+                            if (t && !blockSet.has(t) && !this.positions.has(t)) {
+                                blockSet.add(t);
+                                blockQ.push(t);
+                            }
+                        }
+                    }
+
+                    // 在螺旋环上搜索空闲格位
+                    const free = this._findFreePos(nx, ny);
+                    if (free) {
+                        const shiftDx = free.x - nx;
+                        const shiftDy = free.y - ny;
+                        for (const bh of block) {
+                            const bp = this.positions.get(bh);
+                            if (bp) {
+                                this.positions.set(bh, {
+                                    x: bp.x + shiftDx,
+                                    y: bp.y + shiftDy,
+                                });
+                            }
+                        }
+                        // 子树已整体平移，跳过常规赋值
+                        continue;
+                    }
+                    // 找不到空闲格位则放弃该房间
+                    continue;
+                }
+
+                this.positions.set(targetHash, { x: nx, y: ny });
+                queue.push(targetHash);
+            }
+        }
+    }
+
+    // 查找占据指定格位的房间 hash，无则返回 null
+    _findOccupant(x, y) {
+        for (const [hash, pos] of this.positions) {
+            if (pos.x === x && pos.y === y) return hash;
+        }
+        return null;
+    }
+
+    // 在螺旋环上搜索最近的空闲格位
+    _findFreePos(cx, cy) {
+        const occupied = new Set();
+        for (const pos of this.positions.values()) {
+            occupied.add(pos.x + ',' + pos.y);
+        }
+        if (!occupied.has(cx + ',' + cy)) return { x: cx, y: cy };
+        for (let ring = 1; ring <= 20; ring++) {
+            for (let dx = -ring; dx <= ring; dx++) {
+                for (let dy = -ring; dy <= ring; dy++) {
+                    if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
+                    const key = (cx + dx) + ',' + (cy + dy);
+                    if (!occupied.has(key)) return { x: cx + dx, y: cy + dy };
                 }
             }
         }
+        return null;
     }
 
     _reverseDir(dir) {
@@ -247,7 +317,9 @@ class Mapper {
         const cs = this.cellSize;
         const rs = this.roomSize;
 
-        ctx.clearRect(0, 0, W, H);
+        // 完全清除画布（fillRect 比 clearRect 更可靠，防止文本残留）
+        ctx.fillStyle = '#0a0f0a';
+        ctx.fillRect(0, 0, W, H);
 
         if (!this.currentHash || !this.rooms.has(this.currentHash)) {
             this._drawPlaceholder(ctx, W, H);
