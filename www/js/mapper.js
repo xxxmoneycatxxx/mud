@@ -326,8 +326,8 @@ class Mapper {
                 ctx.fill();
             }
 
-            // 标签：当前房间 + 已探索的邻居
-            if (vr.isCurrent || (explored && this._isAdjacent(vr.hash))) {
+            // 标签：当前房间 + 所有已探索的可见房间
+            if (vr.isCurrent || explored) {
                 ctx.fillStyle = vr.isCurrent ? '#fff' : '#888';
                 ctx.font = (vr.isCurrent ? 'bold ' : '') + '10px Consolas, monospace';
                 ctx.textAlign = 'center';
