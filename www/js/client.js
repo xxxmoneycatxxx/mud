@@ -62,6 +62,7 @@ class AdvancedMUDClient {
         this.setupTerminalFeatures();
         this.setupQuickCommands();
         this.setupRoomExits();
+        this.setupStatusBar();
         this.setupTerminalExits();
         this.setupHelpModal();
         // 高度定制客户端：无需首屏配置，加载后直接自动连接

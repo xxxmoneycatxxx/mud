@@ -421,6 +421,81 @@ AdvancedMUDClient.prototype.toggleMinimap = function () {
     }
 };
 
+// 切换状态栏折叠/展开
+AdvancedMUDClient.prototype.toggleStatusBar = function () {
+    const panel = document.getElementById('statusBar');
+    const toggle = document.getElementById('statusToggle');
+    if (!panel) return;
+    panel.classList.toggle('collapsed');
+    if (toggle) {
+        toggle.textContent = panel.classList.contains('collapsed') ? '+' : '\u2212';
+    }
+};
+
+// 状态栏面板：折叠按钮 + 拖拽（鼠标 + 触摸）
+AdvancedMUDClient.prototype.setupStatusBar = function () {
+    // 折叠/展开按钮
+    const toggleBtn = document.getElementById('statusToggle');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => this.toggleStatusBar());
+    }
+
+    // 拖拽（与 minimap 相同逻辑）
+    const panel = document.getElementById('statusBar');
+    const header = document.querySelector('.status-header');
+    if (!panel || !header) return;
+    let dragging = false;
+    let offsetX = 0, offsetY = 0;
+
+    const onStart = (clientX, clientY) => {
+        const rect = panel.getBoundingClientRect();
+        // 清除居中 transform，改用显式像素定位（否则 translateX(-50%) 会与 left 叠加导致偏移）
+        panel.style.transform = 'none';
+        panel.style.left = rect.left + 'px';
+        panel.style.top = rect.top + 'px';
+        offsetX = clientX - rect.left;
+        offsetY = clientY - rect.top;
+        dragging = true;
+        panel.classList.add('dragging');
+    };
+    const onMove = (clientX, clientY) => {
+        if (!dragging) return;
+        const x = clientX - offsetX;
+        const y = clientY - offsetY;
+        const maxX = window.innerWidth - panel.offsetWidth;
+        const maxY = window.innerHeight - panel.offsetHeight;
+        panel.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+        panel.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+    };
+    const onEnd = () => {
+        if (!dragging) return;
+        dragging = false;
+        panel.classList.remove('dragging');
+    };
+
+    // 鼠标
+    header.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.status-toggle')) return;
+        e.preventDefault();
+        onStart(e.clientX, e.clientY);
+    });
+    document.addEventListener('mousemove', (e) => onMove(e.clientX, e.clientY));
+    document.addEventListener('mouseup', onEnd);
+
+    // 触摸
+    header.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.status-toggle')) return;
+        const t = e.touches[0];
+        onStart(t.clientX, t.clientY);
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        const t = e.touches[0];
+        onMove(t.clientX, t.clientY);
+    }, { passive: true });
+    document.addEventListener('touchend', onEnd);
+};
+
 // 从 hp 命令输出中解析属性值，更新状态栏
 AdvancedMUDClient.prototype.parseHpOutput = function (text) {
     // 去除 ANSI 转义码

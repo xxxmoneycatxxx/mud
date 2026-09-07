@@ -7,10 +7,16 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <!-- 状态栏 -->
-    <div class="status-bar" id="statusBar">
-        <div class="stats-line" id="statsLine">
-            <span style="color:#666;">气血 --/--</span>
+    <!-- 状态栏浮动面板：角色属性 Gauge 可视化 -->
+    <div class="status-panel" id="statusBar">
+        <div class="status-header">
+            <span class="status-title">角色状态</span>
+            <button class="status-toggle" id="statusToggle" title="收起/展开状态栏">−</button>
+        </div>
+        <div class="status-body" id="statusBody">
+            <div class="stats-line" id="statsLine">
+                <span style="color:#666;">气血 --/--</span>
+            </div>
         </div>
     </div>
 

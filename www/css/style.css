@@ -163,31 +163,89 @@ body {
     opacity: 0.7;
 }
 
-/* ===== 状态栏（Gauge 可视化） ===== */
-.status-bar {
-    display: none;
-    background: #0a0f0a;
-    border-bottom: 1px solid #1a3a1a;
-    padding: 6px 12px;
+/* ===== 状态栏浮动面板（参照小地图面板样式） ===== */
+.status-panel {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    background: rgba(10, 15, 10, 0.92);
+    border: 1px solid #1a3a1a;
+    border-radius: 4px;
+    min-width: 200px;
+    max-width: 420px;
     font-size: 12px;
-    color: #aaa;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+    display: none;
 }
-.status-bar.visible { display: flex; align-items: flex-start; gap: 0; flex-wrap: wrap; }
+.status-panel.visible { display: block; }
+.status-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    border-bottom: 1px solid #1a3a1a;
+    cursor: grab;
+    user-select: none;
+}
+.status-header:active {
+    cursor: grabbing;
+}
+.status-panel.dragging {
+    transition: none !important;
+}
+.status-title {
+    color: #0f0;
+    font-weight: bold;
+    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+}
+.status-toggle {
+    background: none;
+    border: 1px solid #333;
+    color: #888;
+    font-size: 14px;
+    line-height: 1;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 2px;
+    margin-left: 6px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.status-toggle:hover {
+    color: #0f0;
+    border-color: #0f0;
+}
+.status-body {
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+    padding: 6px 8px;
+}
+.status-panel.collapsed .status-body {
+    max-height: 0;
+    padding: 0 8px;
+    overflow: hidden;
+}
 .stats-line {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
     gap: 4px 6px;
-    flex: 1;
-    min-width: 0;
 }
 /* 单个 Gauge 容器 */
 .stat-gauge {
     display: flex;
     flex-direction: column;
-    min-width: 90px;
-    flex: 1 1 100px;
-    max-width: 160px;
+    min-width: 80px;
+    flex: 1 1 80px;
+    max-width: 140px;
 }
 .stat-gauge .gauge-label {
     font-size: 10px;
@@ -739,10 +797,15 @@ body {
         padding: 8px 35px 8px 10px;
     }
 
+    .status-panel {
+        max-width: 300px;
+        min-width: 160px;
+        font-size: 11px;
+    }
     .stat-gauge {
-        min-width: 70px;
-        flex-basis: 80px;
-        max-width: 120px;
+        min-width: 65px;
+        flex-basis: 70px;
+        max-width: 110px;
     }
     .stat-gauge .gauge-label,
     .stat-gauge .gauge-text {
