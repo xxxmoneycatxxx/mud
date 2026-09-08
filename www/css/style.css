@@ -974,6 +974,10 @@ body {
     background: #1a3a1a;
     color: #cc9;
 }
+.settings-item-badge.macro {
+    background: #2a1a3a;
+    color: #c9c;
+}
 .settings-empty {
     color: #999;
     font-size: 11px;

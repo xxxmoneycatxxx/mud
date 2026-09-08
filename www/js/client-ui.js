@@ -365,37 +365,232 @@ AdvancedMUDClient.prototype._renderAliasList = function () {
     if (!container) return;
     container.innerHTML = '';
 
+    // 顶部操作栏
+    const toolbar = document.createElement('div');
+    toolbar.className = 'settings-toolbar';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'settings-action-btn';
+    addBtn.textContent = '+ 新增';
+    addBtn.addEventListener('click', () => this._showAliasForm(-1));
+    toolbar.appendChild(addBtn);
+    container.appendChild(toolbar);
+
+    // 别名列表
     const aliases = this._aliases || [];
     if (aliases.length === 0) {
-        container.innerHTML = '<div class="settings-empty">暂无别名规则</div>';
+        const empty = document.createElement('div');
+        empty.className = 'settings-empty';
+        empty.textContent = '暂无别名规则';
+        container.appendChild(empty);
+    } else {
+        aliases.forEach((alias, index) => {
+            const item = document.createElement('div');
+            item.className = 'settings-item';
+
+            const info = document.createElement('div');
+            info.className = 'settings-item-info';
+            let nameHtml = this._escHtml(alias.name);
+            if (alias.builtin) nameHtml += '<span class="settings-item-badge builtin">内置</span>';
+            if (alias.command.indexOf(';') !== -1) nameHtml += '<span class="settings-item-badge macro">宏</span>';
+            info.innerHTML = '<div class="settings-item-name">' + nameHtml + '</div>'
+                + '<div class="settings-item-detail">' + this._escHtml(alias.pattern) + ' → ' + this._escHtml(alias.command) + '</div>';
+
+            const actions = document.createElement('div');
+            actions.className = 'settings-item-actions';
+
+            // 开关
+            const toggle = document.createElement('label');
+            toggle.className = 'settings-toggle';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = alias.enabled;
+            input.addEventListener('change', () => {
+                alias.enabled = input.checked;
+                this._saveAliases();
+            });
+            const slider = document.createElement('span');
+            slider.className = 'slider';
+            toggle.appendChild(input);
+            toggle.appendChild(slider);
+            actions.appendChild(toggle);
+
+            // 编辑/删除（仅用户规则）
+            if (!alias.builtin) {
+                const editBtn = document.createElement('button');
+                editBtn.className = 'settings-icon-btn';
+                editBtn.textContent = '✎';
+                editBtn.title = '编辑';
+                editBtn.addEventListener('click', () => this._showAliasForm(index));
+                actions.appendChild(editBtn);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'settings-icon-btn settings-icon-btn-danger';
+                delBtn.textContent = '✕';
+                delBtn.title = '删除';
+                delBtn.addEventListener('click', () => {
+                    if (confirm('确认删除别名「' + alias.name + '」？')) {
+                        this.removeAlias(index);
+                        this._renderAliasList();
+                    }
+                });
+                actions.appendChild(delBtn);
+            }
+
+            item.appendChild(info);
+            item.appendChild(actions);
+            container.appendChild(item);
+        });
+    }
+
+    // 表单区域
+    const formArea = document.createElement('div');
+    formArea.id = 'aliasFormArea';
+    container.appendChild(formArea);
+
+    // 底部导入/导出
+    const footer = document.createElement('div');
+    footer.className = 'settings-toolbar settings-toolbar-bottom';
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'settings-action-btn';
+    exportBtn.textContent = '导出';
+    exportBtn.addEventListener('click', () => this._exportAliasJSON());
+    const importBtn = document.createElement('button');
+    importBtn.className = 'settings-action-btn';
+    importBtn.textContent = '导入';
+    importBtn.addEventListener('click', () => this._importAliasJSON());
+    footer.appendChild(exportBtn);
+    footer.appendChild(importBtn);
+    container.appendChild(footer);
+};
+
+// 显示别名编辑表单
+AdvancedMUDClient.prototype._showAliasForm = function (index) {
+    const formArea = document.getElementById('aliasFormArea');
+    if (!formArea) return;
+
+    if (formArea.innerHTML && formArea.dataset.editIndex === String(index)) {
+        formArea.innerHTML = '';
+        formArea.dataset.editIndex = '';
         return;
     }
 
-    aliases.forEach((alias) => {
-        const item = document.createElement('div');
-        item.className = 'settings-item';
+    const isEdit = index >= 0;
+    const alias = isEdit ? this._aliases[index] : null;
 
-        const info = document.createElement('div');
-        info.className = 'settings-item-info';
-        let nameHtml = this._escHtml(alias.name);
-        if (alias.builtin) nameHtml += '<span class="settings-item-badge builtin">内置</span>';
-        info.innerHTML = '<div class="settings-item-name">' + nameHtml + '</div>'
-            + '<div class="settings-item-detail">' + this._escHtml(alias.pattern) + ' → ' + this._escHtml(alias.command) + '</div>';
+    formArea.dataset.editIndex = String(index);
+    formArea.innerHTML = '';
 
-        const toggle = document.createElement('label');
-        toggle.className = 'settings-toggle';
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.checked = alias.enabled;
-        const slider = document.createElement('span');
-        slider.className = 'slider';
-        toggle.appendChild(input);
-        toggle.appendChild(slider);
+    const form = document.createElement('div');
+    form.className = 'settings-form';
+    form.innerHTML = '<div class="settings-form-title">' + (isEdit ? '编辑别名' : '新增别名') + '</div>';
 
-        item.appendChild(info);
-        item.appendChild(toggle);
-        container.appendChild(item);
+    // 名称
+    const nameRow = document.createElement('div');
+    nameRow.className = 'settings-form-row';
+    nameRow.innerHTML = '<label>名称</label>';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'settings-form-input';
+    nameInput.placeholder = '如：施法';
+    nameInput.value = alias ? alias.name : '';
+    nameRow.appendChild(nameInput);
+    form.appendChild(nameRow);
+
+    // 匹配模式
+    const patternRow = document.createElement('div');
+    patternRow.className = 'settings-form-row';
+    patternRow.innerHTML = '<label>匹配</label>';
+    const patternInput = document.createElement('input');
+    patternInput.type = 'text';
+    patternInput.className = 'settings-form-input';
+    patternInput.placeholder = '如：cs 或 ^cs (.+)$';
+    patternInput.value = alias ? alias.pattern : '';
+    patternRow.appendChild(patternInput);
+    form.appendChild(patternRow);
+
+    // 替换命令
+    const cmdRow = document.createElement('div');
+    cmdRow.className = 'settings-form-row';
+    cmdRow.innerHTML = '<label>替换为</label>';
+    const cmdInput = document.createElement('input');
+    cmdInput.type = 'text';
+    cmdInput.className = 'settings-form-input';
+    cmdInput.placeholder = '如：cast shield $1 ；多命令用 ; 分隔';
+    cmdInput.value = alias ? alias.command : '';
+    cmdRow.appendChild(cmdInput);
+    form.appendChild(cmdRow);
+
+    // 按钮
+    const btnRow = document.createElement('div');
+    btnRow.className = 'settings-form-buttons';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'settings-action-btn';
+    saveBtn.textContent = '保存';
+    saveBtn.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        const pattern = patternInput.value.trim();
+        const command = cmdInput.value.trim();
+        if (!name || !pattern || !command) {
+            alert('请填写名称、匹配和替换命令');
+            return;
+        }
+        // 正则模式时验证合法性
+        if (/[*+?^${}()|[\]\\]/.test(pattern)) {
+            try { new RegExp(pattern); } catch (e) { alert('正则表达式无效: ' + e.message); return; }
+        }
+        if (isEdit) {
+            this.updateAlias(index, { name: name, pattern: pattern, command: command });
+        } else {
+            this.addAlias(name, pattern, command);
+        }
+        this._renderAliasList();
     });
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'settings-action-btn';
+    cancelBtn.textContent = '取消';
+    cancelBtn.addEventListener('click', () => {
+        formArea.innerHTML = '';
+        formArea.dataset.editIndex = '';
+    });
+    btnRow.appendChild(saveBtn);
+    btnRow.appendChild(cancelBtn);
+    form.appendChild(btnRow);
+
+    formArea.appendChild(form);
+};
+
+// 导出别名为 JSON 文件下载
+AdvancedMUDClient.prototype._exportAliasJSON = function () {
+    const json = this.exportAliases();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mud_aliases.json';
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+// 导入别名 JSON
+AdvancedMUDClient.prototype._importAliasJSON = function () {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                this.importAliases(ev.target.result);
+                this._renderAliasList();
+            } catch (err) {
+                alert('导入失败: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    });
+    input.click();
 };
 
 // 渲染快捷键列表（示例数据）
@@ -1305,19 +1500,44 @@ AdvancedMUDClient.prototype.setupEventListeners = function () {
 };
 
 AdvancedMUDClient.prototype.handleSendCommand = function () {
-    const command = this.commandInput.value.trim();
+    let command = this.commandInput.value.trim();
 
-    // 本地回显（ASCII 和 Telnet 模式均由客户端回显）
-    if (command && this.connected) {
-        if (this._expectPassword) {
-            this.appendMessage('> ***', 'system');
-            this._expectPassword = false; // 密码已发送，重置标记
-        } else {
-            this.appendMessage('> ' + command);
+    // 应用别名替换（可能返回字符串或命令数组）
+    let commands = null;
+    if (command) {
+        const resolved = this.applyAlias(command);
+        if (Array.isArray(resolved)) {
+            commands = resolved;
+        } else if (resolved !== command) {
+            command = resolved;
         }
     }
 
-    if (command) {
+    // 多命令宏：逐条回显并发送
+    if (commands) {
+        if (this.connected) {
+            this.appendMessage('> ' + commands.join('; '), 'system');
+        }
+        for (const cmd of commands) {
+            if (/^gtr\s+/i.test(cmd)) {
+                const keyword = cmd.replace(/^gtr\s+/i, '').trim();
+                if (keyword) this._handleGotoRoom(keyword);
+            } else {
+                this.sendCommand(cmd);
+            }
+        }
+        this.addToHistory(command);
+    } else if (command) {
+        // 本地回显（ASCII 和 Telnet 模式均由客户端回显）
+        if (this.connected) {
+            if (this._expectPassword) {
+                this.appendMessage('> ***', 'system');
+                this._expectPassword = false;
+            } else {
+                this.appendMessage('> ' + command);
+            }
+        }
+
         // 拦截 gtr 命令，路由到寻路组件
         if (/^gtr\s+/i.test(command)) {
             const keyword = command.replace(/^gtr\s+/i, '').trim();

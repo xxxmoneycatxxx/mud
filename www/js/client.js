@@ -41,15 +41,14 @@ class AdvancedMUDClient {
         this._loadTriggers();
 
         // 别名规则表：输入匹配 pattern 时替换为 command
+        // 注意：方向缩写(n/s/e/w等)、技能中文别名(dazuo/lian/xue等) 已由服务端 aliasd.c 处理，无需客户端重复
         this._aliases = [
-            {
-                name: '方向缩写',
-                pattern: 'n',
-                command: 'north',
-                enabled: true,
-                builtin: true,
-            },
+            { name: '寻路', pattern: '^go (.+)$', command: 'gtr $1', enabled: true, builtin: true },
+            { name: '施法', pattern: '^c (.+)$', command: 'cast $1', enabled: true, builtin: true },
+            { name: '战前准备', pattern: 'zb', command: 'wield sword;ready shield;cast armor', enabled: false, builtin: true },
+            { name: '物品栏', pattern: 'eq', command: 'inventory', enabled: false, builtin: true },
         ];
+        this._loadAliases();
 
         // 快捷键绑定表：按键 → 命令
         this._keybinds = [
@@ -596,5 +595,118 @@ class AdvancedMUDClient {
             });
         }
         this._saveTriggers();
+    }
+
+    // ===== 别名系统 =====
+
+    // 别名持久化：内置规则保存 enabled，用户规则保存完整定义
+    _saveAliases() {
+        try {
+            const data = this._aliases.map(a => {
+                if (a.builtin) return { name: a.name, enabled: a.enabled, builtin: true };
+                return { name: a.name, pattern: a.pattern, command: a.command, enabled: a.enabled };
+            });
+            localStorage.setItem('mud_aliases', JSON.stringify(data));
+        } catch (e) { /* 存储失败忽略 */ }
+    }
+
+    // 别名恢复：内置规则恢复 enabled，用户规则追加
+    _loadAliases() {
+        try {
+            const saved = localStorage.getItem('mud_aliases');
+            if (!saved) return;
+            const data = JSON.parse(saved);
+            for (const d of data) {
+                if (d.builtin) {
+                    const alias = this._aliases.find(a => a.name === d.name && a.builtin);
+                    if (alias) alias.enabled = d.enabled;
+                } else {
+                    this._aliases.push({
+                        name: d.name,
+                        pattern: d.pattern,
+                        command: d.command,
+                        enabled: d.enabled !== false,
+                    });
+                }
+            }
+        } catch (e) { /* 解析失败忽略 */ }
+    }
+
+    // 应用别名替换：返回替换后的命令（字符串）或命令数组（多命令宏，以分号分隔）
+    applyAlias(command) {
+        if (!this._aliases) return command;
+        let result = command;
+        for (const alias of this._aliases) {
+            if (!alias.enabled) continue;
+            const p = alias.pattern;
+            // 包含正则元字符则用正则匹配，否则精确全等匹配
+            if (/[*+?^${}()|[\]\\]/.test(p)) {
+                try {
+                    const re = new RegExp(p);
+                    if (re.test(result)) {
+                        result = result.replace(re, alias.command);
+                    }
+                } catch (e) { /* 无效正则跳过 */ }
+            } else {
+                if (result === p) {
+                    result = alias.command;
+                }
+            }
+        }
+        // 多命令宏：以分号分隔时返回数组，逐条发送
+        if (result.indexOf(';') !== -1) {
+            const parts = result.split(';').map(s => s.trim()).filter(Boolean);
+            if (parts.length > 1) return parts;
+        }
+        return result;
+    }
+
+    // 添加用户别名
+    addAlias(name, pattern, command) {
+        this._aliases.push({ name: name, pattern: pattern, command: command, enabled: true });
+        this._saveAliases();
+    }
+
+    // 更新别名（按索引）
+    updateAlias(index, fields) {
+        const a = this._aliases[index];
+        if (!a || a.builtin) return;
+        if (fields.name !== undefined) a.name = fields.name;
+        if (fields.pattern !== undefined) a.pattern = fields.pattern;
+        if (fields.command !== undefined) a.command = fields.command;
+        if (fields.enabled !== undefined) a.enabled = fields.enabled;
+        this._saveAliases();
+    }
+
+    // 删除别名（按索引，仅允许非内置）
+    removeAlias(index) {
+        const a = this._aliases[index];
+        if (!a || a.builtin) return;
+        this._aliases.splice(index, 1);
+        this._saveAliases();
+    }
+
+    // 导出用户别名
+    exportAliases() {
+        const userAliases = this._aliases
+            .filter(a => !a.builtin)
+            .map(a => ({ name: a.name, pattern: a.pattern, command: a.command, enabled: a.enabled }));
+        return JSON.stringify(userAliases, null, 2);
+    }
+
+    // 导入别名
+    importAliases(jsonStr) {
+        const items = JSON.parse(jsonStr);
+        for (const d of items) {
+            if (!d.name || !d.pattern || !d.command) continue;
+            if (this._aliases.some(a => a.name === d.name && !a.builtin)) continue;
+            this._aliases.push({
+                name: d.name,
+                pattern: d.pattern,
+                command: d.command,
+                enabled: d.enabled !== false,
+            });
+        }
+        this._saveAliases();
     }
 }
