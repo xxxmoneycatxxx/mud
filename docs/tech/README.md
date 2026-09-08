@@ -11,6 +11,9 @@
 - [MUD_PROTOCOLS_GUIDE.md](MUD_PROTOCOLS_GUIDE.md) - MUD网络协议完整指南，包括GMCP、MSSP、MSP等协议
 - [socket.md](socket.md) - Socket通信技术文档，通用Socket客户端模块使用说明
 
+### Web 客户端
+- [web_client.md](web_client.md) - Web 客户端完整技术文档，包括连接架构、GMCP 数据流、地图/寻路、自动化子系统、脚本引擎等
+
 ## 🎯 使用说明
 
 这些文档提供：

@@ -9,6 +9,8 @@
 
 ## 🎯 计划中的设计文档
 
+> 以下文档尚未创建，仅作为规划参考。
+
 ### 系统增强
 - **planned-features.md** - 计划中的新功能设计
 - **system-enhancements.md** - 现有系统增强方案
