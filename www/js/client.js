@@ -62,6 +62,7 @@ class AdvancedMUDClient {
                 builtin: true,
             },
         ];
+        this._timerIntervals = new Map(); // 活跃定时器 interval ID 映射
 
         // 关键词高亮表：匹配关键词渲染指定颜色
         this._highlights = [
@@ -119,6 +120,7 @@ class AdvancedMUDClient {
         // 初始化脚本引擎 + 恢复已启用脚本
         this.scriptEngine = new ScriptEngine(this);
         this._loadScripts();
+        this._loadTimers();
 
         this.setupEventListeners();
         this.setupTerminalFeatures();
@@ -211,6 +213,9 @@ class AdvancedMUDClient {
         if (typeof pathfinder !== 'undefined') pathfinder.stopWalk();
         if (typeof mapper !== 'undefined') mapper.setHighlightPath(null);
 
+        // 停止所有定时器
+        this._stopAllTimers();
+
         console.log('🔧 连接已强制清理');
     }
 
@@ -277,6 +282,9 @@ class AdvancedMUDClient {
 
                 // 启动心跳检测
                 this.startHeartbeat();
+
+                // 启动所有已启用的定时器
+                this._startAllTimers();
 
                 // 延迟初始化 Telnet 协商，确保连接稳定（协商过程不再打扰用户，仅出错时提示）
                 this.cleanupTimeout = setTimeout(() => {
@@ -835,5 +843,141 @@ class AdvancedMUDClient {
             });
         }
         this._saveScripts();
+    }
+
+    // ===== 定时器系统 =====
+
+    // 定时器持久化：内置规则保存 enabled，用户规则保存完整定义
+    _saveTimers() {
+        try {
+            const data = this._timers.map(t => {
+                if (t.builtin) return { name: t.name, enabled: t.enabled, builtin: true };
+                return { name: t.name, interval: t.interval, command: t.command, enabled: t.enabled };
+            });
+            localStorage.setItem('mud_timers', JSON.stringify(data));
+        } catch (e) { /* 存储失败忽略 */ }
+    }
+
+    // 定时器恢复：内置规则恢复 enabled，用户规则追加（不自动启动，等连接后启动）
+    _loadTimers() {
+        try {
+            const saved = localStorage.getItem('mud_timers');
+            if (!saved) return;
+            const data = JSON.parse(saved);
+            for (const d of data) {
+                if (d.builtin) {
+                    const timer = this._timers.find(t => t.name === d.name && t.builtin);
+                    if (timer) timer.enabled = d.enabled;
+                } else {
+                    this._timers.push({
+                        name: d.name,
+                        interval: d.interval,
+                        command: d.command,
+                        enabled: d.enabled !== false,
+                    });
+                }
+            }
+        } catch (e) { /* 解析失败忽略 */ }
+    }
+
+    // 启动单个定时器
+    _startTimer(timer) {
+        if (!timer.enabled || this._timerIntervals.has(timer.name)) return;
+        const id = setInterval(() => {
+            if (this.connected) {
+                this.sendCommand(timer.command);
+            }
+        }, timer.interval * 1000);
+        this._timerIntervals.set(timer.name, id);
+    }
+
+    // 停止单个定时器
+    _stopTimer(name) {
+        const id = this._timerIntervals.get(name);
+        if (id) {
+            clearInterval(id);
+            this._timerIntervals.delete(name);
+        }
+    }
+
+    // 启动所有已启用的定时器（连接时调用）
+    _startAllTimers() {
+        for (const timer of this._timers) {
+            if (timer.enabled) this._startTimer(timer);
+        }
+    }
+
+    // 停止所有定时器（断连时调用）
+    _stopAllTimers() {
+        for (const id of this._timerIntervals.values()) {
+            clearInterval(id);
+        }
+        this._timerIntervals.clear();
+    }
+
+    // 添加用户定时器
+    addTimer(name, interval, command) {
+        this._timers.push({ name: name, interval: interval, command: command, enabled: false });
+        this._saveTimers();
+    }
+
+    // 更新定时器
+    updateTimer(index, fields) {
+        const timer = this._timers[index];
+        if (!timer || timer.builtin) return;
+        const wasEnabled = timer.enabled;
+        Object.assign(timer, fields);
+        this._saveTimers();
+        // 引擎同步
+        this._stopTimer(timer.name);
+        if (timer.enabled && this.connected) {
+            this._startTimer(timer);
+        }
+    }
+
+    // 删除用户定时器
+    removeTimer(index) {
+        const timer = this._timers[index];
+        if (!timer || timer.builtin) return;
+        this._stopTimer(timer.name);
+        this._timers.splice(index, 1);
+        this._saveTimers();
+    }
+
+    // 切换定时器启用状态
+    toggleTimer(index, enabled) {
+        const timer = this._timers[index];
+        if (!timer) return;
+        timer.enabled = enabled;
+        this._saveTimers();
+        if (enabled && this.connected) {
+            this._startTimer(timer);
+        } else {
+            this._stopTimer(timer.name);
+        }
+    }
+
+    // 导出用户定时器
+    exportTimers() {
+        const userTimers = this._timers
+            .filter(t => !t.builtin)
+            .map(t => ({ name: t.name, interval: t.interval, command: t.command, enabled: t.enabled }));
+        return JSON.stringify(userTimers, null, 2);
+    }
+
+    // 导入定时器
+    importTimers(jsonStr) {
+        const items = JSON.parse(jsonStr);
+        for (const d of items) {
+            if (!d.name || !d.interval || !d.command) continue;
+            if (this._timers.some(t => t.name === d.name && !t.builtin)) continue;
+            this._timers.push({
+                name: d.name,
+                interval: d.interval,
+                command: d.command,
+                enabled: d.enabled || false,
+            });
+        }
+        this._saveTimers();
     }
 }

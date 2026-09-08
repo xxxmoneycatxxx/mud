@@ -592,41 +592,243 @@ AdvancedMUDClient.prototype._importAliasJSON = function () {
     input.click();
 };
 
-// 渲染定时器列表（示例数据）
+// 渲染定时器列表到设置面板
 AdvancedMUDClient.prototype._renderTimerList = function () {
     const container = document.getElementById('settingsTimers');
     if (!container) return;
     container.innerHTML = '';
 
+    // 顶部操作栏
+    const toolbar = document.createElement('div');
+    toolbar.className = 'settings-toolbar';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'settings-action-btn';
+    addBtn.textContent = '+ 新增';
+    addBtn.addEventListener('click', () => this._showTimerForm(-1));
+    toolbar.appendChild(addBtn);
+    container.appendChild(toolbar);
+
+    // 定时器列表
     const timers = this._timers || [];
     if (timers.length === 0) {
-        container.innerHTML = '<div class="settings-empty">暂无定时任务</div>';
+        const empty = document.createElement('div');
+        empty.className = 'settings-empty';
+        empty.textContent = '暂无定时任务';
+        container.appendChild(empty);
+    } else {
+        timers.forEach((timer, index) => {
+            const item = document.createElement('div');
+            item.className = 'settings-item';
+
+            const info = document.createElement('div');
+            info.className = 'settings-item-info';
+            let nameHtml = this._escHtml(timer.name);
+            if (timer.builtin) nameHtml += '<span class="settings-item-badge builtin">内置</span>';
+            // 运行状态指示
+            if (timer.enabled && this._timerIntervals && this._timerIntervals.has(timer.name)) {
+                nameHtml += '<span class="settings-item-badge running">运行中</span>';
+            }
+            info.innerHTML = '<div class="settings-item-name">' + nameHtml + '</div>'
+                + '<div class="settings-item-detail">每 ' + timer.interval + ' 秒 · ' + this._escHtml(timer.command) + '</div>';
+
+            const actions = document.createElement('div');
+            actions.className = 'settings-item-actions';
+
+            // 开关
+            const toggle = document.createElement('label');
+            toggle.className = 'settings-toggle';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = timer.enabled;
+            input.addEventListener('change', () => {
+                this.toggleTimer(index, input.checked);
+                this._renderTimerList();
+            });
+            const slider = document.createElement('span');
+            slider.className = 'slider';
+            toggle.appendChild(input);
+            toggle.appendChild(slider);
+            actions.appendChild(toggle);
+
+            // 编辑/删除（仅用户规则）
+            if (!timer.builtin) {
+                const editBtn = document.createElement('button');
+                editBtn.className = 'settings-icon-btn';
+                editBtn.textContent = '✎';
+                editBtn.title = '编辑';
+                editBtn.addEventListener('click', () => this._showTimerForm(index));
+                actions.appendChild(editBtn);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'settings-icon-btn settings-icon-btn-danger';
+                delBtn.textContent = '✕';
+                delBtn.title = '删除';
+                delBtn.addEventListener('click', () => {
+                    if (confirm('确认删除定时任务「' + timer.name + '」？')) {
+                        this.removeTimer(index);
+                        this._renderTimerList();
+                    }
+                });
+                actions.appendChild(delBtn);
+            }
+
+            item.appendChild(info);
+            item.appendChild(actions);
+            container.appendChild(item);
+        });
+    }
+
+    // 表单区域
+    const formArea = document.createElement('div');
+    formArea.id = 'timerFormArea';
+    container.appendChild(formArea);
+
+    // 底部导入/导出
+    const footer = document.createElement('div');
+    footer.className = 'settings-toolbar settings-toolbar-bottom';
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'settings-action-btn';
+    exportBtn.textContent = '导出';
+    exportBtn.addEventListener('click', () => this._exportTimerJSON());
+    const importBtn = document.createElement('button');
+    importBtn.className = 'settings-action-btn';
+    importBtn.textContent = '导入';
+    importBtn.addEventListener('click', () => this._importTimerJSON());
+    footer.appendChild(exportBtn);
+    footer.appendChild(importBtn);
+    container.appendChild(footer);
+};
+
+// 显示定时器编辑表单
+AdvancedMUDClient.prototype._showTimerForm = function (index) {
+    const formArea = document.getElementById('timerFormArea');
+    if (!formArea) return;
+
+    if (formArea.innerHTML && formArea.dataset.editIndex === String(index)) {
+        formArea.innerHTML = '';
+        formArea.dataset.editIndex = '';
         return;
     }
 
-    timers.forEach((timer) => {
-        const item = document.createElement('div');
-        item.className = 'settings-item';
+    const isEdit = index >= 0;
+    const timer = isEdit ? this._timers[index] : null;
 
-        const info = document.createElement('div');
-        info.className = 'settings-item-info';
-        info.innerHTML = '<div class="settings-item-name">' + this._escHtml(timer.name) + '</div>'
-            + '<div class="settings-item-detail">每 ' + timer.interval + ' 秒 · ' + this._escHtml(timer.command) + '</div>';
+    formArea.dataset.editIndex = String(index);
+    formArea.innerHTML = '';
 
-        const toggle = document.createElement('label');
-        toggle.className = 'settings-toggle';
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.checked = timer.enabled;
-        const slider = document.createElement('span');
-        slider.className = 'slider';
-        toggle.appendChild(input);
-        toggle.appendChild(slider);
+    const form = document.createElement('div');
+    form.className = 'settings-form';
+    form.innerHTML = '<div class="settings-form-title">' + (isEdit ? '编辑定时任务' : '新增定时任务') + '</div>';
 
-        item.appendChild(info);
-        item.appendChild(toggle);
-        container.appendChild(item);
+    // 名称
+    const nameRow = document.createElement('div');
+    nameRow.className = 'settings-form-row';
+    nameRow.innerHTML = '<label>名称</label>';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'settings-form-input';
+    nameInput.placeholder = '如：状态刷新';
+    nameInput.value = timer ? timer.name : '';
+    nameRow.appendChild(nameInput);
+    form.appendChild(nameRow);
+
+    // 间隔（秒）
+    const intervalRow = document.createElement('div');
+    intervalRow.className = 'settings-form-row';
+    intervalRow.innerHTML = '<label>间隔（秒）</label>';
+    const intervalInput = document.createElement('input');
+    intervalInput.type = 'number';
+    intervalInput.className = 'settings-form-input';
+    intervalInput.min = '1';
+    intervalInput.placeholder = '如：30';
+    intervalInput.value = timer ? timer.interval : '';
+    intervalRow.appendChild(intervalInput);
+    form.appendChild(intervalRow);
+
+    // 执行命令
+    const cmdRow = document.createElement('div');
+    cmdRow.className = 'settings-form-row';
+    cmdRow.innerHTML = '<label>命令</label>';
+    const cmdInput = document.createElement('input');
+    cmdInput.type = 'text';
+    cmdInput.className = 'settings-form-input';
+    cmdInput.placeholder = '如：hp';
+    cmdInput.value = timer ? timer.command : '';
+    cmdRow.appendChild(cmdInput);
+    form.appendChild(cmdRow);
+
+    // 按钮
+    const btnRow = document.createElement('div');
+    btnRow.className = 'settings-form-buttons';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'settings-action-btn';
+    saveBtn.textContent = '保存';
+    saveBtn.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        const interval = parseInt(intervalInput.value, 10);
+        const command = cmdInput.value.trim();
+        if (!name || !interval || !command) {
+            alert('请填写名称、间隔和命令');
+            return;
+        }
+        if (interval < 1) {
+            alert('间隔至少 1 秒');
+            return;
+        }
+        if (isEdit) {
+            this.updateTimer(index, { name: name, interval: interval, command: command });
+        } else {
+            this.addTimer(name, interval, command);
+        }
+        this._renderTimerList();
     });
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'settings-action-btn';
+    cancelBtn.textContent = '取消';
+    cancelBtn.addEventListener('click', () => {
+        formArea.innerHTML = '';
+        formArea.dataset.editIndex = '';
+    });
+    btnRow.appendChild(saveBtn);
+    btnRow.appendChild(cancelBtn);
+    form.appendChild(btnRow);
+
+    formArea.appendChild(form);
+};
+
+// 导出定时器 JSON
+AdvancedMUDClient.prototype._exportTimerJSON = function () {
+    const json = this.exportTimers();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mud-timers.json';
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+// 导入定时器 JSON
+AdvancedMUDClient.prototype._importTimerJSON = function () {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                this.importTimers(reader.result);
+                this._renderTimerList();
+                this.appendMessage('✅ 定时器导入成功', 'system');
+            } catch (err) {
+                this.appendMessage('❌ 定时器导入失败: ' + err.message, 'system');
+            }
+        };
+        reader.readAsText(file);
+    });
+    input.click();
 };
 
 // 渲染高亮列表（示例数据）
