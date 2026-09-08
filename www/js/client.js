@@ -34,10 +34,60 @@ class AdvancedMUDClient {
                 command: 'get dan',
                 enabled: true,
                 cooldown: 0,
+                builtin: true,
                 _lastFired: 0,
             },
         ];
-        this._loadTriggerStates();
+        this._loadTriggers();
+
+        // 别名规则表：输入匹配 pattern 时替换为 command
+        this._aliases = [
+            {
+                name: '方向缩写',
+                pattern: 'n',
+                command: 'north',
+                enabled: true,
+                builtin: true,
+            },
+        ];
+
+        // 快捷键绑定表：按键 → 命令
+        this._keybinds = [
+            { key: 'F1', command: 'look', enabled: true },
+            { key: 'F2', command: 'score', enabled: true },
+            { key: 'F3', command: 'i', enabled: true },
+        ];
+
+        // 定时任务表：间隔执行命令
+        this._timers = [
+            {
+                name: '状态刷新',
+                interval: 30,
+                command: 'hp',
+                enabled: true,
+                builtin: true,
+            },
+        ];
+
+        // 关键词高亮表：匹配关键词渲染指定颜色
+        this._highlights = [
+            {
+                keyword: '仙丹',
+                color: '#ff0',
+                enabled: true,
+            },
+        ];
+
+        // 用户脚本表：自定义 JavaScript 脚本片段
+        this._scripts = [
+            {
+                name: '自动打坐',
+                description: '检测到「你盘膝坐下」时自动执行 meditation',
+                code: 'onMessage(/你盘膝坐下/, () => sendCommand("meditation"));',
+                enabled: false,
+                builtin: true,
+            },
+        ];
 
         // ANSI 颜色码映射表 (与服务端 ansi.h 对齐)
         this._ansiColorMap = ANSI_COLOR_MAP;
@@ -438,24 +488,113 @@ class AdvancedMUDClient {
         }
     }
 
-    // 触发器启用状态持久化：保存到 localStorage
-    _saveTriggerStates() {
+    // 触发器完整持久化：内置规则保存 enabled 状态，用户规则保存完整定义
+    _saveTriggers() {
         try {
-            const states = this._triggers.map(t => ({ name: t.name, enabled: t.enabled }));
-            localStorage.setItem('mud_trigger_states', JSON.stringify(states));
+            const data = this._triggers.map(t => {
+                if (t.builtin) return { name: t.name, enabled: t.enabled, builtin: true };
+                return { name: t.name, pattern: t.pattern.source, command: t.command, cooldown: t.cooldown, enabled: t.enabled };
+            });
+            localStorage.setItem('mud_triggers', JSON.stringify(data));
         } catch (e) { /* 存储失败忽略 */ }
     }
 
-    // 触发器启用状态恢复：从 localStorage 加载
-    _loadTriggerStates() {
+    // 触发器恢复：内置规则恢复 enabled，用户规则追加到列表
+    _loadTriggers() {
         try {
-            const saved = localStorage.getItem('mud_trigger_states');
+            // 兼容旧版：迁移 mud_trigger_states → mud_triggers
+            const oldKey = localStorage.getItem('mud_trigger_states');
+            if (oldKey && !localStorage.getItem('mud_triggers')) {
+                const oldStates = JSON.parse(oldKey);
+                for (const s of oldStates) {
+                    const trigger = this._triggers.find(t => t.name === s.name && t.builtin);
+                    if (trigger) trigger.enabled = s.enabled;
+                }
+                localStorage.removeItem('mud_trigger_states');
+                this._saveTriggers();
+                return;
+            }
+
+            const saved = localStorage.getItem('mud_triggers');
             if (!saved) return;
-            const states = JSON.parse(saved);
-            for (const s of states) {
-                const trigger = this._triggers.find(t => t.name === s.name);
-                if (trigger) trigger.enabled = s.enabled;
+            const data = JSON.parse(saved);
+            for (const d of data) {
+                if (d.builtin) {
+                    // 内置规则：仅恢复 enabled 状态
+                    const trigger = this._triggers.find(t => t.name === d.name && t.builtin);
+                    if (trigger) trigger.enabled = d.enabled;
+                } else {
+                    // 用户规则：重建并追加
+                    this._triggers.push({
+                        name: d.name,
+                        pattern: new RegExp(d.pattern),
+                        command: d.command,
+                        enabled: d.enabled !== false,
+                        cooldown: d.cooldown || 0,
+                        _lastFired: 0,
+                    });
+                }
             }
         } catch (e) { /* 解析失败忽略 */ }
+    }
+
+    // 添加用户触发器
+    addTrigger(name, pattern, command, cooldown) {
+        this._triggers.push({
+            name: name,
+            pattern: new RegExp(pattern),
+            command: command,
+            enabled: true,
+            cooldown: cooldown || 0,
+            _lastFired: 0,
+        });
+        this._saveTriggers();
+    }
+
+    // 更新触发器（按索引）
+    updateTrigger(index, fields) {
+        const t = this._triggers[index];
+        if (!t || t.builtin) return;
+        if (fields.name !== undefined) t.name = fields.name;
+        if (fields.pattern !== undefined) t.pattern = new RegExp(fields.pattern);
+        if (fields.command !== undefined) t.command = fields.command;
+        if (fields.cooldown !== undefined) t.cooldown = fields.cooldown;
+        if (fields.enabled !== undefined) t.enabled = fields.enabled;
+        this._saveTriggers();
+    }
+
+    // 删除触发器（按索引，仅允许非内置）
+    removeTrigger(index) {
+        const t = this._triggers[index];
+        if (!t || t.builtin) return;
+        this._triggers.splice(index, 1);
+        this._saveTriggers();
+    }
+
+    // 导出用户触发器为 JSON 字符串
+    exportTriggers() {
+        const userTriggers = this._triggers
+            .filter(t => !t.builtin)
+            .map(t => ({ name: t.name, pattern: t.pattern.source, command: t.command, cooldown: t.cooldown, enabled: t.enabled }));
+        return JSON.stringify(userTriggers, null, 2);
+    }
+
+    // 从 JSON 字符串导入触发器（追加，不覆盖）
+    importTriggers(jsonStr) {
+        const items = JSON.parse(jsonStr);
+        for (const d of items) {
+            if (!d.name || !d.pattern || !d.command) continue;
+            // 避免重复导入同名规则
+            if (this._triggers.some(t => t.name === d.name && !t.builtin)) continue;
+            this._triggers.push({
+                name: d.name,
+                pattern: new RegExp(d.pattern),
+                command: d.command,
+                enabled: d.enabled !== false,
+                cooldown: d.cooldown || 0,
+                _lastFired: 0,
+            });
+        }
+        this._saveTriggers();
     }
 }

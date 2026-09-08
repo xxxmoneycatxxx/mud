@@ -94,17 +94,39 @@
         </div>
     </div>
 
-    <!-- 设置面板：触发器管理等 -->
+    <!-- 设置面板：标签页结构（触发器/别名/快捷键/定时器/高亮/脚本） -->
     <div class="settings-overlay" id="settingsOverlay">
         <div class="settings-modal">
             <div class="settings-titlebar">
                 <span>【 设置 】</span>
                 <button class="settings-close" id="settingsClose" title="关闭 (Esc)">✕</button>
             </div>
+            <div class="settings-tabs" id="settingsTabs">
+                <button class="settings-tab active" data-tab="triggers">触发器</button>
+                <button class="settings-tab" data-tab="aliases">别名</button>
+                <button class="settings-tab" data-tab="keybinds">快捷键</button>
+                <button class="settings-tab" data-tab="timers">定时器</button>
+                <button class="settings-tab" data-tab="highlights">高亮</button>
+                <button class="settings-tab" data-tab="scripts">脚本</button>
+            </div>
             <div class="settings-body">
-                <div class="settings-section">
-                    <div class="settings-section-title">自动触发器</div>
-                    <div class="settings-triggers" id="settingsTriggers"></div>
+                <div class="settings-tab-content active" id="tab-triggers">
+                    <div class="settings-list" id="settingsTriggers"></div>
+                </div>
+                <div class="settings-tab-content" id="tab-aliases">
+                    <div class="settings-list" id="settingsAliases"></div>
+                </div>
+                <div class="settings-tab-content" id="tab-keybinds">
+                    <div class="settings-list" id="settingsKeybinds"></div>
+                </div>
+                <div class="settings-tab-content" id="tab-timers">
+                    <div class="settings-list" id="settingsTimers"></div>
+                </div>
+                <div class="settings-tab-content" id="tab-highlights">
+                    <div class="settings-list" id="settingsHighlights"></div>
+                </div>
+                <div class="settings-tab-content" id="tab-scripts">
+                    <div class="settings-list" id="settingsScripts"></div>
                 </div>
             </div>
             <div class="settings-footer">Esc 关闭</div>

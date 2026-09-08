@@ -249,7 +249,7 @@ body {
 }
 .stat-gauge .gauge-label {
     font-size: 10px;
-    color: #666;
+    color: #bbb;
     line-height: 1.2;
     margin-bottom: 1px;
 }
@@ -274,7 +274,7 @@ body {
 /* 数值文本 */
 .stat-gauge .gauge-text {
     font-size: 10px;
-    color: #555;
+    color: #ccc;
     line-height: 1.2;
     margin-top: 1px;
     font-variant-numeric: tabular-nums;
@@ -286,7 +286,7 @@ body {
     min-width: 60px;
     padding: 0 4px;
 }
-.stat-text .label { font-size: 10px; color: #666; line-height: 1.2; }
+.stat-text .label { font-size: 10px; color: #bbb; line-height: 1.2; }
 .stat-text .val   { font-size: 11px; font-weight: bold; line-height: 1.2; margin-top: 1px; }
 .stat-text .val.exp { color: #ffd93d; }
 .stat-text .val.pot { color: #ff6b6b; }
@@ -468,7 +468,7 @@ body {
 }
 .move-name {
     font-size: 9px;
-    color: #666;
+    color: #ccc;
     line-height: 1.2;
     margin-top: 1px;
     max-width: 100%;
@@ -511,7 +511,7 @@ body {
 }
 .move-extra-btn {
     background: #0a0f0a;
-    color: #886;
+    color: #ee0;
     border: 1px solid #333;
     border-radius: 3px;
     padding: 2px 8px;
@@ -527,7 +527,7 @@ body {
 
 /* ===== 楼层切换 ===== */
 .minimap-floor {
-    color: #886;
+    color: #ee0;
     font-size: 10px;
     font-weight: bold;
     background: rgba(50, 50, 20, 0.4);
@@ -543,7 +543,7 @@ body {
 }
 .move-floor-btn {
     background: #0a0f0a;
-    color: #886;
+    color: #ee0;
     border: 1px solid #333;
     border-radius: 3px;
     padding: 1px 6px;
@@ -561,7 +561,7 @@ body {
     cursor: default;
 }
 .move-floor-ind {
-    color: #886;
+    color: #ee0;
     font-size: 10px;
     font-weight: bold;
     margin: 0 2px;
@@ -572,7 +572,7 @@ body {
     padding: 2px 8px;
     border-top: 1px solid #111;
     font-size: 9px;
-    color: #555;
+    color: #bbb;
     text-align: center;
     user-select: none;
 }
@@ -850,8 +850,8 @@ body {
 }
 .settings-overlay.visible { display: flex; }
 .settings-modal {
-    width: min(420px, 88vw);
-    max-height: 70vh;
+    width: min(460px, 92vw);
+    max-height: 75vh;
     display: flex;
     flex-direction: column;
     background: #0a0a0a;
@@ -864,7 +864,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    text-align: center;
     padding: 6px 10px;
     color: #ff0;
     font-weight: bold;
@@ -885,67 +884,117 @@ body {
     border-radius: 3px;
 }
 .settings-close:hover { color: #f00; border-color: #f00; }
+
+/* 标签栏 */
+.settings-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border-bottom: 1px solid #1a3a1a;
+    padding: 0;
+}
+.settings-tab {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 4px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #555;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.settings-tab:hover { color: #0f0; }
+.settings-tab.active {
+    color: #0f0;
+    border-bottom-color: #0f0;
+}
+
+/* 标签内容区 */
 .settings-body {
-    padding: 10px;
+    padding: 0;
     overflow-y: auto;
     flex: 1;
 }
-.settings-section-title {
-    color: #886;
-    font-size: 11px;
-    font-weight: bold;
-    margin-bottom: 6px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid #1a1a1a;
+.settings-tab-content {
+    display: none;
+    padding: 8px 10px;
 }
+.settings-tab-content.active { display: block; }
+
 .settings-footer {
     padding: 4px 10px;
     font-size: 9px;
-    color: #555;
+    color: #aaa;
     text-align: center;
     border-top: 1px solid #1a3a1a;
 }
 
-/* 触发器列表项 */
-.trigger-item {
+/* 通用列表项（触发器/别名/快捷键/定时器/高亮/脚本共用） */
+.settings-list {
+    min-height: 40px;
+}
+.settings-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 6px 4px;
     border-bottom: 1px solid #111;
 }
-.trigger-item:last-child { border-bottom: none; }
-.trigger-info {
+.settings-item:last-child { border-bottom: none; }
+.settings-item-info {
     flex: 1;
     min-width: 0;
 }
-.trigger-name {
+.settings-item-name {
     color: #0f0;
     font-size: 12px;
     font-weight: bold;
 }
-.trigger-detail {
-    color: #555;
+.settings-item-detail {
+    color: #ccc;
     font-size: 10px;
     margin-top: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-/* 开关按钮 */
-.trigger-toggle {
+.settings-item-badge {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 9px;
+    border-radius: 2px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+.settings-item-badge.builtin {
+    background: #1a3a1a;
+    color: #cc9;
+}
+.settings-empty {
+    color: #999;
+    font-size: 11px;
+    text-align: center;
+    padding: 16px 0;
+}
+
+/* 开关按钮（触发器/定时器/脚本等启用禁用） */
+.settings-toggle {
     position: relative;
     width: 36px;
     height: 18px;
     flex-shrink: 0;
     margin-left: 8px;
 }
-.trigger-toggle input {
+.settings-toggle input {
     opacity: 0;
     width: 0;
     height: 0;
 }
-.trigger-toggle .slider {
+.settings-toggle .slider {
     position: absolute;
     inset: 0;
     background: #333;
@@ -953,7 +1002,7 @@ body {
     cursor: pointer;
     transition: background 0.2s;
 }
-.trigger-toggle .slider::before {
+.settings-toggle .slider::before {
     content: '';
     position: absolute;
     width: 14px;
@@ -964,10 +1013,116 @@ body {
     border-radius: 50%;
     transition: transform 0.2s, background 0.2s;
 }
-.trigger-toggle input:checked + .slider {
+.settings-toggle input:checked + .slider {
     background: #060;
 }
-.trigger-toggle input:checked + .slider::before {
+.settings-toggle input:checked + .slider::before {
     transform: translateX(18px);
     background: #0f0;
+}
+
+/* 操作栏（新增/导入导出按钮行） */
+.settings-toolbar {
+    display: flex;
+    gap: 6px;
+    padding: 4px 0 8px;
+}
+.settings-toolbar.bottom {
+    padding: 8px 0 4px;
+    border-top: 1px solid #1a1a1a;
+    margin-top: 4px;
+}
+.settings-action-btn {
+    background: #111;
+    border: 1px solid #333;
+    color: #0f0;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 3px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.settings-action-btn:hover {
+    background: #1a3a1a;
+    border-color: #0f0;
+}
+
+/* 列表项操作按钮组 */
+.settings-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: 6px;
+}
+.settings-icon-btn {
+    background: none;
+    border: 1px solid #333;
+    color: #bbb;
+    font-size: 12px;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 0;
+    font-family: inherit;
+}
+.settings-icon-btn:hover {
+    color: #0f0;
+    border-color: #0f0;
+}
+.settings-icon-btn-danger:hover {
+    color: #f44;
+    border-color: #f44;
+}
+
+/* 触发器编辑表单 */
+.settings-form {
+    background: #0f0f0f;
+    border: 1px solid #1a3a1a;
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin: 6px 0;
+}
+.settings-form-title {
+    color: #ff0;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+.settings-form-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+}
+.settings-form-row label {
+    color: #bbb;
+    font-size: 10px;
+    width: 56px;
+    flex-shrink: 0;
+    text-align: right;
+}
+.settings-form-input {
+    flex: 1;
+    background: #111;
+    border: 1px solid #333;
+    color: #0f0;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 3px 6px;
+    border-radius: 2px;
+    outline: none;
+}
+.settings-form-input:focus {
+    border-color: #0f0;
+}
+.settings-form-buttons {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    justify-content: flex-end;
 }
