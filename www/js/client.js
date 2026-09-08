@@ -297,7 +297,7 @@ class AdvancedMUDClient {
                 // 延迟初始化 Telnet 协商，确保连接稳定（协商过程不再打扰用户，仅出错时提示）
                 this.cleanupTimeout = setTimeout(() => {
                     this.initTelnetNegotiation();
-                    // 连接 GMCPHandler 回调，将数据流转到 UI 更新
+                    // 连接 GMCP 回调，将数据流转到 UI 更新
                     if (this.telnet && this.telnet.gmcp) {
                         this.telnet.gmcp.onMessage = (module, data) => {
                             this.processGMCPData({ module, data });
