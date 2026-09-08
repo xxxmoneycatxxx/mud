@@ -1075,4 +1075,68 @@ class AdvancedMUDClient {
         }
         this._saveHighlights();
     }
+
+    // ===== 全套配置备份 =====
+
+    // 导出全部配置（触发器+别名+脚本+定时器+高亮）为一个 JSON
+    exportAllConfig() {
+        return JSON.stringify({
+            version: 1,
+            triggers: JSON.parse(this.exportTriggers()),
+            aliases: JSON.parse(this.exportAliases()),
+            scripts: JSON.parse(this.exportScripts()),
+            timers: JSON.parse(this.exportTimers()),
+            highlights: JSON.parse(this.exportHighlights()),
+        }, null, 2);
+    }
+
+    // 导入全套配置（覆盖当前）
+    importAllConfig(jsonStr) {
+        const data = JSON.parse(jsonStr);
+        if (!data || typeof data !== 'object') throw new Error('格式无效');
+
+        if (Array.isArray(data.triggers)) {
+            this._triggers = this._triggers.filter(t => t.builtin);
+            for (const d of data.triggers) {
+                if (!d.name || !d.pattern || !d.command) continue;
+                this._triggers.push({ name: d.name, pattern: d.pattern, command: d.command, cooldown: d.cooldown || 0, enabled: d.enabled || false });
+            }
+            this._saveTriggers();
+        }
+        if (Array.isArray(data.aliases)) {
+            this._aliases = this._aliases.filter(a => a.builtin);
+            for (const d of data.aliases) {
+                if (!d.name || !d.pattern || d.command === undefined) continue;
+                this._aliases.push({ name: d.name, pattern: d.pattern, command: d.command, enabled: d.enabled || false });
+            }
+            this._saveAliases();
+        }
+        if (Array.isArray(data.scripts)) {
+            if (this.scriptEngine) this.scriptEngine.stopAll();
+            this._scripts = this._scripts.filter(s => s.builtin);
+            for (const d of data.scripts) {
+                if (!d.name || !d.code) continue;
+                this._scripts.push({ name: d.name, description: d.description || '', code: d.code, enabled: d.enabled || false });
+            }
+            this._saveScripts();
+        }
+        if (Array.isArray(data.timers)) {
+            this._stopAllTimers();
+            this._timers = this._timers.filter(t => t.builtin);
+            for (const d of data.timers) {
+                if (!d.name || !d.interval || !d.command) continue;
+                this._timers.push({ name: d.name, interval: d.interval, command: d.command, enabled: d.enabled || false });
+            }
+            this._saveTimers();
+            if (this.connected) this._startAllTimers();
+        }
+        if (Array.isArray(data.highlights)) {
+            this._highlights = this._highlights.filter(h => h.builtin);
+            for (const d of data.highlights) {
+                if (!d.keyword) continue;
+                this._highlights.push({ keyword: d.keyword, color: d.color || '#ffff00', enabled: d.enabled || false });
+            }
+            this._saveHighlights();
+        }
+    }
 }

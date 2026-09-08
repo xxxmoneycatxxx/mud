@@ -69,6 +69,17 @@ AdvancedMUDClient.prototype._setupSettingsEvents = function () {
             this._switchSettingsTab(tabName);
         });
     }
+
+    // 全套导出
+    const btnExportAll = document.getElementById('btnExportAllConfig');
+    if (btnExportAll) {
+        btnExportAll.addEventListener('click', () => this._exportAllConfigJSON());
+    }
+    // 全套导入
+    const btnImportAll = document.getElementById('btnImportAllConfig');
+    if (btnImportAll) {
+        btnImportAll.addEventListener('click', () => this._importAllConfigJSON());
+    }
 };
 
 // 打开设置面板
@@ -84,6 +95,44 @@ AdvancedMUDClient.prototype._openSettings = function () {
 AdvancedMUDClient.prototype._closeSettings = function () {
     const overlay = document.getElementById('settingsOverlay');
     if (overlay) overlay.classList.remove('visible');
+};
+
+// 全套导出：打包所有配置为 JSON 文件下载
+AdvancedMUDClient.prototype._exportAllConfigJSON = function () {
+    const json = this.exportAllConfig();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const date = new Date().toISOString().slice(0, 10);
+    a.download = 'mud-config-' + date + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    this.appendMessage('✅ 全套配置已导出', 'system');
+};
+
+// 全套导入：选择 JSON 文件覆盖当前所有配置
+AdvancedMUDClient.prototype._importAllConfigJSON = function () {
+    if (!confirm('导入将覆盖当前所有配置（触发器/别名/脚本/定时器/高亮），内置规则保留。确认继续？')) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                this.importAllConfig(reader.result);
+                this._renderActiveSettingsTab();
+                this.appendMessage('✅ 全套配置已导入', 'system');
+            } catch (err) {
+                this.appendMessage('❌ 配置导入失败: ' + err.message, 'system');
+            }
+        };
+        reader.readAsText(file);
+    });
+    input.click();
 };
 
 // 切换设置面板标签页

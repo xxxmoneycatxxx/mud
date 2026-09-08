@@ -926,11 +926,19 @@ body {
 .settings-tab-content.active { display: block; }
 
 .settings-footer {
-    padding: 4px 10px;
-    font-size: 9px;
-    color: #aaa;
-    text-align: center;
+    padding: 6px 10px;
     border-top: 1px solid #1a3a1a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.settings-footer-hint {
+    font-size: 9px;
+    color: #666;
+}
+.settings-footer-backup {
+    display: flex;
+    gap: 4px;
 }
 
 /* 通用列表项（触发器/别名/快捷键/定时器/高亮/脚本共用） */
