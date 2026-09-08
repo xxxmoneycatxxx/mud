@@ -7,6 +7,7 @@ class ScriptEngine {
         this.client = client;
         // 每个已启用脚本的运行时状态
         // Map<name, { timers: number[], messageHandlers: {pattern, callback}[], fn: Function }>
+        // timers 混合存储 setInterval 和 setTimeout 的 ID，stop 时双重清理
         this._runtime = new Map();
     }
 
@@ -30,7 +31,7 @@ class ScriptEngine {
         try {
             runtime.fn = new Function(
                 'onMessage', 'sendCommand', 'getVitals', 'getCurrentRoom',
-                'registerTimer', 'log', 'isConnected',
+                'registerTimer', 'sleep', 'log', 'isConnected',
                 script.code
             );
         } catch (e) {
@@ -42,13 +43,13 @@ class ScriptEngine {
         try {
             runtime.fn(
                 api.onMessage, api.sendCommand, api.getVitals,
-                api.getCurrentRoom, api.registerTimer, api.log,
-                api.isConnected
+                api.getCurrentRoom, api.registerTimer, api.sleep,
+                api.log, api.isConnected
             );
         } catch (e) {
             this._reportError(script.name, '初始化失败: ' + e.message);
-            // 清理已注册的定时器
-            runtime.timers.forEach(id => clearInterval(id));
+            // 清理已注册的定时器（setTimeout + setInterval ID 双重清理）
+            runtime.timers.forEach(id => { clearTimeout(id); clearInterval(id); });
             this._runtime.delete(script.name);
             return;
         }
@@ -61,8 +62,8 @@ class ScriptEngine {
         const runtime = this._runtime.get(name);
         if (!runtime) return;
 
-        // 清理所有定时器
-        runtime.timers.forEach(id => clearInterval(id));
+        // 清理所有定时器（setTimeout + setInterval ID 双重清理）
+        runtime.timers.forEach(id => { clearTimeout(id); clearInterval(id); });
         // 清理消息处理器
         runtime.messageHandlers.length = 0;
         runtime.fn = null;
@@ -150,6 +151,21 @@ class ScriptEngine {
                 }, intervalMs);
                 runtime.timers.push(id);
                 return id;
+            },
+
+            // 延迟执行（一次性），返回 Promise，配合 async/await 实现顺序延迟
+            // 脚本停止时自动取消未完成的 sleep
+            sleep: (ms) => {
+                if (typeof ms !== 'number' || ms < 100) {
+                    throw new RangeError('sleep 延迟至少 100ms');
+                }
+                return new Promise((resolve) => {
+                    const id = setTimeout(() => {
+                        runtime.timers = runtime.timers.filter(t => t !== id);
+                        resolve();
+                    }, ms);
+                    runtime.timers.push(id);
+                });
             },
 
             // 日志输出到终端（system 类型）

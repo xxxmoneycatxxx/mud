@@ -877,7 +877,7 @@ body {
 
     .command-input {
         font-size: 12px;
-        padding: 8px 35px 8px 8px;
+        padding: 8px 35px 8px 6px;
     }
 
     .status-panel {
@@ -1091,7 +1091,7 @@ body {
     font-size: 11px;
     line-height: 1.4;
     resize: vertical;
-    min-height: 80px;
+    min-height: 160px;
     tab-size: 4;
     background: #0a0a0a;
     color: #0f0;
@@ -1291,4 +1291,182 @@ body {
 .highlight-swatch {
     font-size: 14px;
     vertical-align: middle;
+}
+
+/* ===== 代码编辑器包装器（行号 + textarea） ===== */
+.settings-form-row-block {
+    flex-direction: column;
+    align-items: stretch;
+}
+.settings-form-row-block > label {
+    width: auto;
+    text-align: left;
+    margin-bottom: 4px;
+}
+.code-editor-wrap {
+    display: flex;
+    border: 1px solid #333;
+    border-radius: 2px;
+    overflow: hidden;
+    background: #0a0a0a;
+}
+.code-editor-wrap:focus-within {
+    border-color: #0f0;
+}
+.code-line-numbers {
+    width: 32px;
+    flex-shrink: 0;
+    background: #080808;
+    color: #555;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 3px 4px 3px 0;
+    text-align: right;
+    overflow: hidden;
+    user-select: none;
+    white-space: pre;
+    border-right: 1px solid #1a1a1a;
+}
+.code-editor-wrap .settings-form-code {
+    border: none;
+    min-height: 160px;
+}
+.code-editor-wrap .settings-form-code:focus {
+    box-shadow: none;
+}
+
+/* 语法错误提示 */
+.settings-form-errhint {
+    color: #f55;
+    font-size: 10px;
+    padding: 4px 0 0;
+    line-height: 1.4;
+    text-shadow: 0 0 4px rgba(255, 50, 50, 0.2);
+}
+
+/* ===== API 文档折叠面板 ===== */
+.script-api-doc {
+    margin: 8px 0 4px;
+    border: 1px solid #1a3a1a;
+    border-radius: 4px;
+    background: #0a0f0a;
+}
+.script-api-doc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    cursor: pointer;
+    color: #cc0;
+    font-size: 11px;
+    font-weight: bold;
+    user-select: none;
+    transition: background 0.15s;
+}
+.script-api-doc-header:hover {
+    background: #0f1a0f;
+}
+.script-api-arrow {
+    font-size: 10px;
+    color: #888;
+}
+.script-api-doc-body {
+    padding: 0 10px 10px;
+    border-top: 1px solid #1a3a1a;
+    max-height: 400px;
+    overflow-y: auto;
+}
+.script-api-doc-body::-webkit-scrollbar { width: 4px; }
+.script-api-doc-body::-webkit-scrollbar-track { background: #0a0a0a; }
+.script-api-doc-body::-webkit-scrollbar-thumb { background: #1a3a1a; border-radius: 2px; }
+
+.script-api-item {
+    padding: 8px 0 6px;
+    border-bottom: 1px solid #111;
+}
+.script-api-item:last-of-type { border-bottom: none; }
+.api-func {
+    color: #0f0;
+    font-size: 12px;
+    font-weight: bold;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    text-shadow: 0 0 3px rgba(0, 255, 0, 0.15);
+}
+.api-desc {
+    color: #bbb;
+    font-size: 10px;
+    margin-top: 2px;
+    line-height: 1.4;
+}
+.api-params {
+    margin-top: 3px;
+}
+.api-param {
+    color: #999;
+    font-size: 10px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    line-height: 1.5;
+}
+.api-example {
+    background: #050805;
+    border: 1px solid #1a2a1a;
+    border-radius: 2px;
+    padding: 4px 8px;
+    margin-top: 4px;
+    color: #4f4;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 10px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-x: auto;
+}
+
+/* 常见模式区 */
+.script-api-patterns {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #1a3a1a;
+}
+.api-pattern-title {
+    color: #cc0;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+.api-pattern-item {
+    margin-bottom: 6px;
+}
+.api-pattern-item b {
+    color: #0f0;
+    font-size: 10px;
+}
+.api-pattern-item pre {
+    background: #050805;
+    border: 1px solid #1a2a1a;
+    border-radius: 2px;
+    padding: 4px 8px;
+    margin-top: 2px;
+    color: #4f4;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 10px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* ===== 设置面板加宽（容纳代码编辑器） ===== */
+@media (min-width: 769px) {
+    .settings-modal {
+        width: min(560px, 92vw);
+    }
+}
+
+/* ===== 输入区紧凑化（增大终端显示区域） ===== */
+.command-input {
+    padding: 8px 35px 8px 6px;
+}
+.input-prompt {
+    padding: 0 6px 0 8px;
 }

@@ -1170,6 +1170,15 @@ AdvancedMUDClient.prototype._renderScriptList = function () {
     addBtn.textContent = '+ 新增';
     addBtn.addEventListener('click', () => this._showScriptForm(-1));
     toolbar.appendChild(addBtn);
+
+    // 可视化构建器入口
+    const visualBtn = document.createElement('button');
+    visualBtn.className = 'settings-action-btn';
+    visualBtn.textContent = '⚡ 可视化构建';
+    visualBtn.title = '无需写代码，填表即可生成常用脚本';
+    visualBtn.addEventListener('click', () => this._showVisualBuilder());
+    toolbar.appendChild(visualBtn);
+
     container.appendChild(toolbar);
 
     // 脚本列表
@@ -1247,6 +1256,14 @@ AdvancedMUDClient.prototype._renderScriptList = function () {
     formArea.id = 'scriptFormArea';
     container.appendChild(formArea);
 
+    // 可视化构建器表单区域
+    const builderArea = document.createElement('div');
+    builderArea.id = 'scriptBuilderArea';
+    container.appendChild(builderArea);
+
+    // API 文档面板
+    this._renderApiDoc(container);
+
     // 底部导入/导出
     const footer = document.createElement('div');
     footer.className = 'settings-toolbar settings-toolbar-bottom';
@@ -1308,23 +1325,62 @@ AdvancedMUDClient.prototype._showScriptForm = function (index) {
     descRow.appendChild(descInput);
     form.appendChild(descRow);
 
-    // 代码（多行 textarea）
+    // 代码（带行号的 textarea）
     const codeRow = document.createElement('div');
-    codeRow.className = 'settings-form-row';
+    codeRow.className = 'settings-form-row settings-form-row-block';
     codeRow.innerHTML = '<label>代码</label>';
+
+    // 代码编辑区包装器（行号 + textarea）
+    const codeWrap = document.createElement('div');
+    codeWrap.className = 'code-editor-wrap';
+    const lineNums = document.createElement('div');
+    lineNums.className = 'code-line-numbers';
+    lineNums.setAttribute('aria-hidden', 'true');
     const codeInput = document.createElement('textarea');
     codeInput.className = 'settings-form-input settings-form-code';
-    codeInput.rows = 6;
+    codeInput.rows = 10;
     codeInput.spellcheck = false;
     codeInput.placeholder = 'onMessage(/pattern/, () => sendCommand("cmd"));';
     codeInput.value = script ? (script.code || '') : '';
-    codeRow.appendChild(codeInput);
+    codeWrap.appendChild(lineNums);
+    codeWrap.appendChild(codeInput);
+    codeRow.appendChild(codeWrap);
     form.appendChild(codeRow);
+
+    // 行号同步更新
+    const updateLineNums = () => {
+        const lines = codeInput.value.split('\n').length;
+        let html = '';
+        for (let i = 1; i <= lines; i++) html += i + '\n';
+        lineNums.textContent = html;
+    };
+    codeInput.addEventListener('input', updateLineNums);
+    codeInput.addEventListener('scroll', () => {
+        lineNums.scrollTop = codeInput.scrollTop;
+    });
+    // Tab 键插入 4 空格
+    codeInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const start = codeInput.selectionStart;
+            const end = codeInput.selectionEnd;
+            codeInput.value = codeInput.value.substring(0, start) + '    ' + codeInput.value.substring(end);
+            codeInput.selectionStart = codeInput.selectionEnd = start + 4;
+            updateLineNums();
+        }
+    });
+    updateLineNums();
+
+    // 语法错误提示区
+    const errHint = document.createElement('div');
+    errHint.className = 'settings-form-errhint';
+    errHint.style.display = 'none';
+    form.appendChild(errHint);
 
     // API 提示
     const hint = document.createElement('div');
     hint.className = 'settings-form-hint';
-    hint.textContent = 'API: onMessage(regex, cb) · sendCommand(cmd) · getVitals() · getCurrentRoom() · registerTimer(ms, cb) · log(msg) · isConnected()';
+    hint.textContent = 'API: onMessage(regex, cb) · sendCommand(cmd) · getVitals() · getCurrentRoom() · registerTimer(ms, cb) · sleep(ms) · log(msg) · isConnected()';
     form.appendChild(hint);
 
     // 按钮
@@ -1339,6 +1395,19 @@ AdvancedMUDClient.prototype._showScriptForm = function (index) {
         const code = codeInput.value;
         if (!name || !code) {
             alert('请填写名称和代码');
+            return;
+        }
+        // 语法预检
+        try {
+            new Function(
+                'onMessage', 'sendCommand', 'getVitals', 'getCurrentRoom',
+                'registerTimer', 'sleep', 'log', 'isConnected',
+                code
+            );
+            errHint.style.display = 'none';
+        } catch (e) {
+            errHint.textContent = '❗ 语法错误: ' + e.message;
+            errHint.style.display = 'block';
             return;
         }
         if (isEdit) {
@@ -1397,7 +1466,422 @@ AdvancedMUDClient.prototype._importScriptJSON = function () {
     input.click();
 };
 
-// HTML 转义工具
+// ===== API 文档面板（可折叠） =====
+AdvancedMUDClient.prototype._renderApiDoc = function (container) {
+    const doc = document.createElement('div');
+    doc.className = 'script-api-doc';
+
+    // 可点击的折叠头部
+    const header = document.createElement('div');
+    header.className = 'script-api-doc-header';
+    header.innerHTML = '<span>📖 API 参考文档</span><span class="script-api-arrow">▶</span>';
+    header.addEventListener('click', () => {
+        const body = doc.querySelector('.script-api-doc-body');
+        const arrow = header.querySelector('.script-api-arrow');
+        if (body.style.display === 'none') {
+            body.style.display = 'block';
+            arrow.textContent = '▼';
+        } else {
+            body.style.display = 'none';
+            arrow.textContent = '▶';
+        }
+    });
+    doc.appendChild(header);
+
+    // 文档主体（默认折叠）
+    const body = document.createElement('div');
+    body.className = 'script-api-doc-body';
+    body.style.display = 'none';
+
+    const apis = [
+        {
+            name: 'onMessage',
+            sig: 'onMessage(pattern, callback)',
+            desc: '注册消息匹配回调，当收到的文本匹配 pattern 时调用 callback。',
+            params: [
+                'pattern: RegExp — 匹配消息的正则表达式（必须）',
+                'callback: function(matchedText, matchResult) — 匹配时执行的回调'
+            ],
+            example: 'onMessage(/你盘膝坐下/, () => sendCommand("meditation"));'
+        },
+        {
+            name: 'sendCommand',
+            sig: 'sendCommand(cmd)',
+            desc: '向服务端发送一条命令。',
+            params: ['cmd: string — 命令字符串，自动 trim 空白'],
+            example: 'sendCommand("exert recover");'
+        },
+        {
+            name: 'getVitals',
+            sig: 'getVitals()',
+            desc: '获取当前角色状态数据（返回副本，不可修改内部状态）。',
+            params: ['返回: object — 包含 hp, max_hp, mp, max_mp, sp, max_sp 等字段'],
+            example: 'const v = getVitals();\nif (v.hp < v.max_hp * 0.5) sendCommand("exert recover");'
+        },
+        {
+            name: 'getCurrentRoom',
+            sig: 'getCurrentRoom()',
+            desc: '获取当前房间信息。',
+            params: ['返回: object|null — 包含 name, exits, area, hash 字段；未连接时返回 null'],
+            example: 'const room = getCurrentRoom();\nlog("当前房间: " + room.name);'
+        },
+        {
+            name: 'registerTimer',
+            sig: 'registerTimer(ms, callback)',
+            desc: '注册周期性定时任务，每隔 ms 毫秒执行一次 callback。',
+            params: [
+                'ms: number — 间隔毫秒数（最小 100）',
+                'callback: function — 每次触发时执行的回调'
+            ],
+            example: 'registerTimer(5000, () => {\n    const v = getVitals();\n    if (v.hp < v.max_hp * 0.5) sendCommand("exert recover");\n});'
+        },
+        {
+            name: 'sleep',
+            sig: 'sleep(ms)',
+            desc: '延迟指定毫秒数，返回 Promise。配合 async/await 实现顺序延迟。脚本停止时自动取消。',
+            params: ['ms: number — 延迟毫秒数（最小 100）'],
+            example: 'onMessage(/你盘膝坐下/, async () => {\n    sendCommand("meditation");\n    await sleep(3000);\n    sendCommand("exert recover");\n});'
+        },
+        {
+            name: 'log',
+            sig: 'log(msg)',
+            desc: '输出日志消息到终端显示（system 类型），自动带脚本名前缀。',
+            params: ['msg: string — 要显示的日志文本'],
+            example: 'log("气血不足，自动疗伤");'
+        },
+        {
+            name: 'isConnected',
+            sig: 'isConnected()',
+            desc: '检查当前是否已连接到服务器。',
+            params: ['返回: boolean — true 表示已连接'],
+            example: 'if (isConnected()) sendCommand("hp");'
+        }
+    ];
+
+    apis.forEach(api => {
+        const item = document.createElement('div');
+        item.className = 'script-api-item';
+        let html = '<div class="api-func">' + this._escHtml(api.sig) + '</div>';
+        html += '<div class="api-desc">' + this._escHtml(api.desc) + '</div>';
+        html += '<div class="api-params">';
+        api.params.forEach(p => {
+            html += '<div class="api-param">· ' + this._escHtml(p) + '</div>';
+        });
+        html += '</div>';
+        html += '<pre class="api-example">' + this._escHtml(api.example) + '</pre>';
+        item.innerHTML = html;
+        body.appendChild(item);
+    });
+
+    // 常见模式提示
+    const patterns = document.createElement('div');
+    patterns.className = 'script-api-patterns';
+    patterns.innerHTML = '<div class="api-pattern-title">常见模式</div>'
+        + '<div class="api-pattern-item"><b>消息触发 + 冷却</b><pre>'
+        + this._escHtml('let last = 0;\nonMessage(/触发文本/, () => {\n    if (Date.now() - last < 5000) return;\n    last = Date.now();\n    sendCommand("执行命令");\n});')
+        + '</pre></div>'
+        + '<div class="api-pattern-item"><b>定时检查 + 条件执行</b><pre>'
+        + this._escHtml('registerTimer(3000, () => {\n    const v = getVitals();\n    if (v.hp && v.max_hp && v.hp < v.max_hp * 0.5) {\n        sendCommand("exert recover");\n        log("自动疗伤");\n    }\n});')
+        + '</pre></div>'
+        + '<div class="api-pattern-item"><b>顺序延迟操作</b><pre>'
+        + this._escHtml('onMessage(/战斗结束/, async () => {\n    sendCommand("get all from corpse");\n    await sleep(1000);\n    sendCommand("north");\n});')
+        + '</pre></div>';
+    body.appendChild(patterns);
+
+    doc.appendChild(body);
+    container.appendChild(doc);
+};
+
+// ===== 可视化脚本构建器 =====
+AdvancedMUDClient.prototype._showVisualBuilder = function () {
+    const area = document.getElementById('scriptBuilderArea');
+    if (!area) return;
+
+    // 切换显示/隐藏
+    if (area.innerHTML && !area.dataset.collapsed) {
+        area.innerHTML = '';
+        area.dataset.collapsed = '1';
+        return;
+    }
+    area.dataset.collapsed = '';
+    area.innerHTML = '';
+
+    const form = document.createElement('div');
+    form.className = 'settings-form';
+    form.innerHTML = '<div class="settings-form-title">⚡ 可视化脚本构建器 — 无需写代码，填表即可生成</div>';
+
+    // 模式选择
+    const modeRow = document.createElement('div');
+    modeRow.className = 'settings-form-row';
+    modeRow.innerHTML = '<label>模式</label>';
+    const modeSelect = document.createElement('select');
+    modeSelect.className = 'settings-form-input';
+    modeSelect.style.flex = '1';
+    modeSelect.innerHTML = '<option value="trigger">消息触发 → 执行命令</option>'
+        + '<option value="periodic">定时检查属性 → 条件执行</option>';
+    modeRow.appendChild(modeSelect);
+    form.appendChild(modeRow);
+
+    // 动态表单区域
+    const dynamicArea = document.createElement('div');
+    dynamicArea.id = 'vbDynamicArea';
+    form.appendChild(dynamicArea);
+
+    // 名称
+    const nameRow = document.createElement('div');
+    nameRow.className = 'settings-form-row';
+    nameRow.innerHTML = '<label>脚本名</label>';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'settings-form-input';
+    nameInput.placeholder = '自动生成，可修改';
+    nameRow.appendChild(nameInput);
+    form.appendChild(nameRow);
+
+    // 预览区域
+    const previewArea = document.createElement('div');
+    previewArea.id = 'vbPreview';
+    previewArea.style.display = 'none';
+    form.appendChild(previewArea);
+
+    // 按钮行
+    const btnRow = document.createElement('div');
+    btnRow.className = 'settings-form-buttons';
+
+    const previewBtn = document.createElement('button');
+    previewBtn.className = 'settings-action-btn';
+    previewBtn.textContent = '预览代码';
+    previewBtn.addEventListener('click', () => {
+        const code = this._vbGenerateCode(modeSelect, dynamicArea);
+        if (code === null) return;
+        const preview = document.getElementById('vbPreview');
+        if (preview) {
+            preview.style.display = 'block';
+            preview.innerHTML = '<div class="settings-form-title">生成的代码</div>'
+                + '<pre class="api-example" style="margin:0">' + this._escHtml(code) + '</pre>';
+        }
+    });
+    btnRow.appendChild(previewBtn);
+
+    const createBtn = document.createElement('button');
+    createBtn.className = 'settings-action-btn';
+    createBtn.textContent = '创建脚本';
+    createBtn.addEventListener('click', () => {
+        const code = this._vbGenerateCode(modeSelect, dynamicArea);
+        if (code === null) return;
+        const name = nameInput.value.trim() || (modeSelect.value === 'trigger' ? '消息触发脚本' : '定时检查脚本');
+        const desc = modeSelect.value === 'trigger'
+            ? '当消息匹配时自动执行命令'
+            : '定时检查属性并条件执行命令';
+        this.addScript(name, desc, code);
+        area.innerHTML = '';
+        area.dataset.collapsed = '1';
+        this._renderScriptList();
+    });
+    btnRow.appendChild(createBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'settings-action-btn';
+    cancelBtn.textContent = '取消';
+    cancelBtn.addEventListener('click', () => {
+        area.innerHTML = '';
+        area.dataset.collapsed = '1';
+    });
+    btnRow.appendChild(cancelBtn);
+
+    form.appendChild(btnRow);
+    area.appendChild(form);
+
+    // 模式切换时更新动态表单
+    const renderDynamic = () => {
+        dynamicArea.innerHTML = '';
+        if (modeSelect.value === 'trigger') {
+            this._vbRenderTriggerForm(dynamicArea);
+        } else {
+            this._vbRenderPeriodicForm(dynamicArea);
+        }
+    };
+    modeSelect.addEventListener('change', renderDynamic);
+    renderDynamic();
+};
+
+// 可视化构建器：消息触发表单
+AdvancedMUDClient.prototype._vbRenderTriggerForm = function (container) {
+    // 触发文本
+    const textRow = document.createElement('div');
+    textRow.className = 'settings-form-row';
+    textRow.innerHTML = '<label>触发文本</label>';
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'settings-form-input';
+    textInput.placeholder = '如：你盘膝坐下';
+    textInput.id = 'vbTriggerText';
+    textRow.appendChild(textInput);
+    container.appendChild(textRow);
+
+    // 匹配方式
+    const matchRow = document.createElement('div');
+    matchRow.className = 'settings-form-row';
+    matchRow.innerHTML = '<label>匹配</label>';
+    const matchSelect = document.createElement('select');
+    matchSelect.className = 'settings-form-input';
+    matchSelect.style.flex = '1';
+    matchSelect.innerHTML = '<option value="contains">包含文本</option><option value="regex">正则表达式</option>';
+    matchSelect.id = 'vbTriggerMatch';
+    matchRow.appendChild(matchSelect);
+    container.appendChild(matchRow);
+
+    // 执行命令
+    const cmdRow = document.createElement('div');
+    cmdRow.className = 'settings-form-row';
+    cmdRow.innerHTML = '<label>执行命令</label>';
+    const cmdInput = document.createElement('input');
+    cmdInput.type = 'text';
+    cmdInput.className = 'settings-form-input';
+    cmdInput.placeholder = '如：meditation';
+    cmdInput.id = 'vbTriggerCmd';
+    cmdRow.appendChild(cmdInput);
+    container.appendChild(cmdRow);
+
+    // 冷却时间
+    const cdRow = document.createElement('div');
+    cdRow.className = 'settings-form-row';
+    cdRow.innerHTML = '<label>冷却(秒)</label>';
+    const cdInput = document.createElement('input');
+    cdInput.type = 'number';
+    cdInput.className = 'settings-form-input';
+    cdInput.value = '3';
+    cdInput.min = '0';
+    cdInput.max = '60';
+    cdInput.style.flex = '1';
+    cdInput.id = 'vbTriggerCd';
+    cdRow.appendChild(cdInput);
+    container.appendChild(cdRow);
+};
+
+// 可视化构建器：定时检查表单
+AdvancedMUDClient.prototype._vbRenderPeriodicForm = function (container) {
+    // 检查属性
+    const attrRow = document.createElement('div');
+    attrRow.className = 'settings-form-row';
+    attrRow.innerHTML = '<label>属性</label>';
+    const attrSelect = document.createElement('select');
+    attrSelect.className = 'settings-form-input';
+    attrSelect.style.flex = '1';
+    attrSelect.innerHTML = '<option value="hp">气血 (hp)</option><option value="mp">内力 (mp)</option><option value="sp">精力 (sp)</option>';
+    attrSelect.id = 'vbPeriodicAttr';
+    attrRow.appendChild(attrSelect);
+    container.appendChild(attrRow);
+
+    // 条件
+    const condRow = document.createElement('div');
+    condRow.className = 'settings-form-row';
+    condRow.innerHTML = '<label>条件</label>';
+    const condSelect = document.createElement('select');
+    condSelect.className = 'settings-form-input';
+    condSelect.style.flex = '1';
+    condSelect.innerHTML = '<option value="below">低于</option><option value="above">高于</option>';
+    condSelect.id = 'vbPeriodicCond';
+    condRow.appendChild(condSelect);
+    container.appendChild(condRow);
+
+    // 阈值
+    const thRow = document.createElement('div');
+    thRow.className = 'settings-form-row';
+    thRow.innerHTML = '<label>阈值(%)</label>';
+    const thInput = document.createElement('input');
+    thInput.type = 'number';
+    thInput.className = 'settings-form-input';
+    thInput.value = '50';
+    thInput.min = '1';
+    thInput.max = '100';
+    thInput.style.flex = '1';
+    thInput.id = 'vbPeriodicThreshold';
+    thRow.appendChild(thInput);
+    container.appendChild(thRow);
+
+    // 执行命令
+    const cmdRow = document.createElement('div');
+    cmdRow.className = 'settings-form-row';
+    cmdRow.innerHTML = '<label>执行命令</label>';
+    const cmdInput = document.createElement('input');
+    cmdInput.type = 'text';
+    cmdInput.className = 'settings-form-input';
+    cmdInput.placeholder = '如：exert recover';
+    cmdInput.id = 'vbPeriodicCmd';
+    cmdRow.appendChild(cmdInput);
+    container.appendChild(cmdRow);
+
+    // 检查间隔
+    const intRow = document.createElement('div');
+    intRow.className = 'settings-form-row';
+    intRow.innerHTML = '<label>间隔(秒)</label>';
+    const intInput = document.createElement('input');
+    intInput.type = 'number';
+    intInput.className = 'settings-form-input';
+    intInput.value = '5';
+    intInput.min = '1';
+    intInput.max = '60';
+    intInput.style.flex = '1';
+    intInput.id = 'vbPeriodicInterval';
+    intRow.appendChild(intInput);
+    container.appendChild(intRow);
+};
+
+// 可视化构建器：根据表单生成代码
+AdvancedMUDClient.prototype._vbGenerateCode = function (modeSelect, dynamicArea) {
+    if (modeSelect.value === 'trigger') {
+        const text = (document.getElementById('vbTriggerText') || {}).value || '';
+        const match = (document.getElementById('vbTriggerMatch') || {}).value || 'contains';
+        const cmd = (document.getElementById('vbTriggerCmd') || {}).value || '';
+        const cd = parseInt((document.getElementById('vbTriggerCd') || {}).value || '3', 10);
+
+        if (!text || !cmd) {
+            alert('请填写触发文本和执行命令');
+            return null;
+        }
+
+        const pattern = match === 'regex' ? text : text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const cdMs = cd * 1000;
+
+        if (cdMs > 0) {
+            return 'let _last = 0;\n'
+                + 'onMessage(/' + pattern + '/, () => {\n'
+                + '    const now = Date.now();\n'
+                + '    if (now - _last < ' + cdMs + ') return;\n'
+                + '    _last = now;\n'
+                + '    sendCommand("' + cmd.replace(/"/g, '\\"') + '");\n'
+                + '});';
+        } else {
+            return 'onMessage(/' + pattern + '/, () => {\n'
+                + '    sendCommand("' + cmd.replace(/"/g, '\\"') + '");\n'
+                + '});';
+        }
+    } else {
+        const attr = (document.getElementById('vbPeriodicAttr') || {}).value || 'hp';
+        const cond = (document.getElementById('vbPeriodicCond') || {}).value || 'below';
+        const threshold = parseInt((document.getElementById('vbPeriodicThreshold') || {}).value || '50', 10);
+        const cmd = (document.getElementById('vbPeriodicCmd') || {}).value || '';
+        const interval = parseInt((document.getElementById('vbPeriodicInterval') || {}).value || '5', 10);
+
+        if (!cmd) {
+            alert('请填写执行命令');
+            return null;
+        }
+
+        const ratio = (threshold / 100).toFixed(2);
+        const op = cond === 'below' ? '<' : '>';
+        const condDesc = cond === 'below' ? '低于' : '高于';
+
+        return 'registerTimer(' + (interval * 1000) + ', () => {\n'
+            + '    const v = getVitals();\n'
+            + '    if (v.' + attr + ' && v.max_' + attr + ' && v.' + attr + ' ' + op + ' v.max_' + attr + ' * ' + ratio + ') {\n'
+            + '        sendCommand("' + cmd.replace(/"/g, '\\"') + '");\n'
+            + '        log("' + attr + ' ' + condDesc + ' ' + threshold + '%，自动执行");\n'
+            + '    }\n'
+            + '});';
+    }
+};
 AdvancedMUDClient.prototype._escHtml = function (text) {
     return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 };
