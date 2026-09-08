@@ -1538,11 +1538,11 @@ AdvancedMUDClient.prototype.setupRoomExits = function () {
     });
 };
 
-// 终端可点击链接委托：look/l 出口（点击移动）+ 文档内 help 交叉引用（点击查阅），历史消息同样生效
+// 终端可点击链接委托：look/l 出口（点击移动）+ 文档内 help 交叉引用（点击查阅）+ 房间物品/NPC（点击 look）
 AdvancedMUDClient.prototype.setupTerminalExits = function () {
     if (!this.terminal) return;
     this.terminal.addEventListener('click', (e) => {
-        const link = e.target.closest('.exit-link, .help-link');
+        const link = e.target.closest('.exit-link, .help-link, .inv-link');
         if (!link || !this.connected) return;
         const cmd = link.getAttribute('data-cmd');
         if (!cmd) return;
@@ -2035,6 +2035,10 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
     if (/这里明显的出口是|这里唯一的出口是/.test(message)) {
         html = this.linkifyRoomExits(html);
     }
+    // look 输出中的房间物品/NPC 渲染成可点击链接（点击 look）
+    if (/这里明显的出口是|这里唯一的出口是|这里没有任何明显的出路/.test(message)) {
+        html = this.linkifyRoomInventory(html);
+    }
     // 文档正文中的 help <主题> 交叉引用渲染成可点击链接（点击查阅）
     if (/\bhelp\s+[a-z]/.test(html)) {
         html = this.linkifyHelpRefs(html);
@@ -2146,6 +2150,19 @@ AdvancedMUDClient.prototype.linkifyRoomExits = function (html) {
             (mm, dir) => '<a class="exit-link" data-cmd="' + dir + '">' + mm + '</a>'
         );
     });
+};
+
+// 将 look 输出中的房间物品/NPC 行渲染为可点击链接（点击 look <id>）
+// 仅前缀（2空格 + quest标记单字符ANSI span）不链接，name(id) 整体为链接
+AdvancedMUDClient.prototype.linkifyRoomInventory = function (html) {
+    // 前缀：2 空格 + 可选的单字符 ANSI span（如 quest 标记 ！）
+    // name+id：剩余所有内容直到行尾的 (ascii_id)
+    return html.replace(
+        /^(  (<[^>]*>[^<\u4e00-\u9fff]<\/[^>]*>)?)(.+?)\((([a-z_][a-z_ ]*)\))$/gm,
+        function (match, prefix, ansiSpan, namePart, fullIdPart, id) {
+            return '<span>' + prefix + '</span><a class="inv-link" data-cmd="look ' + id + '">' + namePart + '(' + id + ')</a>';
+        }
+    );
 };
 
 AdvancedMUDClient.prototype.setupEventListeners = function () {

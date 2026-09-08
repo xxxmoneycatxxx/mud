@@ -330,6 +330,20 @@ body {
     text-decoration: none;
 }
 
+/* look 输出中的房间物品/NPC 可点击链接（青色，区别于绿色出口和琥珀色 help） */
+.inv-link {
+    color: #0cc;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+.inv-link:hover {
+    color: #0ff;
+    background: #0a2a2a;
+    text-decoration: none;
+}
+
 /* ===== 小地图浮动面板 ===== */
 .minimap-panel {
     position: fixed;
