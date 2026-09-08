@@ -1,36 +1,113 @@
 # 炎黄群侠传MUD
-[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/oiuv/mud)
 
-![mud](mud.png "mud")
+炎黄MUD UTF-8 版，基于 [FluffOS](https://github.com/fluffos/fluffos) 驱动。底层为炎黄2003，LIB 代码有大量借鉴国内优秀的 LIB，开源在此方便对 MUD 游戏感兴趣的玩家。
 
+- 游戏驱动下载：https://bbs.mud.ren/threads/4
+- **线上游戏体验：https://mud.ren:8888/**（浏览器直接打开，无需安装任何客户端）
 
-炎黄MUD utf-8 版，推荐使用 FluffOS UTF8版驱动。
+---
 
- - 游戏驱动下载：https://bbs.mud.ren/threads/4
- - 线上游戏体验：https://mud.ren:8888/
+## Web 客户端
 
-## LIB说明
+本项目内置了一个功能完善的 **Web MUD 客户端**，通过浏览器访问 `http://localhost:8888` 即可直接游戏。客户端采用纯原生 JavaScript 实现（零构建工具、零 npm 依赖），基于 WebSocket + Telnet 子协议，完整支持 GMCP 通信。
 
-本游戏为侠客行类文字MUD游戏，底层为炎黄2003，LIB代码有大量借鉴国内优秀的LIB，开源在此方便对MUD游戏感兴趣的玩家。
+### 核心架构
 
-![help](help.png "help")
+| 模块 | 文件 | 职责 |
+|------|------|------|
+| Telnet 协议层 | `www/js/telnet.js` | Telnet 常量定义（IAC/GMCP/MSP 等），实际解析由 client.js + client-ui.js 完成 |
+| ANSI 渲染 | `www/js/ansi.js` | 完整 ANSI 转义码映射（前景/背景/高亮/斜体/下划线/闪烁） |
+| 客户端核心 | `www/js/client.js` | 连接管理、心跳检测、触发器/别名/定时器/高亮/脚本五大子系统 |
+| UI 交互层 | `www/js/client-ui.js` | 终端渲染、状态栏、快捷命令、设置面板、事件绑定 |
+| 地图组件 | `www/js/mapper.js` | 房间图构建、Canvas 小地图渲染、楼层切换、localStorage 持久化 |
+| 自动寻路 | `www/js/pathfinder.js` | BFS 寻路算法、全量地图加载、自动行走与暂停恢复 |
+| 脚本引擎 | `www/js/script-engine.js` | 受限作用域沙箱，提供 7 个安全 API 供用户脚本调用 |
+| 帮助浏览器 | `www/js/help.js` | 分类导航 + GMCP 全文检索 + 交叉引用链接 |
+
+### 功能特性
+
+#### 实时状态栏
+- 通过 GMCP `Char.Vitals` 实时显示气血/精/精力/内力/食物/水进度条
+- 经验值和数值信息展示，房间信息显示
+- 可收起/展开，连接后自动显示
+
+#### 交互式小地图
+- **Canvas 实时渲染**：以当前房间为中心，BFS 布局展示已探索房间拓扑
+- **服务端精确数据**：利用 GMCP `Room.Info` 中的 `exit_targets` 直接构建房间连接，无需猜测
+- **localStorage 持久化**：刷新后地图立即恢复，断连不清图（重连后自然更新）
+- **多楼层支持**：up/down 自动切换楼层，楼层指示器和切换按钮
+- **特殊房间标记**：商店(黄)、银行(金)、客栈(蓝)、门派(紫)、副本(橙) 等颜色标记
+- **全屏模式**：点击地图可进入全屏浏览，更大视口 + 图例
+- **九宫格移动面板**：8 方向 + 扩展栏（上/下/进/出/入/离），根据出口自动激活/禁用
+- **探索进度**：底部显示已探索房间数 / 全量地图百分比
+
+#### 自动寻路系统
+- 优先加载服务端导出的全量地图数据（`/storage/map.json`），24 小时 localStorage 缓存
+- 全量地图不可用时自动回退到 mapper 增量探索数据
+- BFS 最短路径搜索 + 房间名称模糊搜索
+- **自动行走**：沿计算路径自动移动，遇敌自动暂停、事件结束后自动恢复
+- 寻路路径在小地图上以黄色虚线高亮显示
+
+#### 五大自动化子系统
+所有子系统均支持 localStorage 持久化 + 独立导入/导出 + 全套一键备份：
+
+| 子系统 | 功能 | 内置示例 |
+|--------|------|----------|
+| **触发器** | 消息匹配正则时自动执行命令，支持冷却时间 | 仙丹自动拾取 |
+| **别名** | 输入缩写自动替换为完整命令，支持正则和多命令宏 | `go <地名>` → `gtr`、`c` → `cast` |
+| **定时器** | 按固定间隔自动发送命令 | 每 30 秒 `hp` 刷新状态 |
+| **高亮** | 关键词匹配渲染指定颜色 | — |
+| **脚本** | 用户自定义 JavaScript 脚本，沙箱引擎提供 7 个安全 API | 自动打坐、自动疗伤、自动逃跑 |
+
+**脚本引擎 API**：`onMessage` / `sendCommand` / `getVitals` / `getCurrentRoom` / `registerTimer` / `log` / `isConnected`
+
+#### 设置面板
+- 标签页结构：触发器 / 别名 / 定时器 / 高亮 / 脚本
+- iOS 风格开关切换，增删改查操作
+- 每个子系统独立导入/导出
+- **全套导出/导入**：一键打包所有配置为 JSON 文件备份
+
+#### 帮助浏览器
+- 复古 ASCII 风格模态框，分类导航 + 主题列表
+- **GMCP 全文检索**：输入关键词由服务端搜索后返回匹配结果
+- **交叉引用链接**：文档正文中的 `help <主题>` 自动渲染为可点击链接
+- 服务端 `Help.Topics` 动态下发，实时更新分类树和主题白名单
+- 键盘操作：F1 开关、Esc 关闭、/ 聚焦搜索、↑↓ 选择、Enter 查看
+
+#### 其他特性
+- **完整 ANSI 渲染**：前景色(30-37)、背景色(40-47)、高亮色(1;30-1;37)、高亮背景(1;40-1;47)、斜体/下划线/暗淡/闪烁/删除线/反色
+- **命令历史持久化**：localStorage 保存，↑↓ 翻阅，刷新后恢复
+- **快捷命令栏**：look/资料/物品/技能/任务/玩家 + ⚙ 设置按钮，点击即发送命令
+- **Telnet 协议完整支持**：GMCP、MSP、NAWS、Terminal Type、Suppress Go Ahead
+- **心跳检测与自动重连**：30 秒心跳，断开后最多 3 次递增延迟重连
+- **流式 UTF-8 解码**：持久化 TextDecoder 跨 WebSocket 帧重组多字节字符，避免中文乱码
+- **Telnet 状态跨帧续接**：IAC 命令和 SB..SE 子协商可跨帧续接，避免半截包丢数据
+
+---
+
+## LIB 说明
+
+本游戏为侠客行类文字 MUD 游戏。
 
 ## 启动说明
 
-游戏集成了[mudcore](https://github.com/mudcore/mudcore)框架，请使用以下指令下载源码：
+游戏集成了 [mudcore](https://github.com/mudcore/mudcore) 框架，请使用以下指令下载源码：
 
-    # 从github安装（国外推荐）
-    git clone --recurse-submodules https://github.com/oiuv/mud.git
-    # 从gitee 安装（国内推荐）
-    git clone --recurse-submodules https://gitee.com/mudren/mud.git
+```bash
+# 从 GitHub 安装（国外推荐）
+git clone --recurse-submodules https://github.com/oiuv/mud.git
+# 从 Gitee 安装（国内推荐）
+git clone --recurse-submodules https://gitee.com/mudren/mud.git
+```
 
-如果你已经直接clone了项目，请使用以下指令更新子模块：
+如果你已经直接 clone 了项目，请使用以下指令更新子模块：
 
-    git submodule update --init
+```bash
+git submodule update --init
+```
 
-> 提示：国内用户[mudcore](https://github.com/mudcore/mudcore)子模块可使用gitee镜像地址
-
-- https://gitee.com/mudcore/mudcore.git
+> 提示：国内用户 [mudcore](https://github.com/mudcore/mudcore) 子模块可使用 Gitee 镜像地址
+> - https://gitee.com/mudcore/mudcore.git
 
 ### 环境要求
 
@@ -41,26 +118,32 @@
 
 **Windows (PowerShell):**
 
-    .\docker-deploy.ps1              # 启动服务
-    .\docker-deploy.ps1 -DebugMode   # 调试模式
-    .\docker-deploy.ps1 -Rebuild     # 重建镜像
-    .\docker-deploy.ps1 -Stop        # 停止服务
+```powershell
+.\docker-deploy.ps1              # 启动服务
+.\docker-deploy.ps1 -DebugMode   # 调试模式
+.\docker-deploy.ps1 -Rebuild     # 重建镜像
+.\docker-deploy.ps1 -Stop        # 停止服务
+```
 
 **Linux / Mac:**
 
-    ./docker-deploy.sh               # 启动服务
-    ./docker-deploy.sh -d            # 调试模式
-    ./docker-deploy.sh --rebuild     # 重建镜像
-    ./docker-deploy.sh --stop        # 停止服务
+```bash
+./docker-deploy.sh               # 启动服务
+./docker-deploy.sh -d            # 调试模式
+./docker-deploy.sh --rebuild     # 重建镜像
+./docker-deploy.sh --stop        # 停止服务
+```
 
 ### 端口说明
 
- * 5566 端口为 GBK 编码 (Telnet)
- * 6666 端口为 UTF-8 编码 (Telnet)
- * 8888 端口为 WebSocket 访问
+| 端口 | 协议 | 说明 |
+|------|------|------|
+| 5566 | Telnet | GBK 编码 |
+| 6666 | Telnet | UTF-8 编码 |
+| **8888** | **WebSocket** | **Web 客户端（浏览器直接访问）** |
 
-> 推荐使用 [Mudlet](https://github.com/Mudlet/Mudlet) 客户端连接游戏，推荐使用 UTF-8 编码进行游戏。
+> 推荐使用浏览器打开 `http://localhost:8888` 体验 Web 客户端，也可使用 [Mudlet](https://github.com/Mudlet/Mudlet) 等传统客户端通过 Telnet 端口连接。推荐使用 UTF-8 编码进行游戏。
 
-注册ID为 `mudren` 的帐号为游戏管理员(admin)。
+注册 ID 为 `mudren` 的帐号为游戏管理员 (admin)。
 
 求助答疑请访问：https://bbs.mud.ren/nodes/6
