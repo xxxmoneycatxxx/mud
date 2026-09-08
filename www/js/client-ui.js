@@ -831,41 +831,280 @@ AdvancedMUDClient.prototype._importTimerJSON = function () {
     input.click();
 };
 
-// 渲染高亮列表（示例数据）
+// 渲染高亮列表到设置面板
 AdvancedMUDClient.prototype._renderHighlightList = function () {
     const container = document.getElementById('settingsHighlights');
     if (!container) return;
     container.innerHTML = '';
 
+    // 顶部操作栏
+    const toolbar = document.createElement('div');
+    toolbar.className = 'settings-toolbar';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'settings-action-btn';
+    addBtn.textContent = '+ 新增';
+    addBtn.addEventListener('click', () => this._showHighlightForm(-1));
+    toolbar.appendChild(addBtn);
+    container.appendChild(toolbar);
+
+    // 高亮规则列表
     const highlights = this._highlights || [];
     if (highlights.length === 0) {
-        container.innerHTML = '<div class="settings-empty">暂无高亮规则</div>';
+        const empty = document.createElement('div');
+        empty.className = 'settings-empty';
+        empty.textContent = '暂无高亮规则';
+        container.appendChild(empty);
+    } else {
+        highlights.forEach((hl, index) => {
+            const item = document.createElement('div');
+            item.className = 'settings-item';
+
+            const info = document.createElement('div');
+            info.className = 'settings-item-info';
+            const preview = '<span class="highlight-swatch" style="color:' + this._escHtml(hl.color) + '">■</span>';
+            info.innerHTML = '<div class="settings-item-name">' + preview + ' ' + this._escHtml(hl.keyword) + '</div>'
+                + '<div class="settings-item-detail">' + this._escHtml(hl.color) + (hl.builtin ? ' · 内置' : '') + '</div>';
+
+            const actions = document.createElement('div');
+            actions.className = 'settings-item-actions';
+
+            // 开关
+            const toggle = document.createElement('label');
+            toggle.className = 'settings-toggle';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = hl.enabled;
+            input.addEventListener('change', () => {
+                this.toggleHighlight(index, input.checked);
+                this._renderHighlightList();
+            });
+            const slider = document.createElement('span');
+            slider.className = 'slider';
+            toggle.appendChild(input);
+            toggle.appendChild(slider);
+            actions.appendChild(toggle);
+
+            // 编辑/删除（仅用户规则）
+            if (!hl.builtin) {
+                const editBtn = document.createElement('button');
+                editBtn.className = 'settings-icon-btn';
+                editBtn.textContent = '✎';
+                editBtn.title = '编辑';
+                editBtn.addEventListener('click', () => this._showHighlightForm(index));
+                actions.appendChild(editBtn);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'settings-icon-btn settings-icon-btn-danger';
+                delBtn.textContent = '✕';
+                delBtn.title = '删除';
+                delBtn.addEventListener('click', () => {
+                    if (confirm('确认删除高亮规则「' + hl.keyword + '」？')) {
+                        this.removeHighlight(index);
+                        this._renderHighlightList();
+                    }
+                });
+                actions.appendChild(delBtn);
+            }
+
+            item.appendChild(info);
+            item.appendChild(actions);
+            container.appendChild(item);
+        });
+    }
+
+    // 表单区域
+    const formArea = document.createElement('div');
+    formArea.id = 'highlightFormArea';
+    container.appendChild(formArea);
+
+    // 底部导入/导出
+    const footer = document.createElement('div');
+    footer.className = 'settings-toolbar settings-toolbar-bottom';
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'settings-action-btn';
+    exportBtn.textContent = '导出';
+    exportBtn.addEventListener('click', () => this._exportHighlightJSON());
+    const importBtn = document.createElement('button');
+    importBtn.className = 'settings-action-btn';
+    importBtn.textContent = '导入';
+    importBtn.addEventListener('click', () => this._importHighlightJSON());
+    footer.appendChild(exportBtn);
+    footer.appendChild(importBtn);
+    container.appendChild(footer);
+};
+
+// 显示高亮编辑表单
+AdvancedMUDClient.prototype._showHighlightForm = function (index) {
+    const formArea = document.getElementById('highlightFormArea');
+    if (!formArea) return;
+
+    if (formArea.innerHTML && formArea.dataset.editIndex === String(index)) {
+        formArea.innerHTML = '';
+        formArea.dataset.editIndex = '';
         return;
     }
 
-    highlights.forEach((hl) => {
-        const item = document.createElement('div');
-        item.className = 'settings-item';
+    const isEdit = index >= 0;
+    const hl = isEdit ? this._highlights[index] : null;
 
-        const info = document.createElement('div');
-        info.className = 'settings-item-info';
-        info.innerHTML = '<div class="settings-item-name">' + this._escHtml(hl.keyword) + '</div>'
-            + '<div class="settings-item-detail">颜色: <span style="color:' + this._escHtml(hl.color) + '">' + this._escHtml(hl.color) + '</span></div>';
+    formArea.dataset.editIndex = String(index);
+    formArea.innerHTML = '';
 
-        const toggle = document.createElement('label');
-        toggle.className = 'settings-toggle';
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.checked = hl.enabled;
-        const slider = document.createElement('span');
-        slider.className = 'slider';
-        toggle.appendChild(input);
-        toggle.appendChild(slider);
+    const form = document.createElement('div');
+    form.className = 'settings-form';
+    form.innerHTML = '<div class="settings-form-title">' + (isEdit ? '编辑高亮规则' : '新增高亮规则') + '</div>';
 
-        item.appendChild(info);
-        item.appendChild(toggle);
-        container.appendChild(item);
+    // 关键词
+    const kwRow = document.createElement('div');
+    kwRow.className = 'settings-form-row';
+    kwRow.innerHTML = '<label>关键词</label>';
+    const kwInput = document.createElement('input');
+    kwInput.type = 'text';
+    kwInput.className = 'settings-form-input';
+    kwInput.placeholder = '如：仙丹';
+    kwInput.value = hl ? hl.keyword : '';
+    kwRow.appendChild(kwInput);
+    form.appendChild(kwRow);
+
+    // 颜色选择
+    const colorRow = document.createElement('div');
+    colorRow.className = 'settings-form-row';
+    colorRow.innerHTML = '<label>颜色</label>';
+
+    const colorPicker = document.createElement('div');
+    colorPicker.className = 'highlight-color-picker';
+
+    // 预设色块
+    const presetColors = ['#ff4444', '#ff8800', '#ffff00', '#44ff44', '#00ffff', '#4488ff', '#ff44ff', '#ffffff'];
+    const currentColor = hl ? hl.color : '#ffff00';
+    presetColors.forEach(c => {
+        const swatch = document.createElement('span');
+        swatch.className = 'highlight-color-swatch' + (c === currentColor ? ' active' : '');
+        swatch.style.backgroundColor = c;
+        swatch.dataset.color = c;
+        swatch.addEventListener('click', () => {
+            hexInput.value = c;
+            previewSwatch.style.color = c;
+            colorPicker.querySelectorAll('.highlight-color-swatch').forEach(s => s.classList.remove('active'));
+            swatch.classList.add('active');
+        });
+        colorPicker.appendChild(swatch);
     });
+
+    // 自定义 hex 输入
+    const hexInput = document.createElement('input');
+    hexInput.type = 'text';
+    hexInput.className = 'settings-form-input highlight-hex-input';
+    hexInput.placeholder = '#ffff00';
+    hexInput.value = currentColor;
+    hexInput.maxLength = 7;
+
+    // 实时预览色块
+    const previewSwatch = document.createElement('span');
+    previewSwatch.className = 'highlight-preview-swatch';
+    previewSwatch.style.color = currentColor;
+    previewSwatch.textContent = '■ 预览';
+
+    hexInput.addEventListener('input', () => {
+        const val = hexInput.value.trim();
+        if (/^#[0-9a-fA-F]{3,6}$/.test(val)) {
+            previewSwatch.style.color = val;
+            colorPicker.querySelectorAll('.highlight-color-swatch').forEach(s => {
+                s.classList.toggle('active', s.dataset.color === val);
+            });
+        }
+    });
+
+    colorRow.appendChild(colorPicker);
+    colorRow.appendChild(hexInput);
+    colorRow.appendChild(previewSwatch);
+    form.appendChild(colorRow);
+
+    // 按钮
+    const btnRow = document.createElement('div');
+    btnRow.className = 'settings-form-buttons';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'settings-action-btn';
+    saveBtn.textContent = '保存';
+    saveBtn.addEventListener('click', () => {
+        const keyword = kwInput.value.trim();
+        const color = hexInput.value.trim();
+        if (!keyword) {
+            alert('请填写关键词');
+            return;
+        }
+        if (!/^#[0-9a-fA-F]{3,6}$/.test(color)) {
+            alert('颜色格式不正确，请使用 #RRGGBB 格式');
+            return;
+        }
+        if (isEdit) {
+            this.updateHighlight(index, { keyword: keyword, color: color });
+        } else {
+            this.addHighlight(keyword, color);
+        }
+        this._renderHighlightList();
+    });
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'settings-action-btn';
+    cancelBtn.textContent = '取消';
+    cancelBtn.addEventListener('click', () => {
+        formArea.innerHTML = '';
+        formArea.dataset.editIndex = '';
+    });
+    btnRow.appendChild(saveBtn);
+    btnRow.appendChild(cancelBtn);
+    form.appendChild(btnRow);
+
+    formArea.appendChild(form);
+};
+
+// 导出高亮规则 JSON
+AdvancedMUDClient.prototype._exportHighlightJSON = function () {
+    const json = this.exportHighlights();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mud-highlights.json';
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+// 导入高亮规则 JSON
+AdvancedMUDClient.prototype._importHighlightJSON = function () {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                this.importHighlights(reader.result);
+                this._renderHighlightList();
+                this.appendMessage('✅ 高亮规则导入成功', 'system');
+            } catch (err) {
+                this.appendMessage('❌ 高亮规则导入失败: ' + err.message, 'system');
+            }
+        };
+        reader.readAsText(file);
+    });
+    input.click();
+};
+
+// 高亮渲染：在已解析 ANSI 的 HTML 中替换关键词为带颜色的 span
+AdvancedMUDClient.prototype._applyHighlights = function (html) {
+    if (!this._highlights) return html;
+    const active = this._highlights.filter(h => h.enabled && h.keyword);
+    if (active.length === 0) return html;
+
+    for (const hl of active) {
+        const escaped = hl.keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp('(?<=>)([^<]*?)(' + escaped + ')', 'g');
+        html = html.replace(regex, '$1<span style="color:' + hl.color.replace(/"/g, '') + ';font-weight:bold">$2</span>');
+    }
+    return html;
 };
 
 // 渲染脚本列表到设置面板
@@ -1741,7 +1980,9 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
     const div = document.createElement('div');
     div.className = 'message ' + className;
     let html = this.parseANSI(message);
-    // look/l 输出的"明显出口"渲染成可点击链接（点击移动）
+    // 关键词高亮渲染
+    html = this._applyHighlights(html);
+    // look/l 输出的“明显出口”渲染成可点击链接（点击移动）
     if (/这里明显的出口是|这里唯一的出口是/.test(message)) {
         html = this.linkifyRoomExits(html);
     }

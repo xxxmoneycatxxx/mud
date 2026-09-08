@@ -68,8 +68,15 @@ class AdvancedMUDClient {
         this._highlights = [
             {
                 keyword: '仙丹',
-                color: '#ff0',
-                enabled: true,
+                color: '#ffff00',
+                enabled: false,
+                builtin: true,
+            },
+            {
+                keyword: '气血',
+                color: '#ff4444',
+                enabled: false,
+                builtin: true,
             },
         ];
 
@@ -121,6 +128,7 @@ class AdvancedMUDClient {
         this.scriptEngine = new ScriptEngine(this);
         this._loadScripts();
         this._loadTimers();
+        this._loadHighlights();
 
         this.setupEventListeners();
         this.setupTerminalFeatures();
@@ -979,5 +987,92 @@ class AdvancedMUDClient {
             });
         }
         this._saveTimers();
+    }
+
+    // ===== 关键词高亮系统 =====
+
+    // 高亮持久化：内置规则保存 enabled，用户规则保存完整定义
+    _saveHighlights() {
+        try {
+            const data = this._highlights.map(h => {
+                if (h.builtin) return { keyword: h.keyword, enabled: h.enabled, builtin: true };
+                return { keyword: h.keyword, color: h.color, enabled: h.enabled };
+            });
+            localStorage.setItem('mud_highlights', JSON.stringify(data));
+        } catch (e) { /* 存储失败忽略 */ }
+    }
+
+    // 高亮恢复：内置规则恢复 enabled，用户规则追加
+    _loadHighlights() {
+        try {
+            const saved = localStorage.getItem('mud_highlights');
+            if (!saved) return;
+            const data = JSON.parse(saved);
+            for (const d of data) {
+                if (d.builtin) {
+                    const existing = this._highlights.find(h => h.builtin && h.keyword === d.keyword);
+                    if (existing) existing.enabled = d.enabled;
+                } else {
+                    this._highlights.push({
+                        keyword: d.keyword,
+                        color: d.color || '#ffff00',
+                        enabled: d.enabled || false,
+                    });
+                }
+            }
+        } catch (e) { /* 解析失败忽略 */ }
+    }
+
+    // 添加用户高亮规则
+    addHighlight(keyword, color) {
+        this._highlights.push({ keyword: keyword, color: color, enabled: true });
+        this._saveHighlights();
+    }
+
+    // 更新高亮规则
+    updateHighlight(index, fields) {
+        const hl = this._highlights[index];
+        if (!hl || hl.builtin) return;
+        Object.assign(hl, fields);
+        this._saveHighlights();
+    }
+
+    // 删除高亮规则
+    removeHighlight(index) {
+        const hl = this._highlights[index];
+        if (!hl || hl.builtin) return;
+        this._highlights.splice(index, 1);
+        this._saveHighlights();
+    }
+
+    // 切换高亮启用状态
+    toggleHighlight(index, enabled) {
+        const hl = this._highlights[index];
+        if (!hl) return;
+        hl.enabled = enabled;
+        this._saveHighlights();
+    }
+
+    // 导出用户高亮规则
+    exportHighlights() {
+        const userHighlights = this._highlights
+            .filter(h => !h.builtin)
+            .map(h => ({ keyword: h.keyword, color: h.color, enabled: h.enabled }));
+        return JSON.stringify(userHighlights, null, 2);
+    }
+
+    // 导入高亮规则
+    importHighlights(jsonStr) {
+        const items = JSON.parse(jsonStr);
+        for (const d of items) {
+            if (!d.keyword) continue;
+            if (this._highlights.some(h => h.keyword === d.keyword && !h.builtin)) continue;
+            this._highlights.push({
+                keyword: d.keyword,
+                color: d.color || '#ffff00',
+                enabled: d.enabled || false,
+            });
+        }
+        this._saveHighlights();
     }
 }
