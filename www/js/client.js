@@ -224,7 +224,7 @@ class AdvancedMUDClient {
         // 停止所有定时器
         this._stopAllTimers();
 
-        console.log('🔧 连接已强制清理');
+        console.log('[MUD] 连接已强制清理');
     }
 
     // 启动心跳检测
@@ -243,7 +243,7 @@ class AdvancedMUDClient {
                     this.forceCleanup();
                 }
             } else {
-                console.log('💔 心跳检测发现连接断开');
+                console.log('[MUD] 心跳检测发现连接断开');
                 this.forceCleanup();
             }
         }, 30000); // 30秒心跳
@@ -262,7 +262,7 @@ class AdvancedMUDClient {
             // 先强制清理之前的连接
             this.forceCleanup();
 
-            this.status.textContent = '正在连接...';
+            this.status.textContent = '连接中';
             this.status.className = 'status connecting';
 
             // 添加时间戳防止缓存
@@ -281,6 +281,14 @@ class AdvancedMUDClient {
                 this.status.className = 'status connected';
                 this.commandInput.disabled = false;
                 this.sendBtn.disabled = false;
+
+                // ASCII 欢迎画面
+                this.appendMessage('', '');
+                this.appendMessage('═══════════════════════════════════════', 'system');
+                this.appendMessage('  炎黄群侠传 · Web MUD Client v1.0', 'system');
+                this.appendMessage('  FluffOS Driver · GMCP Enabled', 'system');
+                this.appendMessage('═══════════════════════════════════════', 'system');
+                this.appendMessage('', '');
 
                 // 显示状态栏和快捷命令
                 const statusBar = document.getElementById('statusBar');
@@ -329,7 +337,7 @@ class AdvancedMUDClient {
                 if (quickCmds) quickCmds.classList.remove('visible');
                 if (minimap) minimap.classList.remove('visible');
 
-                this.appendMessage('🔌 连接已断开', 'error');
+                this.appendMessage('══ 连接已断开 ══', 'error');
 
                 // 延迟清理，确保所有资源释放
                 this.cleanupTimeout = setTimeout(() => {
@@ -339,7 +347,7 @@ class AdvancedMUDClient {
                 if (this.retryCount < this.maxRetries) {
                     this.retryCount++;
                     setTimeout(() => {
-                        this.appendMessage(`🔄 正在重连...(${this.retryCount}/${this.maxRetries})`, 'system');
+                        this.appendMessage(`══ 正在重连 (${this.retryCount}/${this.maxRetries}) ══`, 'system');
                         this.connect(this.resolveWsUrl());
                     }, 2000 * this.retryCount);
                 }
@@ -347,12 +355,12 @@ class AdvancedMUDClient {
 
             this.ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
-                this.appendMessage('❌ 连接错误，请检查网络', 'error');
+                this.appendMessage('══ 连接错误，请检查网络 ══', 'error');
             };
 
         } catch (error) {
             console.error('Connection failed:', error);
-            this.appendMessage('❌ 创建连接失败: ' + error.message, 'error');
+            this.appendMessage('══ 创建连接失败: ' + error.message + ' ══', 'error');
         }
     }
 
@@ -442,7 +450,7 @@ class AdvancedMUDClient {
                 break;
             case TELNET.MSP:
                 const text = new TextDecoder().decode(Uint8Array.from(data));
-                console.log('📡 子协商 MSP:', text);
+                console.log('[MSP] 子协商:', text);
                 break;
         }
     }

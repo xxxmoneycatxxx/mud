@@ -7,7 +7,7 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
     // 通用动作键：中文标签 + tooltip 显示实际命令
     // look 保留（房间描述常用），hp 移除（Gauge 已可视化显示）
     const actions = [
-        { label: 'look', cmd: 'look', title: '查看周围' },
+        { label: '环顾', cmd: 'look', title: 'look' },
         { label: '资料', cmd: 'score', title: '角色属性' },
         { label: '物品', cmd: 'i', title: '背包物品' },
         { label: '技能', cmd: 'cha', title: '技能熟练' },
@@ -30,8 +30,8 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
     // 设置按钮：打开设置面板
     const settingsBtn = document.createElement('button');
     settingsBtn.className = 'qc-btn qc-settings-btn';
-    settingsBtn.textContent = '⚙';
-    settingsBtn.title = '设置（触发器/别名/快捷键等）';
+    settingsBtn.textContent = '设置';
+    settingsBtn.title = 'trigger / alias / timer / script';
     settingsBtn.addEventListener('click', () => this._openSettings());
     qcContainer.appendChild(settingsBtn);
 
@@ -108,7 +108,7 @@ AdvancedMUDClient.prototype._exportAllConfigJSON = function () {
     a.download = 'mud-config-' + date + '.json';
     a.click();
     URL.revokeObjectURL(url);
-    this.appendMessage('✅ 全套配置已导出', 'system');
+    this.appendMessage('※ 全套配置已导出', 'system');
 };
 
 // 全套导入：选择 JSON 文件覆盖当前所有配置
@@ -125,9 +125,9 @@ AdvancedMUDClient.prototype._importAllConfigJSON = function () {
             try {
                 this.importAllConfig(reader.result);
                 this._renderActiveSettingsTab();
-                this.appendMessage('✅ 全套配置已导入', 'system');
+                this.appendMessage('※ 全套配置已导入', 'system');
             } catch (err) {
-                this.appendMessage('❌ 配置导入失败: ' + err.message, 'system');
+                this.appendMessage('！配置导入失败: ' + err.message, 'system');
             }
         };
         reader.readAsText(file);
@@ -870,9 +870,9 @@ AdvancedMUDClient.prototype._importTimerJSON = function () {
             try {
                 this.importTimers(reader.result);
                 this._renderTimerList();
-                this.appendMessage('✅ 定时器导入成功', 'system');
+                this.appendMessage('※ 定时器导入成功', 'system');
             } catch (err) {
-                this.appendMessage('❌ 定时器导入失败: ' + err.message, 'system');
+                this.appendMessage('！定时器导入失败: ' + err.message, 'system');
             }
         };
         reader.readAsText(file);
@@ -1132,9 +1132,9 @@ AdvancedMUDClient.prototype._importHighlightJSON = function () {
             try {
                 this.importHighlights(reader.result);
                 this._renderHighlightList();
-                this.appendMessage('✅ 高亮规则导入成功', 'system');
+                this.appendMessage('※ 高亮规则导入成功', 'system');
             } catch (err) {
-                this.appendMessage('❌ 高亮规则导入失败: ' + err.message, 'system');
+                this.appendMessage('！高亮规则导入失败: ' + err.message, 'system');
             }
         };
         reader.readAsText(file);
@@ -1387,9 +1387,9 @@ AdvancedMUDClient.prototype._importScriptJSON = function () {
             try {
                 this.importScripts(reader.result);
                 this._renderScriptList();
-                this.appendMessage('✅ 脚本导入成功', 'system');
+                this.appendMessage('※ 脚本导入成功', 'system');
             } catch (err) {
-                this.appendMessage('❌ 脚本导入失败: ' + err.message, 'system');
+                this.appendMessage('！脚本导入失败: ' + err.message, 'system');
             }
         };
         reader.readAsText(file);
@@ -2061,7 +2061,7 @@ AdvancedMUDClient.prototype._checkSpeedwalkTriggers = function (message) {
     // 遇敌自动暂停速走（与 Mudlet pauseSpeedWalk 触发器对齐）
     if (pathfinder.isWalking() && /看起来.+想杀死你！$/.test(message)) {
         pathfinder.pauseWalk();
-        this.appendMessage('⚠ 速走已暂停（检测到敌人）', 'system');
+        this.appendMessage('※ 速走已暂停（检测到敌人）', 'system');
         return;
     }
 
@@ -2083,7 +2083,7 @@ AdvancedMUDClient.prototype._processTriggers = function (message) {
         if (trigger.pattern.test(message)) {
             trigger._lastFired = now;
             this.sendCommand(trigger.command);
-            this.appendMessage('⚡ [' + trigger.name + '] → ' + trigger.command, 'system');
+            this.appendMessage('» [' + trigger.name + '] → ' + trigger.command, 'system');
         }
     }
 };

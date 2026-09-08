@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WEB MUD CLIENT - FluffOS</title>
+    <title>炎黄群侠传 · Web MUD</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <!-- 状态栏浮动面板：角色属性 Gauge 可视化 -->
     <div class="status-panel" id="statusBar">
         <div class="status-header">
-            <span class="status-title">角色状态</span>
+            <span class="status-title">〔 角色状态 〕</span>
             <button class="status-toggle" id="statusToggle" title="收起/展开状态栏">−</button>
         </div>
         <div class="status-body" id="statusBody">
@@ -20,12 +20,15 @@
         </div>
     </div>
 
-    <div class="terminal" id="terminal">正在连接到 MUD……</div>
+    <div class="terminal" id="terminal">╔══════════════════════════════════════╗
+║   炎黄群侠传 · Web MUD Client   ║
+║      正在连接到江湖……      ║
+╚══════════════════════════════════════╝</div>
 
     <!-- 小地图浮动面板：房间信息 + Canvas 地图 -->
     <div class="minimap-panel" id="minimapPanel">
         <div class="minimap-header">
-            <span class="minimap-title" id="minimapTitle">房间: --</span>
+            <span class="minimap-title" id="minimapTitle">〔 房间: -- 〕</span>
             <span class="minimap-floor" id="minimapFloorInd" style="display:none">F0</span>
             <button class="minimap-toggle" id="minimapToggle" title="收起/展开小地图">−</button>
         </div>
@@ -60,9 +63,10 @@
     </div>
 
     <div class="input-area">
+        <span class="input-prompt">&gt;</span>
         <div class="input-container">
-            <input type="text" class="command-input" id="commandInput" placeholder="输入命令... (↑↓查看历史)" disabled>
-            <div class="history-hint" id="historyHint" style="display: none;">↑↓历史</div>
+            <input type="text" class="command-input" id="commandInput" placeholder="输入命令… (↑↓历史)" disabled>
+            <div class="history-hint" id="historyHint" style="display: none;">↑↓</div>
         </div>
         <button class="send-btn" id="sendBtn" disabled>发送</button>
     </div>
@@ -73,7 +77,7 @@
         <div class="quick-commands" id="quickCommands"></div>
         <div class="status-container">
             <div class="status connecting" id="status">
-                <span>正在连接...</span>
+                <span>连接中</span>
             </div>
         </div>
     </div>
@@ -81,7 +85,7 @@
     <!-- 帮助浏览模态框：复古 ASCII 风格，导航型（选中主题即在终端执行 help <主题>） -->
     <div class="help-overlay" id="helpOverlay">
         <div class="help-modal" id="helpModal" tabindex="-1">
-            <div class="help-titlebar">【 江湖帮助 】</div>
+            <div class="help-titlebar">〔 江湖帮助 〕</div>
             <div class="help-searchbar">
                 <span class="help-prompt">&gt;</span>
                 <input type="text" id="helpSearch" class="help-search" placeholder="搜索帮助文档内容…（按 / 聚焦）" autocomplete="off">
@@ -98,7 +102,7 @@
     <div class="settings-overlay" id="settingsOverlay">
         <div class="settings-modal">
             <div class="settings-titlebar">
-                <span>【 设置 】</span>
+                <span>〔 设置 〕</span>
                 <button class="settings-close" id="settingsClose" title="关闭 (Esc)">✕</button>
             </div>
             <div class="settings-tabs" id="settingsTabs">
