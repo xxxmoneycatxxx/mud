@@ -24,6 +24,8 @@ class AdvancedMUDClient {
         this._loginDone = false;        // 是否已进入游戏（登录完成）
         this._hpFallbackSent = false;   // hp 兑底是否已发送
         this._lastVitals = null;        // 最近一次状态栏数据（合并用）
+        this._lastRoomInfo = null;       // 最近一次房间信息（脚本 API 用）
+        this.scriptEngine = null;        // 用户脚本引擎（init 中初始化）
 
         // 轻量触发器规则表：pattern 匹配消息时自动执行 command
         // 新增规则只需往数组加一条，支持 cooldown 防刷
@@ -49,13 +51,6 @@ class AdvancedMUDClient {
             { name: '物品栏', pattern: 'eq', command: 'inventory', enabled: false, builtin: true },
         ];
         this._loadAliases();
-
-        // 快捷键绑定表：按键 → 命令
-        this._keybinds = [
-            { key: 'F1', command: 'look', enabled: true },
-            { key: 'F2', command: 'score', enabled: true },
-            { key: 'F3', command: 'i', enabled: true },
-        ];
 
         // 定时任务表：间隔执行命令
         this._timers = [
@@ -86,6 +81,20 @@ class AdvancedMUDClient {
                 enabled: false,
                 builtin: true,
             },
+            {
+                name: '自动疗伤',
+                description: '每 5 秒检查气血，低于 50% 自动 exert recover',
+                code: 'registerTimer(5000, () => {\n    const v = getVitals();\n    if (v.hp && v.max_hp && v.hp < v.max_hp * 0.5) {\n        sendCommand("exert recover");\n        log("气血不足，自动疗伤");\n    }\n});',
+                enabled: false,
+                builtin: true,
+            },
+            {
+                name: '自动逃跑',
+                description: '每 2 秒检查气血，低于 20% 自动 flee',
+                code: 'registerTimer(2000, () => {\n    const v = getVitals();\n    if (v.hp && v.max_hp && v.hp < v.max_hp * 0.2 && isConnected()) {\n        sendCommand("flee");\n        log("气血危急，紧急逃跑！");\n    }\n});',
+                enabled: false,
+                builtin: true,
+            },
         ];
 
         // ANSI 颜色码映射表 (与服务端 ansi.h 对齐)
@@ -107,6 +116,10 @@ class AdvancedMUDClient {
             const saved = localStorage.getItem('mud_command_history');
             if (saved) this.history = JSON.parse(saved);
         } catch (e) { /* 解析失败则使用空历史 */ }
+        // 初始化脚本引擎 + 恢复已启用脚本
+        this.scriptEngine = new ScriptEngine(this);
+        this._loadScripts();
+
         this.setupEventListeners();
         this.setupTerminalFeatures();
         this.setupQuickCommands();
@@ -708,5 +721,119 @@ class AdvancedMUDClient {
             });
         }
         this._saveAliases();
+    }
+
+    // ===== 脚本系统 =====
+
+    // 脚本持久化：内置规则保存 enabled，用户规则保存完整定义
+    _saveScripts() {
+        try {
+            const data = this._scripts.map(s => {
+                if (s.builtin) return { name: s.name, enabled: s.enabled, builtin: true };
+                return { name: s.name, description: s.description, code: s.code, enabled: s.enabled };
+            });
+            localStorage.setItem('mud_scripts', JSON.stringify(data));
+        } catch (e) { /* 存储失败忽略 */ }
+    }
+
+    // 脚本恢复：内置规则恢复 enabled，用户规则追加，已启用的自动启动
+    _loadScripts() {
+        try {
+            const saved = localStorage.getItem('mud_scripts');
+            if (!saved) return;
+            const data = JSON.parse(saved);
+            for (const d of data) {
+                if (d.builtin) {
+                    const script = this._scripts.find(s => s.name === d.name && s.builtin);
+                    if (script) script.enabled = d.enabled;
+                } else {
+                    this._scripts.push({
+                        name: d.name,
+                        description: d.description || '',
+                        code: d.code || '',
+                        enabled: d.enabled !== false,
+                    });
+                }
+            }
+        } catch (e) { /* 解析失败忽略 */ }
+
+        // 启动已启用的脚本
+        if (this.scriptEngine) {
+            for (const script of this._scripts) {
+                if (script.enabled) this.scriptEngine.start(script);
+            }
+        }
+    }
+
+    // 添加用户脚本
+    addScript(name, description, code) {
+        this._scripts.push({ name: name, description: description, code: code, enabled: false });
+        this._saveScripts();
+    }
+
+    // 更新脚本（如果启用状态变化则启动/停止引擎）
+    updateScript(index, fields) {
+        const script = this._scripts[index];
+        if (!script || script.builtin) return;
+        const wasEnabled = script.enabled;
+        Object.assign(script, fields);
+        this._saveScripts();
+        // 引擎同步
+        if (this.scriptEngine) {
+            if (script.enabled && !wasEnabled) {
+                this.scriptEngine.start(script);
+            } else if (!script.enabled && wasEnabled) {
+                this.scriptEngine.stop(script.name);
+            } else if (script.enabled) {
+                // 代码变更，重启脚本
+                this.scriptEngine.stop(script.name);
+                this.scriptEngine.start(script);
+            }
+        }
+    }
+
+    // 删除用户脚本
+    removeScript(index) {
+        const script = this._scripts[index];
+        if (!script || script.builtin) return;
+        if (this.scriptEngine) this.scriptEngine.stop(script.name);
+        this._scripts.splice(index, 1);
+        this._saveScripts();
+    }
+
+    // 切换脚本启用状态
+    toggleScript(index, enabled) {
+        const script = this._scripts[index];
+        if (!script) return;
+        script.enabled = enabled;
+        this._saveScripts();
+        if (this.scriptEngine) {
+            if (enabled) this.scriptEngine.start(script);
+            else this.scriptEngine.stop(script.name);
+        }
+    }
+
+    // 导出用户脚本
+    exportScripts() {
+        const userScripts = this._scripts
+            .filter(s => !s.builtin)
+            .map(s => ({ name: s.name, description: s.description, code: s.code, enabled: s.enabled }));
+        return JSON.stringify(userScripts, null, 2);
+    }
+
+    // 导入脚本
+    importScripts(jsonStr) {
+        const items = JSON.parse(jsonStr);
+        for (const d of items) {
+            if (!d.name || !d.code) continue;
+            if (this._scripts.some(s => s.name === d.name && !s.builtin)) continue;
+            this._scripts.push({
+                name: d.name,
+                description: d.description || '',
+                code: d.code,
+                enabled: d.enabled || false,
+            });
+        }
+        this._saveScripts();
     }
 }

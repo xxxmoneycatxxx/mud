@@ -94,7 +94,7 @@
         </div>
     </div>
 
-    <!-- 设置面板：标签页结构（触发器/别名/快捷键/定时器/高亮/脚本） -->
+    <!-- 设置面板：标签页结构（触发器/别名/定时器/高亮/脚本） -->
     <div class="settings-overlay" id="settingsOverlay">
         <div class="settings-modal">
             <div class="settings-titlebar">
@@ -104,7 +104,6 @@
             <div class="settings-tabs" id="settingsTabs">
                 <button class="settings-tab active" data-tab="triggers">触发器</button>
                 <button class="settings-tab" data-tab="aliases">别名</button>
-                <button class="settings-tab" data-tab="keybinds">快捷键</button>
                 <button class="settings-tab" data-tab="timers">定时器</button>
                 <button class="settings-tab" data-tab="highlights">高亮</button>
                 <button class="settings-tab" data-tab="scripts">脚本</button>
@@ -115,9 +114,6 @@
                 </div>
                 <div class="settings-tab-content" id="tab-aliases">
                     <div class="settings-list" id="settingsAliases"></div>
-                </div>
-                <div class="settings-tab-content" id="tab-keybinds">
-                    <div class="settings-list" id="settingsKeybinds"></div>
                 </div>
                 <div class="settings-tab-content" id="tab-timers">
                     <div class="settings-list" id="settingsTimers"></div>
@@ -133,11 +129,12 @@
         </div>
     </div>
 
-    <!-- 脚本按依赖顺序加载：常量 → 地图 → 寻路 → 类定义 → 原型扩展 → 实例化 -->
+    <!-- 脚本按依赖顺序加载：常量 → 地图 → 寻路 → 脚本引擎 → 类定义 → 原型扩展 → 实例化 -->
     <script src="js/telnet.js"></script>
     <script src="js/ansi.js"></script>
     <script src="js/mapper.js"></script>
     <script src="js/pathfinder.js"></script>
+    <script src="js/script-engine.js"></script>
     <script src="js/client.js"></script>
     <script src="js/client-ui.js"></script>
     <script src="js/help.js"></script>

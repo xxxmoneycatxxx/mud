@@ -108,7 +108,6 @@ AdvancedMUDClient.prototype._renderActiveSettingsTab = function () {
     switch (tabName) {
         case 'triggers': this._renderTriggerList(); break;
         case 'aliases': this._renderAliasList(); break;
-        case 'keybinds': this._renderKeybindList(); break;
         case 'timers': this._renderTimerList(); break;
         case 'highlights': this._renderHighlightList(); break;
         case 'scripts': this._renderScriptList(); break;
@@ -593,32 +592,6 @@ AdvancedMUDClient.prototype._importAliasJSON = function () {
     input.click();
 };
 
-// 渲染快捷键列表（示例数据）
-AdvancedMUDClient.prototype._renderKeybindList = function () {
-    const container = document.getElementById('settingsKeybinds');
-    if (!container) return;
-    container.innerHTML = '';
-
-    const keybinds = this._keybinds || [];
-    if (keybinds.length === 0) {
-        container.innerHTML = '<div class="settings-empty">暂无快捷键绑定</div>';
-        return;
-    }
-
-    keybinds.forEach((kb) => {
-        const item = document.createElement('div');
-        item.className = 'settings-item';
-
-        const info = document.createElement('div');
-        info.className = 'settings-item-info';
-        info.innerHTML = '<div class="settings-item-name">' + this._escHtml(kb.key) + '</div>'
-            + '<div class="settings-item-detail">' + this._escHtml(kb.command) + '</div>';
-
-        item.appendChild(info);
-        container.appendChild(item);
-    });
-};
-
 // 渲染定时器列表（示例数据）
 AdvancedMUDClient.prototype._renderTimerList = function () {
     const container = document.getElementById('settingsTimers');
@@ -693,43 +666,245 @@ AdvancedMUDClient.prototype._renderHighlightList = function () {
     });
 };
 
-// 渲染脚本列表（示例数据）
+// 渲染脚本列表到设置面板
 AdvancedMUDClient.prototype._renderScriptList = function () {
     const container = document.getElementById('settingsScripts');
     if (!container) return;
     container.innerHTML = '';
 
+    // 顶部操作栏
+    const toolbar = document.createElement('div');
+    toolbar.className = 'settings-toolbar';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'settings-action-btn';
+    addBtn.textContent = '+ 新增';
+    addBtn.addEventListener('click', () => this._showScriptForm(-1));
+    toolbar.appendChild(addBtn);
+    container.appendChild(toolbar);
+
+    // 脚本列表
     const scripts = this._scripts || [];
     if (scripts.length === 0) {
-        container.innerHTML = '<div class="settings-empty">暂无用户脚本</div>';
+        const empty = document.createElement('div');
+        empty.className = 'settings-empty';
+        empty.textContent = '暂无用户脚本';
+        container.appendChild(empty);
+    } else {
+        scripts.forEach((script, index) => {
+            const item = document.createElement('div');
+            item.className = 'settings-item';
+
+            const info = document.createElement('div');
+            info.className = 'settings-item-info';
+            let nameHtml = this._escHtml(script.name);
+            if (script.builtin) nameHtml += '<span class="settings-item-badge builtin">内置</span>';
+            // 运行状态指示
+            if (script.enabled && this.scriptEngine && this.scriptEngine.isRunning(script.name)) {
+                nameHtml += '<span class="settings-item-badge running">运行中</span>';
+            }
+            info.innerHTML = '<div class="settings-item-name">' + nameHtml + '</div>'
+                + '<div class="settings-item-detail">' + this._escHtml(script.description || '') + '</div>';
+
+            const actions = document.createElement('div');
+            actions.className = 'settings-item-actions';
+
+            // 开关
+            const toggle = document.createElement('label');
+            toggle.className = 'settings-toggle';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = script.enabled;
+            input.addEventListener('change', () => {
+                this.toggleScript(index, input.checked);
+                this._renderScriptList();
+            });
+            const slider = document.createElement('span');
+            slider.className = 'slider';
+            toggle.appendChild(input);
+            toggle.appendChild(slider);
+            actions.appendChild(toggle);
+
+            // 编辑/删除（仅用户规则）
+            if (!script.builtin) {
+                const editBtn = document.createElement('button');
+                editBtn.className = 'settings-icon-btn';
+                editBtn.textContent = '✎';
+                editBtn.title = '编辑';
+                editBtn.addEventListener('click', () => this._showScriptForm(index));
+                actions.appendChild(editBtn);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'settings-icon-btn settings-icon-btn-danger';
+                delBtn.textContent = '✕';
+                delBtn.title = '删除';
+                delBtn.addEventListener('click', () => {
+                    if (confirm('确认删除脚本「' + script.name + '」？')) {
+                        this.removeScript(index);
+                        this._renderScriptList();
+                    }
+                });
+                actions.appendChild(delBtn);
+            }
+
+            item.appendChild(info);
+            item.appendChild(actions);
+            container.appendChild(item);
+        });
+    }
+
+    // 表单区域
+    const formArea = document.createElement('div');
+    formArea.id = 'scriptFormArea';
+    container.appendChild(formArea);
+
+    // 底部导入/导出
+    const footer = document.createElement('div');
+    footer.className = 'settings-toolbar settings-toolbar-bottom';
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'settings-action-btn';
+    exportBtn.textContent = '导出';
+    exportBtn.addEventListener('click', () => this._exportScriptJSON());
+    const importBtn = document.createElement('button');
+    importBtn.className = 'settings-action-btn';
+    importBtn.textContent = '导入';
+    importBtn.addEventListener('click', () => this._importScriptJSON());
+    footer.appendChild(exportBtn);
+    footer.appendChild(importBtn);
+    container.appendChild(footer);
+};
+
+// 显示脚本编辑表单
+AdvancedMUDClient.prototype._showScriptForm = function (index) {
+    const formArea = document.getElementById('scriptFormArea');
+    if (!formArea) return;
+
+    if (formArea.innerHTML && formArea.dataset.editIndex === String(index)) {
+        formArea.innerHTML = '';
+        formArea.dataset.editIndex = '';
         return;
     }
 
-    scripts.forEach((script) => {
-        const item = document.createElement('div');
-        item.className = 'settings-item';
+    const isEdit = index >= 0;
+    const script = isEdit ? this._scripts[index] : null;
 
-        const info = document.createElement('div');
-        info.className = 'settings-item-info';
-        let nameHtml = this._escHtml(script.name);
-        if (script.builtin) nameHtml += '<span class="settings-item-badge builtin">内置</span>';
-        info.innerHTML = '<div class="settings-item-name">' + nameHtml + '</div>'
-            + '<div class="settings-item-detail">' + this._escHtml(script.description || '') + '</div>';
+    formArea.dataset.editIndex = String(index);
+    formArea.innerHTML = '';
 
-        const toggle = document.createElement('label');
-        toggle.className = 'settings-toggle';
-        const input = document.createElement('input');
-        input.type = 'checkbox';
-        input.checked = script.enabled;
-        const slider = document.createElement('span');
-        slider.className = 'slider';
-        toggle.appendChild(input);
-        toggle.appendChild(slider);
+    const form = document.createElement('div');
+    form.className = 'settings-form';
+    form.innerHTML = '<div class="settings-form-title">' + (isEdit ? '编辑脚本' : '新增脚本') + '</div>';
 
-        item.appendChild(info);
-        item.appendChild(toggle);
-        container.appendChild(item);
+    // 名称
+    const nameRow = document.createElement('div');
+    nameRow.className = 'settings-form-row';
+    nameRow.innerHTML = '<label>名称</label>';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'settings-form-input';
+    nameInput.placeholder = '如：自动疗伤';
+    nameInput.value = script ? script.name : '';
+    nameRow.appendChild(nameInput);
+    form.appendChild(nameRow);
+
+    // 描述
+    const descRow = document.createElement('div');
+    descRow.className = 'settings-form-row';
+    descRow.innerHTML = '<label>描述</label>';
+    const descInput = document.createElement('input');
+    descInput.type = 'text';
+    descInput.className = 'settings-form-input';
+    descInput.placeholder = '如：气血低于 50% 时自动 exert recover';
+    descInput.value = script ? (script.description || '') : '';
+    descRow.appendChild(descInput);
+    form.appendChild(descRow);
+
+    // 代码（多行 textarea）
+    const codeRow = document.createElement('div');
+    codeRow.className = 'settings-form-row';
+    codeRow.innerHTML = '<label>代码</label>';
+    const codeInput = document.createElement('textarea');
+    codeInput.className = 'settings-form-input settings-form-code';
+    codeInput.rows = 6;
+    codeInput.spellcheck = false;
+    codeInput.placeholder = 'onMessage(/pattern/, () => sendCommand("cmd"));';
+    codeInput.value = script ? (script.code || '') : '';
+    codeRow.appendChild(codeInput);
+    form.appendChild(codeRow);
+
+    // API 提示
+    const hint = document.createElement('div');
+    hint.className = 'settings-form-hint';
+    hint.textContent = 'API: onMessage(regex, cb) · sendCommand(cmd) · getVitals() · getCurrentRoom() · registerTimer(ms, cb) · log(msg) · isConnected()';
+    form.appendChild(hint);
+
+    // 按钮
+    const btnRow = document.createElement('div');
+    btnRow.className = 'settings-form-buttons';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'settings-action-btn';
+    saveBtn.textContent = '保存';
+    saveBtn.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        const description = descInput.value.trim();
+        const code = codeInput.value;
+        if (!name || !code) {
+            alert('请填写名称和代码');
+            return;
+        }
+        if (isEdit) {
+            this.updateScript(index, { name: name, description: description, code: code });
+        } else {
+            this.addScript(name, description, code);
+        }
+        this._renderScriptList();
     });
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'settings-action-btn';
+    cancelBtn.textContent = '取消';
+    cancelBtn.addEventListener('click', () => {
+        formArea.innerHTML = '';
+        formArea.dataset.editIndex = '';
+    });
+    btnRow.appendChild(saveBtn);
+    btnRow.appendChild(cancelBtn);
+    form.appendChild(btnRow);
+
+    formArea.appendChild(form);
+};
+
+// 导出脚本 JSON
+AdvancedMUDClient.prototype._exportScriptJSON = function () {
+    const json = this.exportScripts();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mud-scripts.json';
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+// 导入脚本 JSON
+AdvancedMUDClient.prototype._importScriptJSON = function () {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                this.importScripts(reader.result);
+                this._renderScriptList();
+                this.appendMessage('✅ 脚本导入成功', 'system');
+            } catch (err) {
+                this.appendMessage('❌ 脚本导入失败: ' + err.message, 'system');
+            }
+        };
+        reader.readAsText(file);
+    });
+    input.click();
 };
 
 // HTML 转义工具
@@ -996,6 +1171,9 @@ AdvancedMUDClient.prototype.updateCharacterStatus = function (vitals) {
 };
 
 AdvancedMUDClient.prototype.updateRoomInfo = function (roomInfo) {
+    // 存储最新房间信息，供脚本 API getCurrentRoom() 使用
+    this._lastRoomInfo = roomInfo;
+
     const panel = document.getElementById('minimapPanel');
     const title = document.getElementById('minimapTitle');
     if (!panel || !title) return;
@@ -1351,6 +1529,9 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
 
     // 触发器匹配：自动执行命令（仙丹拾取等）
     this._processTriggers(message);
+
+    // 喂给脚本引擎的 onMessage 回调
+    if (this.scriptEngine) this.scriptEngine.feedMessage(message);
 
     // 速走智能中断：遇敌暂停、事件结束恢复
     this._checkSpeedwalkTriggers(message);

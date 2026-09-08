@@ -978,6 +978,26 @@ body {
     background: #2a1a3a;
     color: #c9c;
 }
+.settings-item-badge.running {
+    background: #1a3a1a;
+    color: #0f0;
+}
+.settings-form-code {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    resize: vertical;
+    min-height: 80px;
+    tab-size: 4;
+    background: #0a0a0a;
+    color: #0f0;
+}
+.settings-form-hint {
+    font-size: 10px;
+    color: #888;
+    padding: 4px 0 0;
+    line-height: 1.4;
+}
 .settings-empty {
     color: #999;
     font-size: 11px;
