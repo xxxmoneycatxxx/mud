@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>炎黄群侠传 · Web MUD</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="lib/codemirror/codemirror.css">
 </head>
 <body>
     <!-- 状态栏浮动面板：角色属性 Gauge 可视化 -->
@@ -139,6 +140,9 @@
         </div>
     </div>
 
+    <!-- CodeMirror 5 脚本编辑器 -->
+    <script src="lib/codemirror/codemirror.js"></script>
+    <script src="lib/codemirror/mode/javascript/javascript.js"></script>
     <!-- 脚本按依赖顺序加载：常量 → 地图 → 寻路 → 脚本引擎 → 类定义 → 原型扩展 → 实例化 -->
     <script src="js/telnet.js"></script>
     <script src="js/ansi.js"></script>

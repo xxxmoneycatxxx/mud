@@ -1459,16 +1459,6 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
 
     const codeWrap = document.createElement('div');
     codeWrap.className = 'code-editor-wrap script-editor-code-wrap';
-    const lineNums = document.createElement('div');
-    lineNums.className = 'code-line-numbers';
-    lineNums.setAttribute('aria-hidden', 'true');
-    const codeInput = document.createElement('textarea');
-    codeInput.className = 'settings-form-input settings-form-code';
-    codeInput.spellcheck = false;
-    codeInput.placeholder = 'onMessage(/pattern/, () => sendCommand("cmd"));';
-    codeInput.value = script ? (script.code || '') : '';
-    codeWrap.appendChild(lineNums);
-    codeWrap.appendChild(codeInput);
     editorPane.appendChild(codeWrap);
 
     // 语法错误提示
@@ -1514,69 +1504,34 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
 
     // ===== 事件绑定 =====
 
-    // 行号同步
-    const updateLineNums = () => {
-        const lines = codeInput.value.split('\n').length;
-        let html = '';
-        for (let i = 1; i <= lines; i++) html += i + '\n';
-        lineNums.textContent = html;
+    // 初始化 CodeMirror 5 编辑器
+    const cm = CodeMirror(codeWrap, {
+        value: script ? (script.code || '') : '',
+        mode: 'javascript',
+        theme: 'mud-crt',
+        lineNumbers: true,
+        matchBrackets: true,
+        styleActiveLine: true,
+        indentUnit: 4,
+        tabSize: 4,
+        indentWithTabs: false,
+        lineWrapping: true,
+        extraKeys: {
+            'Enter': 'newlineAndIndent',
+        },
+    });
+    cm.markClean();
+
+    // 记录初始元数据，用于判断是否有未保存修改
+    const initName = script ? (script.name || '') : '';
+    const initDesc = script ? (script.description || '') : '';
+    const initGroup = script ? (script.group || '') : '';
+    const isDirty = () => {
+        return !cm.isClean()
+            || nameInput.value.trim() !== initName
+            || descInput.value.trim() !== initDesc
+            || groupInput.value.trim() !== initGroup;
     };
-    codeInput.addEventListener('input', updateLineNums);
-    codeInput.addEventListener('scroll', () => {
-        lineNums.scrollTop = codeInput.scrollTop;
-    });
-    // Tab / Enter / 括号自动闭合
-    const INDENT = '    ';
-    codeInput.addEventListener('keydown', (e) => {
-        const s = codeInput.selectionStart;
-        const end = codeInput.selectionEnd;
-        const val = codeInput.value;
-
-        // Tab 键插入 4 空格
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            codeInput.value = val.substring(0, s) + INDENT + val.substring(end);
-            codeInput.selectionStart = codeInput.selectionEnd = s + INDENT.length;
-            updateLineNums();
-            return;
-        }
-
-        // Enter 自动缩进：复制上一行缩进，行尾 { 多加一级
-        if (e.key === 'Enter' && s === end) {
-            e.preventDefault();
-            // 找当前行起始位置
-            let lineStart = val.lastIndexOf('\n', s - 1) + 1;
-            const lineText = val.substring(lineStart, s);
-            // 提取前导缩进
-            const indentMatch = lineText.match(/^(\s*)/);
-            let indent = indentMatch ? indentMatch[1] : '';
-            // 行尾为 { 时多加一级
-            if (/\{\s*$/.test(lineText)) indent += INDENT;
-            const insert = '\n' + indent;
-            codeInput.value = val.substring(0, s) + insert + val.substring(s);
-            codeInput.selectionStart = codeInput.selectionEnd = s + insert.length;
-            updateLineNums();
-            return;
-        }
-
-        // 括号/引号自动闭合
-        const pairs = { '(': ')', '[': ']', '{': '}', "'": "'", '"': '"' };
-        if (pairs[e.key] && s === end) {
-            const close = pairs[e.key];
-            // 光标右侧已有相同闭括号 → 跳过而非重复插入
-            if (val[s] === close) {
-                e.preventDefault();
-                codeInput.selectionStart = codeInput.selectionEnd = s + 1;
-                return;
-            }
-            e.preventDefault();
-            codeInput.value = val.substring(0, s) + e.key + close + val.substring(s);
-            codeInput.selectionStart = codeInput.selectionEnd = s + 1;
-            updateLineNums();
-            return;
-        }
-    });
-    updateLineNums();
 
     // 默认根据屏幕宽度决定是否展开 API 面板
     let apiVisible = window.innerWidth >= 900;
@@ -1591,8 +1546,11 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
         applyApiVisibility();
     });
 
-    // 关闭模态框
-    const closeModal = () => {
+    // 关闭模态框（有未保存修改时确认）
+    const closeModal = (force) => {
+        if (!force && isDirty()) {
+            if (!confirm('有未保存的修改，确认放弃？')) return;
+        }
         overlay.remove();
         document.removeEventListener('keydown', escHandler);
     };
@@ -1600,7 +1558,7 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
         if (e.key === 'Escape') closeModal();
     };
     document.addEventListener('keydown', escHandler);
-    closeBtn.addEventListener('click', closeModal);
+    closeBtn.addEventListener('click', () => closeModal());
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) closeModal();
     });
@@ -1610,7 +1568,7 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
         const name = nameInput.value.trim();
         const description = descInput.value.trim();
         const group = groupInput.value.trim();
-        const code = codeInput.value;
+        const code = cm.getValue();
         if (!name || !code) {
             alert('请填写名称和代码');
             return;
@@ -1620,6 +1578,7 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
             new Function(
                 'onMessage', 'sendCommand', 'getVitals', 'getCurrentRoom',
                 'registerTimer', 'sleep', 'log', 'isConnected',
+                'getStore', 'onGMCP',
                 code
             );
             errHint.style.display = 'none';
@@ -1640,14 +1599,15 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
             }
         }
         this._renderScriptList();
-        closeModal();
+        closeModal(true);
     });
 
     // 取消
-    cancelBtn.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', () => closeModal());
 
     // 聚焦代码区
-    codeInput.focus();
+    setTimeout(() => cm.refresh(), 0);
+    cm.focus();
 };
 
 // ===== 模态框内 API 文档面板构建 =====
@@ -1750,6 +1710,9 @@ AdvancedMUDClient.prototype._buildEditorApiPanel = function (container) {
         + '</pre></div>'
         + '<div class="api-pattern-item"><b>顺序延迟操作</b><pre>'
         + this._escHtml('onMessage(/战斗结束/, async () => {\n    sendCommand("get all from corpse");\n    await sleep(1000);\n    sendCommand("north");\n});')
+        + '</pre></div>'
+        + '<div class="api-pattern-item"><b>等待指定消息（循环直至检测到）</b><pre>'
+        + this._escHtml('function waitFor(pattern, timeout) {\n    return new Promise((resolve) => {\n        let done = false;\n        const t = setTimeout(() => {\n            if (!done) { done = true; resolve(false); }\n        }, timeout || 30000);\n        onMessage(pattern, () => {\n            if (!done) { done = true; clearTimeout(t); resolve(true); }\n        });\n    });\n}\n\n(async () => {\n    while (true) {\n        sendCommand("practice sword");\n        if (await waitFor(/你已练到极限/, 10000)) {\n            log("练剑完成");\n            break;\n        }\n    }\n})();')
         + '</pre></div>';
     scroll.appendChild(patterns);
 
@@ -1927,6 +1890,9 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
         + '</pre></div>'
         + '<div class="api-pattern-item"><b>顺序延迟操作</b><pre>'
         + this._escHtml('onMessage(/战斗结束/, async () => {\n    sendCommand("get all from corpse");\n    await sleep(1000);\n    sendCommand("north");\n});')
+        + '</pre></div>'
+        + '<div class="api-pattern-item"><b>等待指定消息（循环直至检测到）</b><pre>'
+        + this._escHtml('function waitFor(pattern, timeout) {\n    return new Promise((resolve) => {\n        let done = false;\n        const t = setTimeout(() => {\n            if (!done) { done = true; resolve(false); }\n        }, timeout || 30000);\n        onMessage(pattern, () => {\n            if (!done) { done = true; clearTimeout(t); resolve(true); }\n        });\n    });\n}\n\n(async () => {\n    while (true) {\n        sendCommand("practice sword");\n        if (await waitFor(/你已练到极限/, 10000)) {\n            log("练剑完成");\n            break;\n        }\n    }\n})();')
         + '</pre></div>';
     body.appendChild(patterns);
 
