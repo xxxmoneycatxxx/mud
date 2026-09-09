@@ -1090,6 +1090,39 @@ body {
     background: #1a2a3a;
     color: #9cc;
 }
+
+/* 脚本分组折叠 */
+.script-group {
+    margin: 4px 0;
+    border: 1px solid #1a2a1a;
+    border-radius: 3px;
+    background: #050a05;
+}
+.script-group-summary {
+    display: block;
+    padding: 4px 8px;
+    color: #cc0;
+    font-size: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+.script-group-summary::-webkit-details-marker { display: none; }
+.script-group-summary::before {
+    content: '\25BC  ';
+    font-size: 8px;
+    color: #888;
+}
+.script-group:not([open]) > .script-group-summary::before {
+    content: '\25B6  ';
+}
+.script-group-summary:hover {
+    background: #0a1a0a;
+}
+.script-group .settings-item {
+    border-top: 1px solid #0a1a0a;
+}
 .settings-form-code {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 11px;

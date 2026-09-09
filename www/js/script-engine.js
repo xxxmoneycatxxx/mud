@@ -20,6 +20,8 @@ class ScriptEngine {
         const runtime = {
             timers: [],
             messageHandlers: [],
+            gmcpHandlers: [],
+            lastError: null,
             fn: null,
         };
 
@@ -32,6 +34,7 @@ class ScriptEngine {
             runtime.fn = new Function(
                 'onMessage', 'sendCommand', 'getVitals', 'getCurrentRoom',
                 'registerTimer', 'sleep', 'log', 'isConnected',
+                'getStore', 'onGMCP',
                 script.code
             );
         } catch (e) {
@@ -44,7 +47,8 @@ class ScriptEngine {
             runtime.fn(
                 api.onMessage, api.sendCommand, api.getVitals,
                 api.getCurrentRoom, api.registerTimer, api.sleep,
-                api.log, api.isConnected
+                api.log, api.isConnected,
+                api.getStore, api.onGMCP
             );
         } catch (e) {
             this._reportError(script.name, '初始化失败: ' + e.message);
@@ -64,8 +68,9 @@ class ScriptEngine {
 
         // 清理所有定时器（setTimeout + setInterval ID 双重清理）
         runtime.timers.forEach(id => { clearTimeout(id); clearInterval(id); });
-        // 清理消息处理器
+        // 清理消息处理器和 GMCP 处理器
         runtime.messageHandlers.length = 0;
+        runtime.gmcpHandlers.length = 0;
         runtime.fn = null;
 
         this._runtime.delete(name);
@@ -95,11 +100,40 @@ class ScriptEngine {
         }
     }
 
+    // ===== GMCP 事件分发 =====
+
+    // 将 GMCP 模块数据喂给所有已启用脚本的 onGMCP 回调
+    feedGMCP(module, data) {
+        for (const [name, runtime] of this._runtime) {
+            for (const handler of runtime.gmcpHandlers) {
+                if (handler.module === module) {
+                    try {
+                        handler.callback(data);
+                    } catch (e) {
+                        this._reportError(name, 'GMCP 回调异常: ' + e.message);
+                    }
+                }
+            }
+        }
+    }
+
     // ===== 查询 =====
 
     // 检查某脚本是否正在运行
     isRunning(name) {
         return this._runtime.has(name);
+    }
+
+    // 获取脚本运行时状态摘要
+    getStatus(name) {
+        const runtime = this._runtime.get(name);
+        if (!runtime) return null;
+        return {
+            handlers: runtime.messageHandlers.length,
+            timers: runtime.timers.length,
+            gmcpHandlers: runtime.gmcpHandlers.length,
+            lastError: runtime.lastError,
+        };
     }
 
     // ===== 内部方法 =====
@@ -178,6 +212,37 @@ class ScriptEngine {
             isConnected: () => {
                 return this.client.connected === true;
             },
+
+            // 获取共享变量存储（所有脚本共享，localStorage 持久化）
+            getStore: () => {
+                const STORE_KEY = 'mud_script_store';
+                let data = {};
+                try {
+                    data = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+                } catch (e) {
+                    data = {};
+                }
+                const save = () => {
+                    localStorage.setItem(STORE_KEY, JSON.stringify(data));
+                };
+                return {
+                    get: (key) => data[key],
+                    set: (key, val) => { data[key] = val; save(); },
+                    del: (key) => { delete data[key]; save(); },
+                    keys: () => Object.keys(data),
+                };
+            },
+
+            // 订阅 GMCP 模块推送事件（精确匹配模块名）
+            onGMCP: (module, callback) => {
+                if (typeof module !== 'string' || !module.trim()) {
+                    throw new TypeError('onGMCP 第一个参数必须是模块名字符串');
+                }
+                if (typeof callback !== 'function') {
+                    throw new TypeError('onGMCP 第二个参数必须是函数');
+                }
+                runtime.gmcpHandlers.push({ module: module.trim(), callback });
+            },
         };
     }
 
@@ -186,6 +251,9 @@ class ScriptEngine {
         if (this.client.appendMessage) {
             this.client.appendMessage(msg, 'system');
         }
-        console.warn('[ScriptEngine] ' + scriptName + ': ' + detail);
+        // 记录到运行时状态（供 getStatus 查询）
+        const runtime = this._runtime.get(scriptName);
+        if (runtime) runtime.lastError = detail;
+        console.error('[ScriptEngine] ' + scriptName + ':', detail);
     }
 }

@@ -1189,7 +1189,16 @@ AdvancedMUDClient.prototype._renderScriptList = function () {
         empty.textContent = '暂无用户脚本';
         container.appendChild(empty);
     } else {
+        // 分离内置脚本和用户脚本
+        const builtins = [];
+        const userScripts = [];
         scripts.forEach((script, index) => {
+            if (script.builtin) builtins.push({ script, index });
+            else userScripts.push({ script, index });
+        });
+
+        // 渲染单个脚本条目
+        const renderItem = (script, index) => {
             const item = document.createElement('div');
             item.className = 'settings-item';
 
@@ -1197,13 +1206,23 @@ AdvancedMUDClient.prototype._renderScriptList = function () {
             info.className = 'settings-item-info';
             let nameHtml = this._escHtml(script.name);
             if (script.builtin) nameHtml += '<span class="settings-item-badge builtin">内置</span>';
-            if (script.group) nameHtml += '<span class="settings-item-badge group">' + this._escHtml(script.group) + '</span>';
-            // 运行状态指示
-            if (script.enabled && this.scriptEngine && this.scriptEngine.isRunning(script.name)) {
-                nameHtml += '<span class="settings-item-badge running">运行中</span>';
+            const isRunning = script.enabled && this.scriptEngine && this.scriptEngine.isRunning(script.name);
+            if (isRunning) nameHtml += '<span class="settings-item-badge running">运行中</span>';
+            info.innerHTML = '<div class="settings-item-name">' + nameHtml + '</div>';
+
+            // 描述 + 运行时摘要
+            let detail = script.description || '';
+            if (isRunning && this.scriptEngine) {
+                const status = this.scriptEngine.getStatus(script.name);
+                if (status) {
+                    const parts = [];
+                    if (status.handlers > 0) parts.push(status.handlers + ' 触发器');
+                    if (status.timers > 0) parts.push(status.timers + ' 定时器');
+                    if (status.gmcpHandlers > 0) parts.push(status.gmcpHandlers + ' GMCP');
+                    if (parts.length > 0) detail += (detail ? ' · ' : '') + parts.join(' · ');
+                }
             }
-            info.innerHTML = '<div class="settings-item-name">' + nameHtml + '</div>'
-                + '<div class="settings-item-detail">' + this._escHtml(script.description || '') + '</div>';
+            if (detail) info.innerHTML += '<div class="settings-item-detail">' + this._escHtml(detail) + '</div>';
 
             const actions = document.createElement('div');
             actions.className = 'settings-item-actions';
@@ -1248,8 +1267,43 @@ AdvancedMUDClient.prototype._renderScriptList = function () {
 
             item.appendChild(info);
             item.appendChild(actions);
-            container.appendChild(item);
+            return item;
+        };
+
+        // 内置脚本始终在最上方，不参与分组
+        builtins.forEach(({ script, index }) => {
+            container.appendChild(renderItem(script, index));
         });
+
+        // 用户脚本按 group 分组
+        const groupMap = new Map();
+        userScripts.forEach(({ script, index }) => {
+            const g = script.group || '';
+            if (!groupMap.has(g)) groupMap.set(g, []);
+            groupMap.get(g).push({ script, index });
+        });
+
+        for (const [group, items] of groupMap) {
+            if (group) {
+                // 有分组：用 <details> 折叠
+                const details = document.createElement('details');
+                details.className = 'script-group';
+                details.open = true;
+                const summary = document.createElement('summary');
+                summary.className = 'script-group-summary';
+                summary.textContent = group + ' (' + items.length + ')';
+                details.appendChild(summary);
+                items.forEach(({ script, index }) => {
+                    details.appendChild(renderItem(script, index));
+                });
+                container.appendChild(details);
+            } else {
+                // 无分组：直接渲染
+                items.forEach(({ script, index }) => {
+                    container.appendChild(renderItem(script, index));
+                });
+            }
+        }
     }
 
     // 表单区域
@@ -1265,7 +1319,7 @@ AdvancedMUDClient.prototype._renderScriptList = function () {
     // API 文档面板
     this._renderApiDoc(container);
 
-    // 底部导入/导出
+    // 底部导入/导出/查看存储
     const footer = document.createElement('div');
     footer.className = 'settings-toolbar settings-toolbar-bottom';
     const exportBtn = document.createElement('button');
@@ -1276,9 +1330,40 @@ AdvancedMUDClient.prototype._renderScriptList = function () {
     importBtn.className = 'settings-action-btn';
     importBtn.textContent = '导入';
     importBtn.addEventListener('click', () => this._importScriptJSON());
+    const storeBtn = document.createElement('button');
+    storeBtn.className = 'settings-action-btn';
+    storeBtn.textContent = '查看存储';
+    storeBtn.addEventListener('click', () => this._showStoreViewer());
     footer.appendChild(exportBtn);
     footer.appendChild(importBtn);
+    footer.appendChild(storeBtn);
     container.appendChild(footer);
+};
+
+// 查看脚本共享存储
+AdvancedMUDClient.prototype._showStoreViewer = function () {
+    const STORE_KEY = 'mud_script_store';
+    let data = {};
+    try { data = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); } catch (e) {}
+    const keys = Object.keys(data);
+
+    if (keys.length === 0) {
+        this.appendMessage('※ 脚本存储为空，无数据', 'system');
+        return;
+    }
+
+    this.appendMessage('※ 脚本共享存储（' + keys.length + ' 项）：', 'system');
+    keys.forEach(key => {
+        let val = data[key];
+        let display = typeof val === 'object' ? JSON.stringify(val) : String(val);
+        if (display.length > 60) display = display.substring(0, 57) + '...';
+        this.appendMessage('  ' + key + ' = ' + display, 'system');
+    });
+
+    if (confirm('确认清空脚本共享存储？（' + keys.length + ' 项数据将丢失）')) {
+        localStorage.removeItem(STORE_KEY);
+        this.appendMessage('※ 脚本存储已清空', 'system');
+    }
 };
 
 // 显示脚本编辑表单
@@ -1440,15 +1525,55 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
     codeInput.addEventListener('scroll', () => {
         lineNums.scrollTop = codeInput.scrollTop;
     });
-    // Tab 键插入 4 空格
+    // Tab / Enter / 括号自动闭合
+    const INDENT = '    ';
     codeInput.addEventListener('keydown', (e) => {
+        const s = codeInput.selectionStart;
+        const end = codeInput.selectionEnd;
+        const val = codeInput.value;
+
+        // Tab 键插入 4 空格
         if (e.key === 'Tab') {
             e.preventDefault();
-            const s = codeInput.selectionStart;
-            const e2 = codeInput.selectionEnd;
-            codeInput.value = codeInput.value.substring(0, s) + '    ' + codeInput.value.substring(e2);
-            codeInput.selectionStart = codeInput.selectionEnd = s + 4;
+            codeInput.value = val.substring(0, s) + INDENT + val.substring(end);
+            codeInput.selectionStart = codeInput.selectionEnd = s + INDENT.length;
             updateLineNums();
+            return;
+        }
+
+        // Enter 自动缩进：复制上一行缩进，行尾 { 多加一级
+        if (e.key === 'Enter' && s === end) {
+            e.preventDefault();
+            // 找当前行起始位置
+            let lineStart = val.lastIndexOf('\n', s - 1) + 1;
+            const lineText = val.substring(lineStart, s);
+            // 提取前导缩进
+            const indentMatch = lineText.match(/^(\s*)/);
+            let indent = indentMatch ? indentMatch[1] : '';
+            // 行尾为 { 时多加一级
+            if (/\{\s*$/.test(lineText)) indent += INDENT;
+            const insert = '\n' + indent;
+            codeInput.value = val.substring(0, s) + insert + val.substring(s);
+            codeInput.selectionStart = codeInput.selectionEnd = s + insert.length;
+            updateLineNums();
+            return;
+        }
+
+        // 括号/引号自动闭合
+        const pairs = { '(': ')', '[': ']', '{': '}', "'": "'", '"': '"' };
+        if (pairs[e.key] && s === end) {
+            const close = pairs[e.key];
+            // 光标右侧已有相同闭括号 → 跳过而非重复插入
+            if (val[s] === close) {
+                e.preventDefault();
+                codeInput.selectionStart = codeInput.selectionEnd = s + 1;
+                return;
+            }
+            e.preventDefault();
+            codeInput.value = val.substring(0, s) + e.key + close + val.substring(s);
+            codeInput.selectionStart = codeInput.selectionEnd = s + 1;
+            updateLineNums();
+            return;
         }
     });
     updateLineNums();
@@ -1583,6 +1708,18 @@ AdvancedMUDClient.prototype._buildEditorApiPanel = function (container) {
             desc: '检查当前是否已连接。',
             params: ['返回: boolean'],
             example: 'if (isConnected()) sendCommand("hp");'
+        },
+        {
+            sig: 'getStore()',
+            desc: '获取共享变量存储（所有脚本共享，localStorage 持久化）。',
+            params: ['返回: object — { get(key), set(key, val), del(key), keys() }'],
+            example: 'const store = getStore();\nstore.set("count", (store.get("count") || 0) + 1);\nlog("执行次数: " + store.get("count"));'
+        },
+        {
+            sig: 'onGMCP(module, callback)',
+            desc: '订阅 GMCP 模块推送事件，收到数据时调用。',
+            params: ['module: string — GMCP 模块名（如 "Char.Vitals"）', 'callback: function(data) — 收到数据时的回调'],
+            example: 'onGMCP("Char.Vitals", (data) => {\n    if (data.hp < data.max_hp * 0.3) log("气血危急!");\n});'
         }
     ];
 
@@ -1743,6 +1880,23 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
             desc: '检查当前是否已连接到服务器。',
             params: ['返回: boolean — true 表示已连接'],
             example: 'if (isConnected()) sendCommand("hp");'
+        },
+        {
+            name: 'getStore',
+            sig: 'getStore()',
+            desc: '获取共享变量存储（所有脚本共享，localStorage 持久化）。',
+            params: ['返回: object — { get(key), set(key, val), del(key), keys() }'],
+            example: 'const store = getStore();\nstore.set("count", (store.get("count") || 0) + 1);\nlog("执行次数: " + store.get("count"));'
+        },
+        {
+            name: 'onGMCP',
+            sig: 'onGMCP(module, callback)',
+            desc: '订阅 GMCP 模块推送事件，收到数据时调用回调。',
+            params: [
+                'module: string — GMCP 模块名（如 "Char.Vitals"）',
+                'callback: function(data) — 收到数据时的回调，参数为解析后的对象'
+            ],
+            example: 'onGMCP("Char.Vitals", (data) => {\n    if (data.hp < data.max_hp * 0.3) log("气血危急!");\n});'
         }
     ];
 
@@ -2264,6 +2418,10 @@ AdvancedMUDClient.prototype.processGMCPData = function (data) {
                 break;
             case 'Client.GUI':
                 break;
+        }
+        // 分发给脚本引擎的 onGMCP 回调
+        if (this.scriptEngine) {
+            this.scriptEngine.feedGMCP(data.module, data.data);
         }
     } catch (e) {
         console.warn('GMCP处理异常:', data.module, e);
