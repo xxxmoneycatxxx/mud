@@ -164,7 +164,7 @@ class Pathfinder {
     // ===== 房间搜索 =====
 
     // 按名称搜索房间（子串匹配，不区分大小写）
-    // 返回 [{ hash, name, area }]
+    // 返回 [{ hash, name, area, exits }]
     searchRoom(keyword) {
         if (!this.loaded || !keyword) return [];
         const kw = keyword.toLowerCase();
@@ -172,7 +172,7 @@ class Pathfinder {
 
         for (const [hash, room] of this.rooms) {
             if (room.n && room.n.toLowerCase().includes(kw)) {
-                results.push({ hash, name: room.n, area: room.a || '' });
+                results.push({ hash, name: room.n, area: room.a || '', exits: room.e || [] });
             }
         }
 

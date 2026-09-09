@@ -2980,14 +2980,19 @@ AdvancedMUDClient.prototype._handleGotoRoom = async function (keyword) {
     // 多个匹配，显示可点击列表
     this.appendMessage('找到 ' + results.length + ' 个匹配房间：', 'system');
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const dirShort = (d) => (typeof DIR_SHORT !== 'undefined' ? DIR_SHORT[d] : d) || d;
     let html = '';
     const maxShow = Math.min(results.length, 20);
     for (let i = 0; i < maxShow; i++) {
         const r = results[i];
+        const exitLabel = (r.exits && r.exits.length > 0)
+            ? r.exits.map(dirShort).join(' ')
+            : '无出口';
         html += '<div class="message system">'
             + '<a class="exit-link" data-cmd="gtr ' + esc(r.hash) + '">'
             + esc(r.name) + '</a>'
             + ' <span style="color:#666">[' + esc(r.area) + ']</span>'
+            + ' <span style="color:#888">出口: ' + esc(exitLabel) + '</span>'
             + '</div>';
     }
     if (results.length > maxShow) {
