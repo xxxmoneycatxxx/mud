@@ -1197,6 +1197,7 @@ AdvancedMUDClient.prototype._renderScriptList = function () {
             info.className = 'settings-item-info';
             let nameHtml = this._escHtml(script.name);
             if (script.builtin) nameHtml += '<span class="settings-item-badge builtin">内置</span>';
+            if (script.group) nameHtml += '<span class="settings-item-badge group">' + this._escHtml(script.group) + '</span>';
             // 运行状态指示
             if (script.enabled && this.scriptEngine && this.scriptEngine.isRunning(script.name)) {
                 nameHtml += '<span class="settings-item-badge running">运行中</span>';
@@ -1291,63 +1292,144 @@ AdvancedMUDClient.prototype._showScriptForm = function (index) {
         return;
     }
 
+    // 使用独立全屏模态框编辑器
+    this._showScriptEditorModal(index);
+};
+
+// ===== 独立脚本编辑模态框（全屏高占比） =====
+AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
     const isEdit = index >= 0;
     const script = isEdit ? this._scripts[index] : null;
 
-    formArea.dataset.editIndex = String(index);
-    formArea.innerHTML = '';
+    // 收集已有分组列表
+    const groups = [];
+    (this._scripts || []).forEach(function (s) {
+        if (s.group && groups.indexOf(s.group) === -1) groups.push(s.group);
+    });
 
-    const form = document.createElement('div');
-    form.className = 'settings-form';
-    form.innerHTML = '<div class="settings-form-title">' + (isEdit ? '编辑脚本' : '新增脚本') + '</div>';
+    // 创建模态框覆盖层
+    const overlay = document.createElement('div');
+    overlay.className = 'script-editor-overlay';
 
-    // 名称
-    const nameRow = document.createElement('div');
-    nameRow.className = 'settings-form-row';
-    nameRow.innerHTML = '<label>名称</label>';
+    const modal = document.createElement('div');
+    modal.className = 'script-editor-modal';
+
+    // —— 标题栏 ——
+    const titleBar = document.createElement('div');
+    titleBar.className = 'script-editor-titlebar';
+    titleBar.innerHTML = '<span>' + (isEdit ? '编辑脚本' : '新增脚本') + '</span>';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'script-editor-close';
+    closeBtn.textContent = '✕';
+    closeBtn.title = '关闭 (Esc)';
+    titleBar.appendChild(closeBtn);
+    modal.appendChild(titleBar);
+
+    // —— 顶部元数据区（名称 / 描述 / 分组） ——
+    const metaBar = document.createElement('div');
+    metaBar.className = 'script-editor-meta';
+
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
     nameInput.className = 'settings-form-input';
-    nameInput.placeholder = '如：自动疗伤';
+    nameInput.placeholder = '脚本名称';
     nameInput.value = script ? script.name : '';
-    nameRow.appendChild(nameInput);
-    form.appendChild(nameRow);
+    metaBar.appendChild(nameInput);
 
-    // 描述
-    const descRow = document.createElement('div');
-    descRow.className = 'settings-form-row';
-    descRow.innerHTML = '<label>描述</label>';
     const descInput = document.createElement('input');
     descInput.type = 'text';
     descInput.className = 'settings-form-input';
-    descInput.placeholder = '如：气血低于 50% 时自动 exert recover';
+    descInput.placeholder = '描述（可选）';
     descInput.value = script ? (script.description || '') : '';
-    descRow.appendChild(descInput);
-    form.appendChild(descRow);
+    metaBar.appendChild(descInput);
 
-    // 代码（带行号的 textarea）
-    const codeRow = document.createElement('div');
-    codeRow.className = 'settings-form-row settings-form-row-block';
-    codeRow.innerHTML = '<label>代码</label>';
+    const groupWrap = document.createElement('div');
+    groupWrap.className = 'script-editor-group-wrap';
+    const groupInput = document.createElement('input');
+    groupInput.type = 'text';
+    groupInput.className = 'settings-form-input';
+    groupInput.placeholder = '分组';
+    groupInput.value = script ? (script.group || '') : '';
+    groupInput.setAttribute('list', 'scriptGroupOptions');
+    const datalist = document.createElement('datalist');
+    datalist.id = 'scriptGroupOptions';
+    groups.forEach(function (g) {
+        const opt = document.createElement('option');
+        opt.value = g;
+        datalist.appendChild(opt);
+    });
+    groupWrap.appendChild(groupInput);
+    groupWrap.appendChild(datalist);
+    metaBar.appendChild(groupWrap);
 
-    // 代码编辑区包装器（行号 + textarea）
+    modal.appendChild(metaBar);
+
+    // —— 主体区域（左：代码编辑器 65% / 右：API 文档 35%） ——
+    const body = document.createElement('div');
+    body.className = 'script-editor-body';
+
+    // 左侧：代码编辑区
+    const editorPane = document.createElement('div');
+    editorPane.className = 'script-editor-pane';
+
     const codeWrap = document.createElement('div');
-    codeWrap.className = 'code-editor-wrap';
+    codeWrap.className = 'code-editor-wrap script-editor-code-wrap';
     const lineNums = document.createElement('div');
     lineNums.className = 'code-line-numbers';
     lineNums.setAttribute('aria-hidden', 'true');
     const codeInput = document.createElement('textarea');
     codeInput.className = 'settings-form-input settings-form-code';
-    codeInput.rows = 10;
     codeInput.spellcheck = false;
     codeInput.placeholder = 'onMessage(/pattern/, () => sendCommand("cmd"));';
     codeInput.value = script ? (script.code || '') : '';
     codeWrap.appendChild(lineNums);
     codeWrap.appendChild(codeInput);
-    codeRow.appendChild(codeWrap);
-    form.appendChild(codeRow);
+    editorPane.appendChild(codeWrap);
 
-    // 行号同步更新
+    // 语法错误提示
+    const errHint = document.createElement('div');
+    errHint.className = 'settings-form-errhint';
+    errHint.style.display = 'none';
+    editorPane.appendChild(errHint);
+
+    body.appendChild(editorPane);
+
+    // 右侧：API 文档面板（可折叠）
+    const apiPane = document.createElement('div');
+    apiPane.className = 'script-editor-api';
+    this._buildEditorApiPanel(apiPane);
+    body.appendChild(apiPane);
+
+    modal.appendChild(body);
+
+    // —— 底部按钮栏 ——
+    const footer = document.createElement('div');
+    footer.className = 'script-editor-footer';
+
+    const apiToggle = document.createElement('button');
+    apiToggle.className = 'settings-action-btn';
+    apiToggle.textContent = '📖 API 文档';
+    footer.appendChild(apiToggle);
+
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'script-editor-btn-group';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'settings-action-btn';
+    saveBtn.textContent = '保存';
+    btnGroup.appendChild(saveBtn);
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'settings-action-btn';
+    cancelBtn.textContent = '取消';
+    btnGroup.appendChild(cancelBtn);
+    footer.appendChild(btnGroup);
+
+    modal.appendChild(footer);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // ===== 事件绑定 =====
+
+    // 行号同步
     const updateLineNums = () => {
         const lines = codeInput.value.split('\n').length;
         let html = '';
@@ -1362,36 +1444,47 @@ AdvancedMUDClient.prototype._showScriptForm = function (index) {
     codeInput.addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
             e.preventDefault();
-            const start = codeInput.selectionStart;
-            const end = codeInput.selectionEnd;
-            codeInput.value = codeInput.value.substring(0, start) + '    ' + codeInput.value.substring(end);
-            codeInput.selectionStart = codeInput.selectionEnd = start + 4;
+            const s = codeInput.selectionStart;
+            const e2 = codeInput.selectionEnd;
+            codeInput.value = codeInput.value.substring(0, s) + '    ' + codeInput.value.substring(e2);
+            codeInput.selectionStart = codeInput.selectionEnd = s + 4;
             updateLineNums();
         }
     });
     updateLineNums();
 
-    // 语法错误提示区
-    const errHint = document.createElement('div');
-    errHint.className = 'settings-form-errhint';
-    errHint.style.display = 'none';
-    form.appendChild(errHint);
+    // 默认根据屏幕宽度决定是否展开 API 面板
+    let apiVisible = window.innerWidth >= 900;
+    const applyApiVisibility = () => {
+        apiPane.style.display = apiVisible ? '' : 'none';
+        apiToggle.textContent = apiVisible ? '📖 隐藏文档' : '📖 API 文档';
+    };
+    applyApiVisibility();
 
-    // API 提示
-    const hint = document.createElement('div');
-    hint.className = 'settings-form-hint';
-    hint.textContent = 'API: onMessage(regex, cb) · sendCommand(cmd) · getVitals() · getCurrentRoom() · registerTimer(ms, cb) · sleep(ms) · log(msg) · isConnected()';
-    form.appendChild(hint);
+    apiToggle.addEventListener('click', () => {
+        apiVisible = !apiVisible;
+        applyApiVisibility();
+    });
 
-    // 按钮
-    const btnRow = document.createElement('div');
-    btnRow.className = 'settings-form-buttons';
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'settings-action-btn';
-    saveBtn.textContent = '保存';
+    // 关闭模态框
+    const closeModal = () => {
+        overlay.remove();
+        document.removeEventListener('keydown', escHandler);
+    };
+    const escHandler = (e) => {
+        if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', escHandler);
+    closeBtn.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal();
+    });
+
+    // 保存
     saveBtn.addEventListener('click', () => {
         const name = nameInput.value.trim();
         const description = descInput.value.trim();
+        const group = groupInput.value.trim();
         const code = codeInput.value;
         if (!name || !code) {
             alert('请填写名称和代码');
@@ -1411,24 +1504,119 @@ AdvancedMUDClient.prototype._showScriptForm = function (index) {
             return;
         }
         if (isEdit) {
-            this.updateScript(index, { name: name, description: description, code: code });
+            this.updateScript(index, { name: name, description: description, group: group, code: code });
         } else {
             this.addScript(name, description, code);
+            // 新增后补充 group 字段
+            if (group) {
+                const newIdx = this._scripts.length - 1;
+                this._scripts[newIdx].group = group;
+                this._saveScripts();
+            }
         }
         this._renderScriptList();
+        closeModal();
     });
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'settings-action-btn';
-    cancelBtn.textContent = '取消';
-    cancelBtn.addEventListener('click', () => {
-        formArea.innerHTML = '';
-        formArea.dataset.editIndex = '';
-    });
-    btnRow.appendChild(saveBtn);
-    btnRow.appendChild(cancelBtn);
-    form.appendChild(btnRow);
 
-    formArea.appendChild(form);
+    // 取消
+    cancelBtn.addEventListener('click', closeModal);
+
+    // 聚焦代码区
+    codeInput.focus();
+};
+
+// ===== 模态框内 API 文档面板构建 =====
+AdvancedMUDClient.prototype._buildEditorApiPanel = function (container) {
+    const header = document.createElement('div');
+    header.className = 'script-editor-api-header';
+    header.innerHTML = '<span>📖 API 参考</span>';
+    container.appendChild(header);
+
+    const scroll = document.createElement('div');
+    scroll.className = 'script-editor-api-scroll';
+
+    const apis = [
+        {
+            sig: 'onMessage(pattern, callback)',
+            desc: '注册消息匹配回调，当收到的文本匹配 pattern 时调用。',
+            params: ['pattern: RegExp — 匹配消息的正则表达式', 'callback: function(matchedText, matchResult)'],
+            example: 'onMessage(/你盘膝坐下/, () => sendCommand("meditation"));'
+        },
+        {
+            sig: 'sendCommand(cmd)',
+            desc: '向服务端发送一条命令。',
+            params: ['cmd: string — 命令字符串，自动 trim'],
+            example: 'sendCommand("exert recover");'
+        },
+        {
+            sig: 'getVitals()',
+            desc: '获取当前角色状态（返回副本）。',
+            params: ['返回: object — hp, max_hp, mp, max_mp, sp, max_sp 等'],
+            example: 'const v = getVitals();\nif (v.hp < v.max_hp * 0.5) sendCommand("exert recover");'
+        },
+        {
+            sig: 'getCurrentRoom()',
+            desc: '获取当前房间信息。',
+            params: ['返回: object|null — name, exits, area, hash'],
+            example: 'const room = getCurrentRoom();\nlog("当前房间: " + room.name);'
+        },
+        {
+            sig: 'registerTimer(ms, callback)',
+            desc: '注册周期定时任务。',
+            params: ['ms: number — 间隔毫秒（最小 100）', 'callback: function — 每次触发执行'],
+            example: 'registerTimer(5000, () => {\n    const v = getVitals();\n    if (v.hp < v.max_hp * 0.5) sendCommand("exert recover");\n});'
+        },
+        {
+            sig: 'sleep(ms)',
+            desc: '延迟指定毫秒，返回 Promise。配合 async/await。',
+            params: ['ms: number — 延迟毫秒（最小 100）'],
+            example: 'onMessage(/战斗结束/, async () => {\n    sendCommand("get all from corpse");\n    await sleep(1000);\n    sendCommand("north");\n});'
+        },
+        {
+            sig: 'log(msg)',
+            desc: '输出日志到终端（自动带脚本名前缀）。',
+            params: ['msg: string — 日志文本'],
+            example: 'log("气血不足，自动疗伤");'
+        },
+        {
+            sig: 'isConnected()',
+            desc: '检查当前是否已连接。',
+            params: ['返回: boolean'],
+            example: 'if (isConnected()) sendCommand("hp");'
+        }
+    ];
+
+    apis.forEach((api) => {
+        const item = document.createElement('div');
+        item.className = 'script-api-item';
+        let html = '<div class="api-func">' + this._escHtml(api.sig) + '</div>';
+        html += '<div class="api-desc">' + this._escHtml(api.desc) + '</div>';
+        html += '<div class="api-params">';
+        api.params.forEach((p) => {
+            html += '<div class="api-param">· ' + this._escHtml(p) + '</div>';
+        });
+        html += '</div>';
+        html += '<pre class="api-example">' + this._escHtml(api.example) + '</pre>';
+        item.innerHTML = html;
+        scroll.appendChild(item);
+    });
+
+    // 常见模式
+    const patterns = document.createElement('div');
+    patterns.className = 'script-api-patterns';
+    patterns.innerHTML = '<div class="api-pattern-title">常见模式</div>'
+        + '<div class="api-pattern-item"><b>消息触发 + 冷却</b><pre>'
+        + this._escHtml('let last = 0;\nonMessage(/触发文本/, () => {\n    if (Date.now() - last < 5000) return;\n    last = Date.now();\n    sendCommand("执行命令");\n});')
+        + '</pre></div>'
+        + '<div class="api-pattern-item"><b>定时检查 + 条件执行</b><pre>'
+        + this._escHtml('registerTimer(3000, () => {\n    const v = getVitals();\n    if (v.hp && v.max_hp && v.hp < v.max_hp * 0.5) {\n        sendCommand("exert recover");\n        log("自动疗伤");\n    }\n});')
+        + '</pre></div>'
+        + '<div class="api-pattern-item"><b>顺序延迟操作</b><pre>'
+        + this._escHtml('onMessage(/战斗结束/, async () => {\n    sendCommand("get all from corpse");\n    await sleep(1000);\n    sendCommand("north");\n});')
+        + '</pre></div>';
+    scroll.appendChild(patterns);
+
+    container.appendChild(scroll);
 };
 
 // 导出脚本 JSON

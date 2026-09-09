@@ -1086,6 +1086,10 @@ body {
     background: #1a3a1a;
     color: #0f0;
 }
+.settings-item-badge.group {
+    background: #1a2a3a;
+    color: #9cc;
+}
 .settings-form-code {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 11px;
@@ -1469,4 +1473,187 @@ body {
 }
 .input-prompt {
     padding: 0 6px 0 8px;
+}
+
+/* ===== 独立脚本编辑模态框 ===== */
+.script-editor-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.script-editor-modal {
+    width: 75vw;
+    height: 80vh;
+    max-width: 1200px;
+    min-width: 480px;
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+    background: #020502;
+    border: 1px solid #1a3a1a;
+    outline: 1px solid #0a1a0a;
+    outline-offset: 3px;
+    box-shadow:
+        0 0 40px rgba(0, 0, 0, 0.8),
+        0 0 6px rgba(0, 255, 0, 0.1);
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    color: #0f0;
+}
+.script-editor-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    color: #cc0;
+    font-weight: bold;
+    font-size: 12px;
+    letter-spacing: 2px;
+    border-bottom: 1px solid #1a3a1a;
+    text-shadow: 0 0 4px rgba(200, 200, 0, 0.3);
+    flex-shrink: 0;
+}
+.script-editor-close {
+    background: none;
+    border: 1px solid #333;
+    color: #888;
+    font-size: 14px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 3px;
+}
+.script-editor-close:hover { color: #f00; border-color: #f00; }
+
+/* 元数据栏（名称 + 描述 + 分组） */
+.script-editor-meta {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #111;
+    flex-shrink: 0;
+    align-items: center;
+}
+.script-editor-meta .settings-form-input {
+    font-size: 11px;
+    padding: 4px 8px;
+}
+.script-editor-meta .settings-form-input:first-child {
+    flex: 0 0 160px;
+}
+.script-editor-meta .settings-form-input:nth-child(2) {
+    flex: 1;
+}
+.script-editor-group-wrap {
+    flex: 0 0 120px;
+}
+.script-editor-group-wrap .settings-form-input {
+    width: 100%;
+}
+
+/* 主体区域（左编辑器 + 右API文档） */
+.script-editor-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.script-editor-pane {
+    flex: 0 0 65%;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 8px 12px;
+    overflow: hidden;
+}
+.script-editor-code-wrap {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+}
+.script-editor-code-wrap .settings-form-code {
+    flex: 1;
+    min-height: 0;
+    resize: none;
+    font-size: 12px;
+    line-height: 1.5;
+}
+.script-editor-code-wrap .code-line-numbers {
+    line-height: 1.5;
+    font-size: 12px;
+}
+.script-editor-pane .settings-form-errhint {
+    flex-shrink: 0;
+    padding: 4px 0 0;
+}
+
+/* 右侧 API 文档面板 */
+.script-editor-api {
+    flex: 0 0 35%;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #1a3a1a;
+    background: #030803;
+    min-width: 0;
+    overflow: hidden;
+}
+.script-editor-api-header {
+    padding: 6px 10px;
+    color: #cc0;
+    font-size: 11px;
+    font-weight: bold;
+    border-bottom: 1px solid #1a3a1a;
+    flex-shrink: 0;
+    user-select: none;
+}
+.script-editor-api-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 10px 10px;
+}
+.script-editor-api-scroll::-webkit-scrollbar { width: 4px; }
+.script-editor-api-scroll::-webkit-scrollbar-track { background: #030803; }
+.script-editor-api-scroll::-webkit-scrollbar-thumb { background: #1a3a1a; border-radius: 2px; }
+
+/* 底部按钮栏 */
+.script-editor-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    border-top: 1px solid #1a3a1a;
+    flex-shrink: 0;
+}
+.script-editor-btn-group {
+    display: flex;
+    gap: 6px;
+}
+
+/* 小屏适配：API 面板默认隐藏，模态框撑满 */
+@media (max-width: 899px) {
+    .script-editor-modal {
+        width: 96vw;
+        height: 90vh;
+    }
+    .script-editor-meta {
+        flex-wrap: wrap;
+    }
+    .script-editor-meta .settings-form-input:first-child {
+        flex: 1 1 100%;
+    }
+    .script-editor-group-wrap {
+        flex: 1;
+    }
+    .script-editor-pane {
+        flex: 1;
+    }
+    .script-editor-api {
+        display: none;
+    }
 }
