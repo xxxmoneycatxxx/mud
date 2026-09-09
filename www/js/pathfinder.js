@@ -161,6 +161,30 @@ class Pathfinder {
         return null; // 不可达
     }
 
+    // 从 fromHash 做一次 BFS，返回 Map<hash, distance>
+    // 用于搜索结果排序/显示距离，单次 O(V+E)
+    calcDistances(fromHash) {
+        const dist = new Map();
+        if (!this.loaded || !this.rooms.has(fromHash)) return dist;
+        dist.set(fromHash, 0);
+        const queue = [fromHash];
+
+        while (queue.length > 0) {
+            const cur = queue.shift();
+            const room = this.rooms.get(cur);
+            if (!room || !room.t) continue;
+            const d = dist.get(cur);
+
+            for (const dir in room.t) {
+                const next = room.t[dir];
+                if (!next || dist.has(next)) continue;
+                dist.set(next, d + 1);
+                queue.push(next);
+            }
+        }
+        return dist;
+    }
+
     // ===== 房间搜索 =====
 
     // 按名称搜索房间（子串匹配，不区分大小写）

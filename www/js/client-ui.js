@@ -2684,6 +2684,14 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
                 }
             }, 1500);
         }
+        // 登录完成后延迟请求房间信息，确保小地图立即显示当前位置
+        // 服务端 init_gmcp() 的 call_out 在 login 流程中触发，此时玩家尚未移入房间，
+        // send_room_info 因 environment() 为空而跳过；此处补发一次请求作为兜底
+        setTimeout(() => {
+            if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.sendGMCP('Room.Info.Get', {});
+            }
+        }, 2000);
     }
 
     // 解析 hp 命令输出，更新状态栏（GMCP 的可靠补充）
@@ -2981,6 +2989,22 @@ AdvancedMUDClient.prototype._handleGotoRoom = async function (keyword) {
     this.appendMessage('找到 ' + results.length + ' 个匹配房间：', 'system');
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const dirShort = (d) => (typeof DIR_SHORT !== 'undefined' ? DIR_SHORT[d] : d) || d;
+
+    // 计算从当前位置到各房间的距离（单次 BFS）
+    let distMap = new Map();
+    if (typeof mapper !== 'undefined' && mapper.currentHash) {
+        distMap = pathfinder.calcDistances(mapper.currentHash);
+    }
+
+    // 有距离信息时按距离排序（不可达排末尾）
+    if (distMap.size > 0) {
+        results.sort((a, b) => {
+            const da = distMap.has(a.hash) ? distMap.get(a.hash) : Infinity;
+            const db = distMap.has(b.hash) ? distMap.get(b.hash) : Infinity;
+            return da - db;
+        });
+    }
+
     let html = '';
     const maxShow = Math.min(results.length, 20);
     for (let i = 0; i < maxShow; i++) {
@@ -2988,11 +3012,15 @@ AdvancedMUDClient.prototype._handleGotoRoom = async function (keyword) {
         const exitLabel = (r.exits && r.exits.length > 0)
             ? r.exits.map(dirShort).join(' ')
             : '无出口';
+        const dist = distMap.has(r.hash) ? distMap.get(r.hash) : -1;
+        const distLabel = dist >= 0 ? dist + '步' : '不可达';
+        const distColor = dist === 0 ? '#4a4' : dist > 0 ? '#888' : '#a66';
         html += '<div class="message system">'
             + '<a class="exit-link" data-cmd="gtr ' + esc(r.hash) + '">'
             + esc(r.name) + '</a>'
             + ' <span style="color:#666">[' + esc(r.area) + ']</span>'
             + ' <span style="color:#888">出口: ' + esc(exitLabel) + '</span>'
+            + ' <span style="color:' + distColor + '">' + esc(distLabel) + '</span>'
             + '</div>';
     }
     if (results.length > maxShow) {

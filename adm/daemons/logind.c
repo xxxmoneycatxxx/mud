@@ -1004,6 +1004,13 @@ varargs void enter_world(object ob, object user, int silent)
 
     if ((user->query("qi") < 0 || user->query("jing") < 0) && living(user))
         user->unconcious();
+
+    // 登录流程完成后补推房间信息：
+    // init_gmcp() 在 setup() 中调度的 call_out("send_room_info", 1) 触发时
+    // 玩家尚未移入起始房间，environment() 为空导致跳过；此处直接补推一次，
+    // 确保 Web 客户端小地图在登录后立即显示当前位置，无需等待首次移动。
+    if (interactive(user))
+        user->send_room_info();
 }
 
 varargs void reconnect(object ob, object user, int silent)
