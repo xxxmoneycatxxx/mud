@@ -15,7 +15,8 @@ void create()
 {
         set_name("朱熹", ({ "zhu xi", "zhu", "xi" }));
         set("long", "朱先生被称为当世第一大文学家，肚子"
-                    "里的墨水比海还要深。\n");
+                    "里的墨水比海还要深。他在此讲学授徒，"
+                    "传授读书写字之道，你也可以向他求学。\n");
         set("title", HIR "文学大宗师" NOR);
         set("gender", "男性");
         set("age", 65);
@@ -32,6 +33,9 @@ void create()
         set("combat_exp", 400000);
         set("shen_type", 1);
         set("inquiry", ([
+            "求学" : "求学？好啊，你先看看墙上的学规，缴了学费再说。",
+            "拜师" : "求学？好啊，你先看看墙上的学规，缴了学费再说。",
+            "读书" : "想学读书写字？先缴学费，然后我可以指点你。",
             "买书" : (: ask_buy :),
             "工作" : (: ask_job :),
             "抄书" : (: ask_job :),
@@ -87,6 +91,7 @@ int accept_object(object who, object ob)
         {
                 message_vision("朱熹同意指点$N一些读书写字的问题。\n", who);
                 who->add_temp("mark/朱", ob->value() / 50);
+                tell_object(who, CYN "朱熹说道：你现在可以向我请教读书写字了。(learn zhu xi literate)\n" NOR);
                 destruct(ob);
                 return 1;
         }
@@ -244,8 +249,11 @@ int working(object me)
                                     chinese_number(b) +
                                     "点经验和" +
                                     chinese_number((b + 20) / 3) +
-                                    "点潜能。\n\n" NOR);
+                                    "点潜能。\n" NOR);
                 }
+                if (! me->query_skill("literate", 1))
+                        tell_object(me, CYN "朱熹说道：你现在可以向我请教读书写字了。(learn zhu xi literate)\n" NOR);
+                tell_object(me, "\n");
                 return 0;
         }
 
