@@ -1739,6 +1739,57 @@ body {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
+.char-skill-maxed {
+    color: #cc0;
+    font-size: 9px;
+    font-weight: bold;
+}
+.char-skill-item.has-detail {
+    cursor: pointer;
+}
+.char-skill-detail {
+    display: none;
+    margin-top: 4px;
+    padding: 4px 0 2px;
+}
+.char-skill-item.expanded .char-skill-detail {
+    display: block;
+}
+.char-skill-detail-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 0;
+}
+.char-skill-detail-label {
+    color: #888;
+    font-size: 10px;
+    min-width: 28px;
+    flex-shrink: 0;
+}
+.char-skill-tag {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 2px;
+}
+.tag-perform {
+    color: #f88;
+    background: rgba(255, 100, 100, 0.1);
+}
+.tag-exert {
+    color: #8f8;
+    background: rgba(100, 255, 100, 0.1);
+}
+.tag-enable {
+    color: #8af;
+    background: rgba(100, 150, 255, 0.1);
+}
+.tag-combine {
+    color: #fa8;
+    background: rgba(255, 170, 100, 0.1);
+}
 
 /* 任务 tab：卡片 */
 .char-quest-section {

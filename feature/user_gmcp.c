@@ -465,10 +465,16 @@ protected void send_char_quest_detail(int index)
 }
 
 // 辅助：构建单个技能分类（必须在 send_char_skills 之前定义）
-private mapping _build_skill_category(string name, string *skill_ids, mapping skl, mapping lrn, string *mapped)
+private mapping _build_skill_category(string name, string *skill_ids, mapping skl, mapping lrn, string *mapped, string *player_skills, mapping vt)
 {
     mixed *skills;
     int i, lvl, percent;
+    object sk_ob;
+    string sk_dir, filename;
+    mixed *perform_list, *exert_list, *all_files;
+    string *enable_list, *combine_list;
+    string *af;
+    int j;
 
     if (!skill_ids || !sizeof(skill_ids))
         return ([ "name": name, "skills": ({}) ]);
@@ -484,6 +490,83 @@ private mapping _build_skill_category(string name, string *skill_ids, mapping sk
         if (percent > 100) percent = 100;
         if (percent < 0) percent = 0;
 
+        // 技能详情：绝招、运功、可激发类型、互备关系
+        sk_ob = get_object(SKILL_D(sid));
+        sk_dir = SKILL_D(sid);
+        perform_list = ({});
+        exert_list = ({});
+
+        if (sk_ob)
+        {
+            int is_force = sk_ob->valid_enable("force");
+
+            // 绝招列表
+            if (is_force)
+                all_files = get_dir(sk_dir + "/perform/");
+            else
+                all_files = get_dir(sk_dir + "/");
+
+            if (arrayp(all_files))
+            {
+                af = (string *)all_files;
+                for (j = 0; j < sizeof(af); j++)
+                {
+                    filename = af[j];
+                    if (strlen(filename) > 2 &&
+                        filename[strlen(filename) - 2] == '.' &&
+                        filename[strlen(filename) - 1] == 'c')
+                        perform_list += ({ filename[0..strlen(filename) - 3] });
+                }
+            }
+
+            // 运功列表（仅内功）
+            if (is_force)
+            {
+                all_files = get_dir(sk_dir + "/exert/");
+                if (arrayp(all_files))
+                {
+                    af = (string *)all_files;
+                    for (j = 0; j < sizeof(af); j++)
+                    {
+                        filename = af[j];
+                        if (strlen(filename) > 2 &&
+                            filename[strlen(filename) - 2] == '.' &&
+                            filename[strlen(filename) - 1] == 'c')
+                            exert_list += ({ filename[0..strlen(filename) - 3] });
+                    }
+                }
+            }
+
+            // 可激发类型
+            enable_list = ({});
+            if (mapp(vt))
+            {
+                string *vtkeys = keys(vt);
+                for (j = 0; j < sizeof(vtkeys); j++)
+                {
+                    if (sk_ob->valid_enable(vtkeys[j]))
+                        enable_list += ({ vt[vtkeys[j]] });
+                }
+            }
+
+            // 互备关系
+            combine_list = ({});
+            if (arrayp(player_skills))
+            {
+                for (j = 0; j < sizeof(player_skills); j++)
+                {
+                    if (player_skills[j] != sid &&
+                        sk_ob->valid_combine(player_skills[j]))
+                        combine_list += ({ to_chinese(player_skills[j]) });
+                }
+            }
+        }
+        else
+        {
+            enable_list = ({});
+            combine_list = ({});
+        }
+
         skills[i] = ([
             "id"      : sid,
             "name"    : to_chinese(sid),
@@ -491,6 +574,10 @@ private mapping _build_skill_category(string name, string *skill_ids, mapping sk
             "percent" : percent,
             "enabled" : member_array(sid, mapped) != -1,
             "maxed"   : lrn[sid] >= (lvl + 1) * (lvl + 1),
+            "perform" : perform_list,
+            "exert"   : exert_list,
+            "enable"  : enable_list,
+            "combine" : combine_list,
         ]);
     }
 
@@ -509,6 +596,8 @@ protected void send_char_skills()
     mixed *prepare_list;
     object weapon;
     string weapon_name;
+    string *player_skills;
+    mapping vt;
     int i;
 
     if (!has_gmcp())
@@ -531,6 +620,38 @@ protected void send_char_skills()
     valid_types = (string *)MASTER_D->query_valid_types();
     if (!valid_types) valid_types = ({});
 
+    // valid_type 映射（类型 ID → 中文名）
+    vt = ([
+        "unarmed"      : "拳脚",
+        "sword"        : "剑法",
+        "blade"        : "刀法",
+        "dagger"       : "短兵",
+        "stick"        : "棒法",
+        "staff"        : "杖法",
+        "club"         : "棍法",
+        "spear"        : "枪法",
+        "whip"         : "鞭法",
+        "hammer"       : "锤法",
+        "axe"          : "斧法",
+        "hook"         : "钩法",
+        "brush"        : "笔法",
+        "throwing"     : "暗器",
+        "force"        : "内功",
+        "dodge"        : "轻功",
+        "parry"        : "招架",
+        "finger"       : "指功",
+        "hand"         : "手功",
+        "cuff"         : "拳功",
+        "strike"       : "掌功",
+        "leg"          : "腿功",
+        "claw"         : "爪功",
+        "medical"      : "医术",
+        "poison"       : "毒技",
+        "cooking"      : "厨艺",
+    ]);
+
+    player_skills = keys(skl);
+
     // 分类：基本技能
     basic = filter_array(valid_types, (: member_array($1, $(keys(skl))) != -1 :));
 
@@ -550,9 +671,9 @@ protected void send_char_skills()
 
     // 构建分类数据
     categories = allocate(3);
-    categories[0] = _build_skill_category("知识技能", skill_k, skl, lrn, mapped);
-    categories[1] = _build_skill_category("基本技能", basic, skl, lrn, mapped);
-    categories[2] = _build_skill_category("特殊技能", others, skl, lrn, mapped);
+    categories[0] = _build_skill_category("知识技能", skill_k, skl, lrn, mapped, player_skills, vt);
+    categories[1] = _build_skill_category("基本技能", basic, skl, lrn, mapped, player_skills, vt);
+    categories[2] = _build_skill_category("特殊技能", others, skl, lrn, mapped, player_skills, vt);
 
     // 过滤空分类
     mixed *non_empty = ({});

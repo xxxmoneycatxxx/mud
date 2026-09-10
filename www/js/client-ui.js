@@ -419,7 +419,9 @@ AdvancedMUDClient.prototype._renderCharSkills = function (d) {
             html += '<div class="char-skill-group-title">' + cat.name + ' (' + skills.length + '项)</div>';
 
             skills.forEach(function (sk) {
-                html += '<div class="char-skill-item">';
+                var hasDetail = (sk.perform && sk.perform.length) || (sk.exert && sk.exert.length) ||
+                                (sk.enable && sk.enable.length) || (sk.combine && sk.combine.length);
+                html += '<div class="char-skill-item' + (hasDetail ? ' has-detail' : '') + '">';
                 // 技能名（已启用青色 + □ 标记）
                 var nameCls = 'char-skill-name' + (sk.enabled ? ' mapped' : '');
                 html += '<span class="' + nameCls + '">';
@@ -430,7 +432,42 @@ AdvancedMUDClient.prototype._renderCharSkills = function (d) {
                 html += '<div class="char-skill-bar" style="width:' + sk.percent + '%"></div>';
                 html += '</div>';
                 // 等级
-                html += '<span class="char-skill-lvl">' + sk.level + ' / ' + sk.percent + '%</span>';
+                html += '<span class="char-skill-lvl">' + sk.level + ' / ' + sk.percent + '%';
+                if (sk.maxed) html += ' <span class="char-skill-maxed">MAX</span>';
+                html += '</span>';
+                // 详情区域
+                if (hasDetail) {
+                    html += '<div class="char-skill-detail">';
+                    if (sk.perform && sk.perform.length) {
+                        html += '<div class="char-skill-detail-row"><span class="char-skill-detail-label">绝招</span>';
+                        sk.perform.forEach(function (p) {
+                            html += '<span class="char-skill-tag tag-perform">' + esc(p) + '</span>';
+                        });
+                        html += '</div>';
+                    }
+                    if (sk.exert && sk.exert.length) {
+                        html += '<div class="char-skill-detail-row"><span class="char-skill-detail-label">运功</span>';
+                        sk.exert.forEach(function (e) {
+                            html += '<span class="char-skill-tag tag-exert">' + esc(e) + '</span>';
+                        });
+                        html += '</div>';
+                    }
+                    if (sk.enable && sk.enable.length) {
+                        html += '<div class="char-skill-detail-row"><span class="char-skill-detail-label">激发</span>';
+                        sk.enable.forEach(function (e) {
+                            html += '<span class="char-skill-tag tag-enable">' + esc(e) + '</span>';
+                        });
+                        html += '</div>';
+                    }
+                    if (sk.combine && sk.combine.length) {
+                        html += '<div class="char-skill-detail-row"><span class="char-skill-detail-label">互备</span>';
+                        sk.combine.forEach(function (c) {
+                            html += '<span class="char-skill-tag tag-combine">' + esc(c) + '</span>';
+                        });
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                }
                 html += '</div>';
             });
 
@@ -439,6 +476,12 @@ AdvancedMUDClient.prototype._renderCharSkills = function (d) {
     }
 
     container.innerHTML = html;
+
+    // 点击技能项展开/收起详情
+    container.onclick = function (e) {
+        var item = e.target.closest('.char-skill-item.has-detail');
+        if (item) item.classList.toggle('expanded');
+    };
 };
 
 // 渲染任务 tab：师门/每日/江湖任务
