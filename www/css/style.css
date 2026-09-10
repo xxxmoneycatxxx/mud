@@ -1647,8 +1647,54 @@ body {
     font-size: 10px;
     margin-left: 4px;
 }
+.char-inv-tag {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 4px;
+    margin-left: 4px;
+    border-radius: 2px;
+    vertical-align: middle;
+}
+.tag-damage {
+    color: #f88;
+    background: rgba(255, 100, 100, 0.1);
+}
+.tag-armor {
+    color: #8af;
+    background: rgba(100, 150, 255, 0.1);
+}
 
 /* 技能 tab：分组 + 进度条 */
+/* 战斗配置概览 */
+.char-skill-config {
+    background: #0a1a0a;
+    border: 1px solid #1a3a1a;
+    border-radius: 3px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+}
+.char-skill-config-title {
+    color: #cc0;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+}
+.char-skill-config-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+    font-size: 11px;
+}
+.char-skill-config-type {
+    color: #888;
+    min-width: 40px;
+}
+.char-skill-config-val {
+    color: #4f4;
+}
+
 .char-skill-group {
     margin-bottom: 10px;
 }
@@ -1744,6 +1790,24 @@ body {
     color: #888;
     font-size: 10px;
     margin-top: 4px;
+}
+.char-quest-solved {
+    margin-top: 6px;
+}
+.char-quest-solved summary {
+    user-select: none;
+}
+.char-quest-solved summary::-webkit-details-marker {
+    color: #555;
+}
+.char-quest-solved-list {
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.char-quest-solved-item {
+    opacity: 0.7;
+    padding: 4px 8px;
 }
 
 /* 江湖任务详情弹窗 */

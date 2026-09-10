@@ -351,6 +351,13 @@ AdvancedMUDClient.prototype._renderCharInventory = function (d) {
             if (item.count > 1) {
                 html += '<span class="char-inv-count">' + esc(item.unit || '') + chineseNumber(item.count) + '</span>';
             }
+            // 内联属性标签（伤害/防护）
+            if (item.damage > 0) {
+                html += '<span class="char-inv-tag tag-damage">伤害 ' + item.damage + '</span>';
+            }
+            if (item.armor > 0) {
+                html += '<span class="char-inv-tag tag-armor">防护 ' + item.armor + '</span>';
+            }
             html += '</li>';
         });
         html += '</ul>';
@@ -371,12 +378,34 @@ function chineseNumber(n) {
     return String(n);
 }
 
-// 渲染技能 tab：分类技能列表
+// 渲染技能 tab：战斗配置 + 分类技能列表
 AdvancedMUDClient.prototype._renderCharSkills = function (d) {
     const container = document.getElementById('charTab-skills');
     if (!container || !d) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     let html = '';
+
+    // —— 当前战斗配置 ——
+    var enableList = d.enable || [];
+    var prepareList = d.prepare || [];
+    var weaponName = d.weapon || '';
+    if (enableList.length || prepareList.length || weaponName) {
+        html += '<div class="char-skill-config">';
+        html += '<div class="char-skill-config-title">当前战斗配置</div>';
+        if (weaponName) {
+            html += '<div class="char-skill-config-row"><span class="char-skill-config-type">武器</span><span class="char-skill-config-val">' + esc(weaponName) + '</span></div>';
+        }
+        enableList.forEach(function (e) {
+            html += '<div class="char-skill-config-row"><span class="char-skill-config-type">' + esc(e.type) + '</span><span class="char-skill-config-val">' + esc(e.skill) + '</span></div>';
+        });
+        if (prepareList.length) {
+            var prepNames = prepareList.map(function (p) { return esc(p.skill); });
+            html += '<div class="char-skill-config-row"><span class="char-skill-config-type">准备</span><span class="char-skill-config-val">' + prepNames.join(' + ') + '</span></div>';
+        }
+        html += '</div>';
+    }
+
     var categories = d.categories || [];
 
     if (!categories.length) {
@@ -480,10 +509,19 @@ AdvancedMUDClient.prototype._renderCharQuests = function (d) {
     }
     var solved = d.solved || [];
     if (solved.length) {
-        html += '<div class="char-quest-hint">已完成 ' + solved.length + ' 个江湖任务';
+        html += '<details class="char-quest-solved">';
+        html += '<summary class="char-quest-hint" style="cursor:pointer">已完成 ' + solved.length + ' 个江湖任务';
         var newlyCount = solved.filter(function (q) { return q.newly; }).length;
         if (newlyCount) html += '（' + newlyCount + ' 个可重复）';
-        html += '</div>';
+        html += '</summary>';
+        html += '<div class="char-quest-solved-list">';
+        solved.forEach(function (q) {
+            html += '<div class="char-quest-card char-quest-solved-item">';
+            html += '<div class="quest-title">Lv.' + (q.level || 0) + (q.newly ? ' <span style="color:#cc0">*</span>' : '') + '</div>';
+            html += '<div class="quest-desc">' + esc(q.name) + '</div>';
+            html += '</div>';
+        });
+        html += '</div></details>';
     }
     html += '</div>';
 

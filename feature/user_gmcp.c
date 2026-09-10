@@ -181,7 +181,7 @@ protected void send_char_inventory()
 {
     object ob = this_object();
     object *inv;
-    mapping count, unit_map, equiped, colored_name;
+    mapping count, unit_map, equiped, colored_name, first_ob_map;
     string short_name, raw_short, *dk, handing_name, handing_clean;
     object handing_ob;
     int i, enc;
@@ -204,6 +204,7 @@ protected void send_char_inventory()
     unit_map = ([]);
     equiped = ([]);
     colored_name = ([]);  // 去色名 -> 原始带色 short
+    first_ob_map = ([]);  // 去色名 -> 第一个实例对象（用于提取属性）
 
     for (i = 0; i < sizeof(inv); i++)
     {
@@ -214,6 +215,7 @@ protected void send_char_inventory()
             count += ([ short_name : 1 ]);
             unit_map += ([ short_name : inv[i]->query("unit") || "" ]);
             colored_name += ([ short_name : raw_short ]);
+            first_ob_map += ([ short_name : inv[i] ]);
         }
         else
         {
@@ -240,12 +242,20 @@ protected void send_char_inventory()
     mixed *items = allocate(sizeof(dk));
     for (i = 0; i < sizeof(dk); i++)
     {
+        object first_ob = first_ob_map[dk[i]];
+        int dmg = (int)first_ob->query("weapon_prop/damage");
+        int arm = (int)first_ob->query("armor_prop/armor");
+        string st = (string)first_ob->query("skill_type");
+
         items[i] = ([
-            "name"     : colored_name[dk[i]],
-            "count"    : count[dk[i]],
-            "unit"     : unit_map[dk[i]],
-            "equipped" : !undefinedp(equiped[dk[i]]),
-            "handing"  : (dk[i] == handing_clean),
+            "name"      : colored_name[dk[i]],
+            "count"     : count[dk[i]],
+            "unit"      : unit_map[dk[i]],
+            "equipped"  : !undefinedp(equiped[dk[i]]),
+            "handing"   : (dk[i] == handing_clean),
+            "damage"    : dmg,
+            "armor"     : arm,
+            "skill_type": st || "",
         ]);
     }
 
@@ -491,10 +501,14 @@ private mapping _build_skill_category(string name, string *skill_ids, mapping sk
 protected void send_char_skills()
 {
     object ob = this_object();
-    mapping skl, lrn, map;
+    mapping skl, lrn, map, pmap;
     string *sname, *mapped, *basic, *skill_k, *others;
     string *valid_types;
     mixed *categories;
+    mixed *enable_list;
+    mixed *prepare_list;
+    object weapon;
+    string weapon_name;
     int i;
 
     if (!has_gmcp())
@@ -548,7 +562,50 @@ protected void send_char_skills()
             non_empty += ({ categories[i] });
     }
 
-    mapping data = ([ "categories": non_empty ]);
+    // 构建激发状态列表（enable）
+    enable_list = ({});
+    if (mapp(map))
+    {
+        string *mk = keys(map);
+        for (i = 0; i < sizeof(mk); i++)
+        {
+            if (ob->query_skill(mk[i]))
+            {
+                enable_list += ({ ([
+                    "type"  : to_chinese(mk[i]),
+                    "skill" : to_chinese(map[mk[i]]),
+                    "id"    : map[mk[i]],
+                ]) });
+            }
+        }
+    }
+
+    // 构建准备状态列表（prepare）
+    prepare_list = ({});
+    pmap = ob->query_skill_prepare();
+    if (mapp(pmap))
+    {
+        string *pk = keys(pmap);
+        for (i = 0; i < sizeof(pk); i++)
+        {
+            prepare_list += ({ ([
+                "type"  : to_chinese(pk[i]),
+                "skill" : to_chinese(pmap[pk[i]]),
+            ]) });
+        }
+    }
+
+    // 当前武器
+    weapon_name = "";
+    if (objectp(weapon = ob->query_temp("weapon")))
+        weapon_name = remove_ansi(weapon->name()) || "";
+
+    mapping data = ([
+        "categories": non_empty,
+        "enable"    : enable_list,
+        "prepare"   : prepare_list,
+        "weapon"    : weapon_name,
+    ]);
 
     string msg = "Char.Skills " + json_encode(data);
     log_gmcp("Sending: " + msg);
