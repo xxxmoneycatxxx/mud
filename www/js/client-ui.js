@@ -326,6 +326,47 @@ function chineseNumber(n) {
     return String(n);
 }
 
+// 渲染技能 tab：分类技能列表
+AdvancedMUDClient.prototype._renderCharSkills = function (d) {
+    const container = document.getElementById('charTab-skills');
+    if (!container || !d) return;
+
+    let html = '';
+    var categories = d.categories || [];
+
+    if (!categories.length) {
+        html += '<div class="char-quest-empty">目前并没有学会任何技能。</div>';
+    } else {
+        categories.forEach(function (cat) {
+            var skills = cat.skills || [];
+            if (!skills.length) return;
+
+            html += '<div class="char-skill-group">';
+            html += '<div class="char-skill-group-title">' + cat.name + ' (' + skills.length + '项)</div>';
+
+            skills.forEach(function (sk) {
+                html += '<div class="char-skill-item">';
+                // 技能名（已启用青色 + □ 标记）
+                var nameCls = 'char-skill-name' + (sk.enabled ? ' mapped' : '');
+                html += '<span class="' + nameCls + '">';
+                if (sk.enabled) html += '□ ';
+                html += sk.name + '</span>';
+                // 进度条
+                html += '<div class="char-skill-bar-wrap">';
+                html += '<div class="char-skill-bar" style="width:' + sk.percent + '%"></div>';
+                html += '</div>';
+                // 等级
+                html += '<span class="char-skill-lvl">' + sk.level + ' / ' + sk.percent + '%</span>';
+                html += '</div>';
+            });
+
+            html += '</div>';
+        });
+    }
+
+    container.innerHTML = html;
+};
+
 // 全套导出：打包所有配置为 JSON 文件下载
 AdvancedMUDClient.prototype._exportAllConfigJSON = function () {
     const json = this.exportAllConfig();
@@ -2637,6 +2678,9 @@ AdvancedMUDClient.prototype.processGMCPData = function (data) {
                 break;
             case 'Char.Inventory':
                 this._renderCharInventory(data.data);
+                break;
+            case 'Char.Skills':
+                this._renderCharSkills(data.data);
                 break;
             case 'Room.Info':
                 this.updateRoomInfo(data.data);

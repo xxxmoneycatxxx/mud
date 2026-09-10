@@ -260,6 +260,107 @@ protected void send_char_inventory()
     catch(efun::send_gmcp(msg));
 }
 
+// 辅助：构建单个技能分类（必须在 send_char_skills 之前定义）
+private mapping _build_skill_category(string name, string *skill_ids, mapping skl, mapping lrn, string *mapped)
+{
+    mixed *skills;
+    int i, lvl, percent;
+
+    if (!skill_ids || !sizeof(skill_ids))
+        return ([ "name": name, "skills": ({}) ]);
+
+    skills = allocate(sizeof(skill_ids));
+    for (i = 0; i < sizeof(skill_ids); i++)
+    {
+        string sid = skill_ids[i];
+        if (!sid) continue;
+
+        lvl = skl[sid];
+        percent = lrn[sid] * 100 / ((lvl + 1) * (lvl + 1) + 1);
+        if (percent > 100) percent = 100;
+        if (percent < 0) percent = 0;
+
+        skills[i] = ([
+            "id"      : sid,
+            "name"    : to_chinese(sid),
+            "level"   : lvl,
+            "percent" : percent,
+            "enabled" : member_array(sid, mapped) != -1,
+            "maxed"   : lrn[sid] >= (lvl + 1) * (lvl + 1),
+        ]);
+    }
+
+    return ([ "name": name, "skills": skills ]);
+}
+
+// 构建并发送角色技能列表（cha 命令的结构化数据，供 Web 角色面板使用）
+protected void send_char_skills()
+{
+    object ob = this_object();
+    mapping skl, lrn, map;
+    string *sname, *mapped, *basic, *skill_k, *others;
+    string *valid_types;
+    mixed *categories;
+    int i;
+
+    if (!has_gmcp())
+        return;
+
+    skl = ob->query_skills();
+    if (!mapp(skl) || !sizeof(skl))
+    {
+        sendGMCP(([ "categories": ({}) ]), "Char", "Skills");
+        return;
+    }
+
+    lrn = ob->query_learned();
+    if (!mapp(lrn)) lrn = ([]);
+
+    map = ob->query_skill_map();
+    if (mapp(map)) mapped = values(map);
+    if (!mapped) mapped = ({});
+
+    valid_types = (string *)MASTER_D->query_valid_types();
+    if (!valid_types) valid_types = ({});
+
+    // 分类：基本技能
+    basic = filter_array(valid_types, (: member_array($1, $(keys(skl))) != -1 :));
+
+    // 分类：知识类技能
+    skill_k = ({});
+    sname = keys(skl);
+    for (i = sizeof(sname) - 1; i >= 0; i--)
+    {
+        string *tmp;
+        tmp = filter_array(sname, (: SKILL_D($1)->type() == "knowledge" :));
+        if (sizeof(tmp)) skill_k = tmp;
+    }
+    skill_k -= basic;
+
+    // 分类：特殊技能（剩余）
+    others = sname - skill_k - basic;
+
+    // 构建分类数据
+    categories = allocate(3);
+    categories[0] = _build_skill_category("知识技能", skill_k, skl, lrn, mapped);
+    categories[1] = _build_skill_category("基本技能", basic, skl, lrn, mapped);
+    categories[2] = _build_skill_category("特殊技能", others, skl, lrn, mapped);
+
+    // 过滤空分类
+    mixed *non_empty = ({});
+    for (i = 0; i < sizeof(categories); i++)
+    {
+        if (mapp(categories[i]) && sizeof(categories[i]["skills"]))
+            non_empty += ({ categories[i] });
+    }
+
+    mapping data = ([ "categories": non_empty ]);
+
+    string msg = "Char.Skills " + json_encode(data);
+    log_gmcp("Sending: " + msg);
+    catch(efun::send_gmcp(msg));
+}
+
 // 心跳调用：属性签名变化时才推送，实现实时状态栏且避免刷屏
 void gmcp_vitals_update()
 {
@@ -424,6 +525,10 @@ void gmcp(string req)
     else if (module == "Char.Inventory.Get" || module == "Char.Inventory")
     {
         send_char_inventory();
+    }
+    else if (module == "Char.Skills.Get" || module == "Char.Skills")
+    {
+        send_char_skills();
     }
     else if (module == "Room.Info.Get" || module == "Room.Info")
     {
