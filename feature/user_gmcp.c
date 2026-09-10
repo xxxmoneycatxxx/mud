@@ -207,7 +207,7 @@ protected void send_char_inventory()
 
     for (i = 0; i < sizeof(inv); i++)
     {
-        string raw_short = inv[i]->short();
+        raw_short = inv[i]->short();
         short_name = remove_ansi(raw_short);
         if (undefinedp(count[short_name]))
         {
