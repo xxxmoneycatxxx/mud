@@ -63,6 +63,32 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# 检查端口是否被占用
+check_port() {
+    if nc -z 127.0.0.1 "$1" 2>/dev/null; then
+        return 1  # 可连接 = 已占用
+    else
+        return 0  # 连接失败 = 可用
+    fi
+}
+
+# 输出失败诊断信息
+show_diagnostics() {
+    echo ""
+    err "部署失败，最近日志:"
+    echo ""
+    docker compose logs --tail 50 2>/dev/null | while IFS= read -r line; do
+        echo "     $line"
+    done
+    echo ""
+    echo "  可能的原因:"
+    echo "    1. Docker 镜像构建失败 (检查网络/Disk 空间)"
+    echo "    2. 端口被其他程序占用 (运行 ss -tlnp | grep '5566\|6666\|8888')"
+    echo "    3. config.cfg 配置有误"
+    echo "    4. mudcore 子模块未初始化 (运行 git submodule update --init)"
+    echo ""
+}
+
 # --- 停止服务 ---
 
 if [ "$STOP" -eq 1 ]; then
@@ -145,10 +171,50 @@ if [ ! -f "$ENV_FILE" ] && [ -f "$EXAMPLE_ENV" ]; then
     ok "data/.env 已从示例复制"
 fi
 
-# 检查 mudcore 子模块
+# 检查 mudcore 子模块 (为空时自动初始化)
 MUDCORE_DIR="$ROOT_DIR/mudcore"
 if [ -d "$MUDCORE_DIR" ] && [ -z "$(ls -A "$MUDCORE_DIR" 2>/dev/null)" ]; then
-    warn "mudcore/ 为空，请运行: git submodule update --init"
+    warn "mudcore/ 为空，正在自动初始化..."
+    if [ -f "$ROOT_DIR/.gitmodules" ]; then
+        if (cd "$ROOT_DIR" && git submodule update --init 2>/dev/null); then
+            ok "mudcore 子模块已初始化"
+        else
+            err "子模块初始化失败，请手动运行: git submodule update --init"
+            exit 1
+        fi
+    else
+        err "未找到 .gitmodules (项目可能不是通过 git clone 获取的)"
+        echo "  请重新克隆: git clone --recurse-submodules <repo-url>"
+        exit 1
+    fi
+fi
+
+# --- 端口冲突预检 ---
+
+step "检查端口占用..."
+
+REQUIRED_PORTS=(5566 6666 8888)
+PORT_CONFLICT=0
+
+for port in "${REQUIRED_PORTS[@]}"; do
+    if ! check_port "$port"; then
+        # 端口被占用 — 但可能是我们自己的容器
+        OWN_CONTAINER=$(docker compose ps --format '{{.Ports}}' 2>/dev/null | grep ":${port}->")
+        if [ -n "$OWN_CONTAINER" ]; then
+            echo "     端口 $port (本容器已占用，将重新创建)"
+        else
+            err "端口 $port 已被其他程序占用"
+            PORT_CONFLICT=1
+        fi
+    fi
+done
+
+if [ "$PORT_CONFLICT" -eq 1 ]; then
+    echo ""
+    echo "  请先释放端口或修改 config.cfg 中的端口配置"
+    echo "  运行 ss -tlnp | grep '5566\|6666\|8888' 查看占用情况"
+    echo ""
+    exit 1
 fi
 
 # --- 解析配置 ---
@@ -194,12 +260,15 @@ $COMPOSE_CMD up -d $PROFILE_ARG $BUILD_FLAG
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
-    echo ""
-    err "部署失败，显示错误日志:"
-    echo ""
-    $COMPOSE_CMD logs --tail 30
+    show_diagnostics
+
+    # 尝试清理失败的容器
+    step "清理失败的容器..."
+    docker compose down --remove-orphans 2>/dev/null
     exit 1
 fi
+
+ok "容器已启动"
 
 # --- 就绪检查 ---
 
@@ -207,18 +276,42 @@ echo ""
 step "等待服务就绪..."
 
 READY=0
-for i in $(seq 1 30); do
-    sleep 1
-    if $COMPOSE_CMD ps 2>/dev/null | grep -q "running"; then
+TIMEOUT=90
+ELAPSED=0
+
+while [ $ELAPSED -lt $TIMEOUT ]; do
+    sleep 2
+    ELAPSED=$((ELAPSED + 2))
+
+    PS_OUTPUT=$($COMPOSE_CMD ps 2>/dev/null)
+
+    # 容器退出或不存在
+    if [ -z "$PS_OUTPUT" ] || echo "$PS_OUTPUT" | grep -qE "exited|dead|restart"; then
+        if echo "$PS_OUTPUT" | grep -qE "exited|dead"; then
+            echo ""
+            err "容器已退出"
+            show_diagnostics
+            exit 1
+        fi
+        continue
+    fi
+
+    # docker compose ps 默认输出 "Up X minutes" 表示运行中
+    if echo "$PS_OUTPUT" | grep -q "Up"; then
         READY=1
         break
     fi
 done
 
 if [ "$READY" -eq 0 ]; then
-    warn "容器可能未正常启动，请检查日志:"
-    echo "    $COMPOSE_CMD logs"
+    warn "服务在 ${TIMEOUT} 秒内未就绪"
     echo ""
+    echo "  服务可能仍在启动中，请稍后手动检查:"
+    echo "    docker compose logs"
+    echo "    docker compose ps"
+    echo ""
+else
+    ok "服务就绪 (${ELAPSED}s)"
 fi
 
 # --- 读取端口 ---
@@ -234,8 +327,11 @@ fi
 
 # --- 输出访问信息 ---
 
-echo ""
-ok "部署成功！"
+if [ "$READY" -eq 1 ]; then
+    echo ""
+    ok "部署成功！"
+fi
+
 echo ""
 echo "  访问信息:"
 echo ""
