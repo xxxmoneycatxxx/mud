@@ -120,7 +120,7 @@ protected void send_char_score()
 
     mapping data = ([
         // 基本信息
-        "name"       : ob->name(1) || "",
+        "name"       : remove_ansi(ob->name(1)) || "",
         "rank"       : remove_ansi((string)RANK_D->query_rank(ob)) || "",
         "gender"     : my["gender"] || "",
         "age"        : (int)ob->query("age") || 0,
@@ -172,6 +172,90 @@ protected void send_char_score()
     ]);
 
     string msg = "Char.Score " + json_encode(data);
+    log_gmcp("Sending: " + msg);
+    catch(efun::send_gmcp(msg));
+}
+
+// 构建并发送角色背包物品（inventory 命令的结构化数据，供 Web 角色面板使用）
+protected void send_char_inventory()
+{
+    object ob = this_object();
+    object *inv;
+    mapping count, unit_map, equiped, colored_name;
+    string short_name, raw_short, *dk, handing_name, handing_clean;
+    object handing_ob;
+    int i, enc;
+
+    if (!has_gmcp())
+        return;
+
+    inv = all_inventory(ob);
+    if (!sizeof(inv))
+    {
+        sendGMCP(([ "encumbrance": 0, "handing": "", "items": ({}) ]), "Char", "Inventory");
+        return;
+    }
+
+    // 负重百分比
+    enc = (int)ob->query_encumbrance() * 100 / (int)ob->query_max_encumbrance();
+
+    // 统计物品（按去色 short 名去重计数，同时保留原始带色 short 供客户端渲染）
+    count = ([]);
+    unit_map = ([]);
+    equiped = ([]);
+    colored_name = ([]);  // 去色名 -> 原始带色 short
+
+    for (i = 0; i < sizeof(inv); i++)
+    {
+        string raw_short = inv[i]->short();
+        short_name = remove_ansi(raw_short);
+        if (undefinedp(count[short_name]))
+        {
+            count += ([ short_name : 1 ]);
+            unit_map += ([ short_name : inv[i]->query("unit") || "" ]);
+            colored_name += ([ short_name : raw_short ]);
+        }
+        else
+        {
+            count[short_name] += 1;
+        }
+
+        if (inv[i]->query("equipped"))
+            equiped[short_name] = 1;
+    }
+
+    // 手持物品（保留带色）
+    handing_name = "";
+    handing_clean = "";
+    if (objectp(handing_ob = ob->query_temp("handing")))
+    {
+        handing_name = handing_ob->short();
+        handing_clean = remove_ansi(handing_name);
+    }
+
+    // 构建物品数组
+    dk = keys(count);
+    dk = sort_array(dk, 1);
+
+    mixed *items = allocate(sizeof(dk));
+    for (i = 0; i < sizeof(dk); i++)
+    {
+        items[i] = ([
+            "name"     : colored_name[dk[i]],
+            "count"    : count[dk[i]],
+            "unit"     : unit_map[dk[i]],
+            "equipped" : !undefinedp(equiped[dk[i]]),
+            "handing"  : (dk[i] == handing_clean),
+        ]);
+    }
+
+    mapping data = ([
+        "encumbrance": enc,
+        "handing"    : handing_name,
+        "items"      : items,
+    ]);
+
+    string msg = "Char.Inventory " + json_encode(data);
     log_gmcp("Sending: " + msg);
     catch(efun::send_gmcp(msg));
 }
@@ -336,6 +420,10 @@ void gmcp(string req)
     else if (module == "Char.Score.Get" || module == "Char.Score")
     {
         send_char_score();
+    }
+    else if (module == "Char.Inventory.Get" || module == "Char.Inventory")
+    {
+        send_char_inventory();
     }
     else if (module == "Room.Info.Get" || module == "Room.Info")
     {

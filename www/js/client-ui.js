@@ -275,6 +275,57 @@ AdvancedMUDClient.prototype._renderCharScore = function (d) {
     }
 };
 
+// 渲染物品 tab：背包物品列表
+AdvancedMUDClient.prototype._renderCharInventory = function (d) {
+    const container = document.getElementById('charTab-inventory');
+    if (!container || !d) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // 将 ANSI 转义码转为 HTML span（复用终端渲染逻辑，保留服务端物品颜色设计）
+    const ansi = (s) => this.parseANSI(String(s == null ? '' : s));
+
+    let html = '';
+
+    // 负重信息
+    html += '<div class="char-inv-header">';
+    html += '<span>负重 ' + (d.encumbrance || 0) + '%</span>';
+    if (d.handing) html += '<span>手持: ' + ansi(d.handing) + '</span>';
+    html += '</div>';
+
+    var items = d.items || [];
+    if (!items.length) {
+        html += '<div class="char-quest-empty">身上没有任何东西。</div>';
+    } else {
+        html += '<ul class="char-inv-list">';
+        items.forEach(function (item) {
+            var cls = 'char-inv-item';
+            if (item.equipped) cls += ' equipped';
+            if (item.handing) cls += ' handing';
+            html += '<li class="' + cls + '">';
+            // 物品名带 ANSI 颜色，用 parseANSI 转为 HTML
+            html += ansi(item.name);
+            if (item.count > 1) {
+                html += '<span class="char-inv-count">' + esc(item.unit || '') + chineseNumber(item.count) + '</span>';
+            }
+            html += '</li>';
+        });
+        html += '</ul>';
+    }
+
+    container.innerHTML = html;
+};
+
+// 简易中文数字转换（用于物品数量显示）
+function chineseNumber(n) {
+    var digits = ['零','一','二','三','四','五','六','七','八','九'];
+    var units = ['','十','百','千','万'];
+    if (n < 10) return digits[n];
+    if (n < 100) {
+        var t = Math.floor(n / 10), o = n % 10;
+        return (t === 1 ? '' : digits[t]) + '十' + (o ? digits[o] : '');
+    }
+    return String(n);
+}
+
 // 全套导出：打包所有配置为 JSON 文件下载
 AdvancedMUDClient.prototype._exportAllConfigJSON = function () {
     const json = this.exportAllConfig();
@@ -2583,6 +2634,9 @@ AdvancedMUDClient.prototype.processGMCPData = function (data) {
                 break;
             case 'Char.Score':
                 this._renderCharScore(data.data);
+                break;
+            case 'Char.Inventory':
+                this._renderCharInventory(data.data);
                 break;
             case 'Room.Info':
                 this.updateRoomInfo(data.data);
