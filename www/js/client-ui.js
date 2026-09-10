@@ -1637,14 +1637,14 @@ AdvancedMUDClient.prototype._buildEditorApiPanel = function (container) {
         {
             sig: 'getVitals()',
             desc: '获取当前角色状态（返回副本）。',
-            params: ['返回: object — hp, max_hp, mp, max_mp, sp, max_sp 等'],
+            params: ['返回: object — hp/max_hp(气血) jing/max_jing(精气) jingli/max_jingli(精力) neili/max_neili(内力) food/max_food(食物) water/max_water(水) exp(经验) pot(潜能)'],
             example: 'const v = getVitals();\nif (v.hp < v.max_hp * 0.5) sendCommand("exert recover");'
         },
         {
             sig: 'getCurrentRoom()',
             desc: '获取当前房间信息。',
-            params: ['返回: object|null — name, exits, area, hash'],
-            example: 'const room = getCurrentRoom();\nlog("当前房间: " + room.name);'
+            params: ['返回: object|null — name(房间名) exits(出口方向数组) exit_targets(出口→房间hash) area(区域) hash(房间标识)；未连接时返回 null'],
+            example: 'const room = getCurrentRoom();\nlog("当前房间: " + room.name + " 出口: " + room.exits.join(","));'
         },
         {
             sig: 'registerTimer(ms, callback)',
@@ -1816,15 +1816,15 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
             name: 'getVitals',
             sig: 'getVitals()',
             desc: '获取当前角色状态数据（返回副本，不可修改内部状态）。',
-            params: ['返回: object — 包含 hp, max_hp, mp, max_mp, sp, max_sp 等字段'],
+            params: ['返回: object — hp/max_hp(气血) jing/max_jing(精气) jingli/max_jingli(精力) neili/max_neili(内力) food/max_food(食物) water/max_water(水) exp(经验) pot(潜能)'],
             example: 'const v = getVitals();\nif (v.hp < v.max_hp * 0.5) sendCommand("exert recover");'
         },
         {
             name: 'getCurrentRoom',
             sig: 'getCurrentRoom()',
             desc: '获取当前房间信息。',
-            params: ['返回: object|null — 包含 name, exits, area, hash 字段；未连接时返回 null'],
-            example: 'const room = getCurrentRoom();\nlog("当前房间: " + room.name);'
+            params: ['返回: object|null — name(房间名) exits(出口方向数组) exit_targets(出口→房间hash) area(区域) hash(房间标识)；未连接时返回 null'],
+            example: 'const room = getCurrentRoom();\nlog("当前房间: " + room.name + " 出口: " + room.exits.join(","));'
         },
         {
             name: 'registerTimer',
