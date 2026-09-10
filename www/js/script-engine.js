@@ -202,10 +202,21 @@ class ScriptEngine {
                 });
             },
 
-            // 日志输出到终端（system 类型）
+            // 日志输出到终端（system 类型），接受任意类型
             log: (msg) => {
-                if (typeof msg !== 'string') return;
-                this.client.appendMessage('📜 [' + scriptName + '] ' + msg, 'system');
+                let text;
+                if (typeof msg === 'string') {
+                    text = msg;
+                } else if (msg === null) {
+                    text = 'null';
+                } else if (msg === undefined) {
+                    text = 'undefined';
+                } else if (typeof msg === 'object') {
+                    try { text = JSON.stringify(msg, null, 2); } catch (e) { text = String(msg); }
+                } else {
+                    text = String(msg);
+                }
+                this.client.appendMessage('📜 [' + scriptName + '] ' + text, 'system');
             },
 
             // 检查当前是否已连接
