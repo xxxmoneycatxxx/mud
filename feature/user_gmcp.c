@@ -1,3 +1,5 @@
+#include <combat.h>
+
 #define GMCP_LOG 50
 
 nosave string *gmcp_log = ({});
@@ -82,6 +84,94 @@ protected void send_char_vitals()
         "pot"        : (int)ob->query("potential") - (int)ob->query("learned_points"),
     ]);
     string msg = "Char.Vitals " + json_encode(data);
+    log_gmcp("Sending: " + msg);
+    catch(efun::send_gmcp(msg));
+}
+
+// 构建并发送角色详细属性（score 命令的结构化数据，供 Web 角色面板使用）
+protected void send_char_score()
+{
+    object ob = this_object();
+    mapping my;
+    object weapon;
+    string skill_type;
+    int attack_points, dodge_points, parry_points;
+
+    if (!has_gmcp())
+        return;
+
+    my = ob->query_entire_dbase() || ([]);
+    if (!mapp(my) || my["max_qi"] < 1)
+        return;
+
+    // 战斗攻防计算（复用 score.c 逻辑）
+    if (objectp(weapon = ob->query_temp("weapon")))
+    {
+        skill_type = weapon->query("skill_type");
+        attack_points = COMBAT_D->skill_power(ob, skill_type, SKILL_USAGE_ATTACK);
+    }
+    else
+    {
+        skill_type = "unarmed";
+        attack_points = COMBAT_D->skill_power(ob, "unarmed", SKILL_USAGE_ATTACK);
+    }
+    parry_points = COMBAT_D->skill_power(ob, "parry", SKILL_USAGE_DEFENSE);
+    dodge_points = COMBAT_D->skill_power(ob, "dodge", SKILL_USAGE_DEFENSE);
+
+    mapping data = ([
+        // 基本信息
+        "name"       : ob->name(1) || "",
+        "rank"       : remove_ansi((string)RANK_D->query_rank(ob)) || "",
+        "gender"     : my["gender"] || "",
+        "age"        : (int)ob->query("age") || 0,
+        "born"       : my["born"] || "",
+        "born_family": my["born_family"] || "",
+        "character"  : my["character"] || "",
+        "family"     : mapp(my["family"]) ? (my["family"]["family_name"] || "") : "",
+        "master_name": mapp(my["family"]) ? (my["family"]["master_name"] || "") : "",
+
+        // 四维属性（先天 + 有效）
+        "str"        : my["str"] || 0,
+        "int"        : my["int"] || 0,
+        "con"        : my["con"] || 0,
+        "dex"        : my["dex"] || 0,
+        "eff_str"    : (int)ob->query_str(),
+        "eff_int"    : (int)ob->query_int(),
+        "eff_con"    : (int)ob->query_con(),
+        "eff_dex"    : (int)ob->query_dex(),
+
+        // 战斗数据
+        "attack"     : attack_points / 100 + 1,
+        "defense"    : (dodge_points + (weapon ? parry_points : parry_points / 10)) / 100 + 1,
+        "damage"     : weapon ? ((int)ob->query_temp("apply/damage") || 0) : ((int)ob->query_temp("apply/unarmed_damage") || 0),
+        "armor"      : (int)ob->query_temp("apply/armor") || 0,
+
+        // 进度与声望
+        "combat_exp" : my["combat_exp"] || 0,
+        "gongxian"   : my["gongxian"] || 0,
+        "score"      : my["score"] || 0,
+        "weiwang"    : my["weiwang"] || 0,
+        "shen"       : my["shen"] || 0,
+
+        // 武学评价（opinion 是嵌套 mapping，需逐层读取）
+        "op_unarmed" : mapp(my["opinion"]) ? (my["opinion"]["unarmed"] || "") : "",
+        "op_weapon"  : mapp(my["opinion"]) ? (my["opinion"]["weapon"] || "") : "",
+        "op_force"   : mapp(my["opinion"]) ? (my["opinion"]["force"] || "") : "",
+        "op_dodge"   : mapp(my["opinion"]) ? (my["opinion"]["dodge"] || "") : "",
+
+        // 特殊进度
+        "breakup"    : (int)my["breakup"],
+        "animaout"   : (int)my["animaout"],
+        "death"      : (int)my["death"],
+        "reborn"     : (int)my["reborn"],
+        "reborn_count": (int)ob->query("reborn/count"),
+
+        // 灵慧
+        "magic_points"   : my["magic_points"] || 0,
+        "magic_learned"  : my["magic_learned"] || 0,
+    ]);
+
+    string msg = "Char.Score " + json_encode(data);
     log_gmcp("Sending: " + msg);
     catch(efun::send_gmcp(msg));
 }
@@ -242,6 +332,10 @@ void gmcp(string req)
     if (module == "Char.Vitals.Get" || module == "Char.Vitals")
     {
         send_char_vitals();
+    }
+    else if (module == "Char.Score.Get" || module == "Char.Score")
+    {
+        send_char_score();
     }
     else if (module == "Room.Info.Get" || module == "Room.Info")
     {

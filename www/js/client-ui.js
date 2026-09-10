@@ -5,13 +5,13 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
     if (!qcContainer) return;
 
     // 通用动作键：中文标签 + tooltip 显示实际命令
-    // look 保留（房间描述常用），hp 移除（Gauge 已可视化显示）
+    // 资料/物品/技能/任务 改为打开角色面板标签页；环顾/玩家 仍发送到终端
     const actions = [
         { label: '环顾', cmd: 'look', title: 'look' },
-        { label: '资料', cmd: 'score', title: '角色属性' },
-        { label: '物品', cmd: 'i', title: '背包物品' },
-        { label: '技能', cmd: 'cha', title: '技能熟练' },
-        { label: '任务', cmd: 'quest', title: '任务列表' },
+        { label: '属性', cmd: 'score', title: '角色属性', panel: 'score' },
+        { label: '物品', cmd: 'i', title: '背包物品', panel: 'inventory' },
+        { label: '技能', cmd: 'cha', title: '技能熟练', panel: 'skills' },
+        { label: '任务', cmd: 'quest', title: '任务列表', panel: 'quests' },
         { label: '玩家', cmd: 'who', title: '在线玩家' },
     ];
 
@@ -20,10 +20,15 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
         btn.className = 'qc-btn';
         btn.textContent = a.label;
         btn.title = a.title + ' (' + a.cmd + ')';
-        btn.addEventListener('click', () => {
-            this.commandInput.value = a.cmd;
-            this.handleSendCommand();
-        });
+        if (a.panel) {
+            // 打开角色面板对应标签页
+            btn.addEventListener('click', () => this._openCharPanel(a.panel));
+        } else {
+            btn.addEventListener('click', () => {
+                this.commandInput.value = a.cmd;
+                this.handleSendCommand();
+            });
+        }
         qcContainer.appendChild(btn);
     });
 
@@ -37,6 +42,8 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
 
     // 设置面板事件绑定
     this._setupSettingsEvents();
+    // 角色面板事件绑定
+    this._setupCharPanelEvents();
 };
 
 // 设置面板：事件绑定（只调用一次）
@@ -95,6 +102,177 @@ AdvancedMUDClient.prototype._openSettings = function () {
 AdvancedMUDClient.prototype._closeSettings = function () {
     const overlay = document.getElementById('settingsOverlay');
     if (overlay) overlay.classList.remove('visible');
+};
+
+// ===== 角色面板：打开/关闭/切换标签页 =====
+
+// 角色面板事件绑定（只调用一次）
+AdvancedMUDClient.prototype._setupCharPanelEvents = function () {
+    const overlay = document.getElementById('charPanelOverlay');
+    const closeBtn = document.getElementById('charPanelClose');
+    const tabsContainer = document.getElementById('charPanelTabs');
+    if (!overlay) return;
+
+    // 关闭按钮
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => this._closeCharPanel());
+    }
+    // 点击背景关闭
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) this._closeCharPanel();
+    });
+    // 标签页切换
+    if (tabsContainer) {
+        tabsContainer.addEventListener('click', (e) => {
+            const tab = e.target.closest('.char-panel-tab');
+            if (!tab) return;
+            const tabName = tab.getAttribute('data-tab');
+            this._switchCharPanelTab(tabName);
+        });
+    }
+    // Esc 关闭
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.classList.contains('visible')) {
+            this._closeCharPanel();
+        }
+    });
+};
+
+// 打开角色面板，切到指定 tab，发送 GMCP 请求
+AdvancedMUDClient.prototype._openCharPanel = function (tabName) {
+    const overlay = document.getElementById('charPanelOverlay');
+    if (!overlay) return;
+    this._switchCharPanelTab(tabName || 'score');
+    overlay.classList.add('visible');
+    // 发送 GMCP 请求获取数据
+    this._requestCharPanelData(tabName);
+};
+
+// 关闭角色面板
+AdvancedMUDClient.prototype._closeCharPanel = function () {
+    const overlay = document.getElementById('charPanelOverlay');
+    if (overlay) overlay.classList.remove('visible');
+};
+
+// 切换角色面板标签页
+AdvancedMUDClient.prototype._switchCharPanelTab = function (tabName) {
+    // 更新标签按钮状态
+    const tabs = document.querySelectorAll('.char-panel-tab');
+    tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-tab') === tabName));
+    // 更新内容区显示
+    const contents = document.querySelectorAll('.char-panel-content');
+    contents.forEach(c => c.classList.remove('active'));
+    const target = document.getElementById('charTab-' + tabName);
+    if (target) target.classList.add('active');
+};
+
+// 根据 tabName 发送对应的 GMCP 请求
+AdvancedMUDClient.prototype._requestCharPanelData = function (tabName) {
+    const moduleMap = {
+        score: 'Char.Score.Get',
+        inventory: 'Char.Inventory.Get',
+        skills: 'Char.Skills.Get',
+        quests: 'Char.Quests.Get'
+    };
+    const module = moduleMap[tabName];
+    if (module && this.sendGMCP) {
+        this.sendGMCP(module, {});
+    }
+};
+
+// 渲染属性 tab：角色详细属性
+AdvancedMUDClient.prototype._renderCharScore = function (d) {
+    const container = document.getElementById('charTab-score');
+    if (!container || !d) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    let html = '';
+
+    // —— 基本信息 ——
+    html += '<div class="char-attr-section">';
+    html += '<div class="char-attr-section-title">基本信息</div>';
+    html += '<div class="char-attr-grid">';
+    html += _attrRow('姓名', esc(d.name) + (d.rank ? ' <span style="color:#888;font-size:10px;">' + esc(d.rank) + '</span>' : ''));
+    html += _attrRow('性别', esc(d.gender));
+    html += _attrRow('年龄', d.age + ' 岁');
+    if (d.character) html += _attrRow('天性', esc(d.character));
+    if (d.born || d.born_family) html += _attrRow('出身', esc(d.born_family || d.born));
+    if (d.family) html += _attrRow('门派', esc(d.family));
+    if (d.master_name) html += _attrRow('师父', esc(d.master_name));
+    html += '</div></div>';
+
+    // —— 四维属性 ——
+    html += '<div class="char-attr-section">';
+    html += '<div class="char-attr-section-title">四维属性</div>';
+    html += '<div class="char-attr-grid">';
+    html += _attrRow('膂力', _attrPair(d.str, d.eff_str));
+    html += _attrRow('悟性', _attrPair(d.int, d.eff_int));
+    html += _attrRow('根骨', _attrPair(d.con, d.eff_con));
+    html += _attrRow('身法', _attrPair(d.dex, d.eff_dex));
+    html += '</div></div>';
+
+    // —— 战斗数据 ——
+    html += '<div class="char-attr-section">';
+    html += '<div class="char-attr-section-title">战斗数据</div>';
+    html += '<div class="char-attr-grid">';
+    html += _attrRow('攻击', d.attack || 0);
+    html += _attrRow('防御', d.defense || 0);
+    html += _attrRow('伤害', d.damage ?? 0);
+    html += _attrRow('护甲', d.armor ?? 0);
+    html += '</div></div>';
+
+    // —— 武学评价 ——
+    var ops = [];
+    if (d.op_unarmed) ops.push({ label: '拳脚', val: d.op_unarmed });
+    if (d.op_weapon)  ops.push({ label: '兵器', val: d.op_weapon });
+    if (d.op_force)   ops.push({ label: '内功', val: d.op_force });
+    if (d.op_dodge)   ops.push({ label: '轻功', val: d.op_dodge });
+    if (ops.length) {
+        html += '<div class="char-attr-section">';
+        html += '<div class="char-attr-section-title">武学评价</div>';
+        html += '<div class="char-attr-grid">';
+        ops.forEach(function (o) { html += _attrRow(o.label, esc(o.val)); });
+        html += '</div></div>';
+    }
+
+    // —— 进度与声望 ——
+    html += '<div class="char-attr-section">';
+    html += '<div class="char-attr-section-title">进度与声望</div>';
+    html += '<div class="char-attr-grid">';
+    html += _attrRow('实战经验', (d.combat_exp || 0).toLocaleString(), 'highlight');
+    html += _attrRow('门派贡献', d.gongxian);
+    html += _attrRow('江湖阅历', d.score, 'highlight');
+    html += _attrRow('江湖威望', d.weiwang, 'highlight');
+    html += _attrRow(d.shen >= 0 ? '正气' : '邪气', Math.abs(d.shen || 0));
+    html += _attrRow('灵慧', (d.magic_points || 0) - (d.magic_learned || 0), 'good');
+    html += '</div></div>';
+
+    // —— 特殊进度 ——
+    var specials = [];
+    if (d.breakup) specials.push('任督二脉');
+    if (d.animaout) specials.push('元婴出世');
+    if (d.death) specials.push('生死玄关');
+    if (d.reborn) specials.push('转世重生' + (d.reborn_count > 1 ? ' ×' + d.reborn_count : ''));
+    if (specials.length) {
+        html += '<div class="char-attr-section">';
+        html += '<div class="char-attr-section-title">特殊进度</div>';
+        html += '<div class="char-attr-grid">';
+        specials.forEach(function (s) { html += _attrRow(s, '<span style="color:#4f4">○</span>'); });
+        html += '</div></div>';
+    }
+
+    container.innerHTML = html;
+
+    // 内部辅助函数
+    function _attrRow(label, valHtml, cls) {
+        var valClass = cls ? ' char-attr-val ' + cls : ' char-attr-val';
+        return '<div class="char-attr-row"><span class="char-attr-label">' + label + '</span><span class="' + valClass.trim() + '">' + valHtml + '</span></div>';
+    }
+    function _attrPair(base, eff) {
+        if (eff > base) return '<span>' + base + '</span> → <span style="color:#cc0">' + eff + '</span>';
+        if (eff < base) return '<span>' + base + '</span> → <span style="color:#888">' + eff + '</span>';
+        return String(base);
+    }
 };
 
 // 全套导出：打包所有配置为 JSON 文件下载
@@ -2402,6 +2580,9 @@ AdvancedMUDClient.prototype.processGMCPData = function (data) {
             case 'Char.Vitals':
                 this._vitalsReceived = true;
                 this.updateCharacterStatus(data.data);
+                break;
+            case 'Char.Score':
+                this._renderCharScore(data.data);
                 break;
             case 'Room.Info':
                 this.updateRoomInfo(data.data);

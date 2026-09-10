@@ -1468,6 +1468,279 @@ body {
     }
 }
 
+/* ===== 角色面板（属性/物品/技能/任务） ===== */
+.char-panel-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+}
+.char-panel-overlay.visible { display: flex; }
+.char-panel-modal {
+    width: min(520px, 92vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    background: #020502;
+    border: 1px solid #1a3a1a;
+    outline: 1px solid #0a1a0a;
+    outline-offset: 3px;
+    box-shadow:
+        0 0 30px rgba(0, 0, 0, 0.7),
+        0 0 4px rgba(0, 255, 0, 0.08);
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    color: #0f0;
+}
+.char-panel-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    color: #cc0;
+    font-weight: bold;
+    letter-spacing: 3px;
+    border-bottom: 1px solid #1a3a1a;
+    text-shadow: 0 0 4px rgba(200, 200, 0, 0.3);
+}
+.char-panel-close {
+    background: none;
+    border: 1px solid #333;
+    color: #888;
+    font-size: 14px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 3px;
+}
+.char-panel-close:hover { color: #f00; border-color: #f00; }
+
+/* 标签栏 */
+.char-panel-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #1a3a1a;
+    padding: 0;
+}
+.char-panel-tab {
+    flex: 1;
+    padding: 5px 4px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #555;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.char-panel-tab:hover { color: #0f0; }
+.char-panel-tab.active {
+    color: #0f0;
+    border-bottom-color: #0f0;
+}
+
+/* 内容区 */
+.char-panel-body {
+    padding: 0;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 120px;
+}
+.char-panel-content {
+    display: none;
+    padding: 10px 12px;
+}
+.char-panel-content.active { display: block; }
+.char-panel-loading {
+    color: #555;
+    font-size: 12px;
+    text-align: center;
+    padding: 30px 0;
+}
+.char-panel-footer {
+    padding: 5px 10px;
+    border-top: 1px solid #1a3a1a;
+    font-size: 9px;
+    color: #666;
+}
+
+/* 属性 tab：两列网格 */
+.char-attr-section {
+    margin-bottom: 10px;
+}
+.char-attr-section-title {
+    color: #cc0;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+}
+.char-attr-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+}
+.char-attr-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 2px 0;
+    border-bottom: 1px solid #0f0f0f;
+}
+.char-attr-label {
+    color: #bbb;
+    font-size: 11px;
+}
+.char-attr-val {
+    color: #0f0;
+    font-size: 12px;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+}
+.char-attr-val.highlight { color: #cc0; }
+.char-attr-val.good { color: #4f4; }
+
+/* 物品 tab：列表 */
+.char-inv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    color: #bbb;
+    font-size: 11px;
+}
+.char-inv-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.char-inv-item {
+    display: flex;
+    align-items: center;
+    padding: 3px 0;
+    border-bottom: 1px solid #0f0f0f;
+    font-size: 12px;
+    color: #0f0;
+}
+.char-inv-item.equipped {
+    color: #0cc;
+}
+.char-inv-item.equipped::before {
+    content: '□';
+    color: #0cc;
+    margin-right: 6px;
+    font-size: 10px;
+}
+.char-inv-item:not(.equipped)::before {
+    content: ' ';
+    margin-right: 6px;
+}
+.char-inv-count {
+    color: #888;
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+/* 技能 tab：分组 + 进度条 */
+.char-skill-group {
+    margin-bottom: 10px;
+}
+.char-skill-group-title {
+    color: #cc0;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+}
+.char-skill-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    border-bottom: 1px solid #0f0f0f;
+}
+.char-skill-name {
+    color: #0f0;
+    font-size: 11px;
+    min-width: 100px;
+    flex-shrink: 0;
+}
+.char-skill-name.mapped { color: #0cc; }
+.char-skill-bar-wrap {
+    flex: 1;
+    height: 5px;
+    background: #1a1a1a;
+    border-radius: 1px;
+    overflow: hidden;
+    border: 1px solid #222;
+}
+.char-skill-bar {
+    height: 100%;
+    background: #1a6a1a;
+    transition: width 0.3s ease;
+}
+.char-skill-lvl {
+    color: #ccc;
+    font-size: 10px;
+    min-width: 56px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 任务 tab：卡片 */
+.char-quest-section {
+    margin-bottom: 12px;
+}
+.char-quest-section-title {
+    color: #cc0;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+}
+.char-quest-card {
+    background: #0a0f0a;
+    border: 1px solid #1a3a1a;
+    border-radius: 3px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+}
+.char-quest-card .quest-title {
+    color: #0f0;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+.char-quest-card .quest-desc {
+    color: #bbb;
+    font-size: 11px;
+    line-height: 1.5;
+}
+.char-quest-card .quest-desc .hi-red { color: #f44; }
+.char-quest-card .quest-desc .hi-green { color: #4f4; }
+.char-quest-card .quest-desc .hi-cyan { color: #0cc; }
+.char-quest-empty {
+    color: #555;
+    font-size: 11px;
+    padding: 8px 0;
+}
+.char-quest-daily-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 11px;
+}
+.char-quest-daily-item .done { color: #4f4; }
+.char-quest-daily-item .undone { color: #f44; }
+
 /* ===== 输入区紧凑化（增大终端显示区域） ===== */
 .command-input {
     padding: 8px 35px 8px 6px;

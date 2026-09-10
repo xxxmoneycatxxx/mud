@@ -140,6 +140,39 @@
         </div>
     </div>
 
+    <!-- 角色面板：属性/物品/技能/任务 标签页模态框 -->
+    <div class="char-panel-overlay" id="charPanelOverlay">
+        <div class="char-panel-modal">
+            <div class="char-panel-titlebar">
+                <span>〔 角色面板 〕</span>
+                <button class="char-panel-close" id="charPanelClose" title="关闭 (Esc)">✕</button>
+            </div>
+            <div class="char-panel-tabs" id="charPanelTabs">
+                <button class="char-panel-tab active" data-tab="score">属性</button>
+                <button class="char-panel-tab" data-tab="inventory">物品</button>
+                <button class="char-panel-tab" data-tab="skills">技能</button>
+                <button class="char-panel-tab" data-tab="quests">任务</button>
+            </div>
+            <div class="char-panel-body">
+                <div class="char-panel-content active" id="charTab-score">
+                    <div class="char-panel-loading">加载中…</div>
+                </div>
+                <div class="char-panel-content" id="charTab-inventory">
+                    <div class="char-panel-loading">加载中…</div>
+                </div>
+                <div class="char-panel-content" id="charTab-skills">
+                    <div class="char-panel-loading">加载中…</div>
+                </div>
+                <div class="char-panel-content" id="charTab-quests">
+                    <div class="char-panel-loading">加载中…</div>
+                </div>
+            </div>
+            <div class="char-panel-footer">
+                <span>Esc 关闭 · 点击标签页切换</span>
+            </div>
+        </div>
+    </div>
+
     <!-- CodeMirror 5 脚本编辑器 -->
     <script src="lib/codemirror/codemirror.js"></script>
     <script src="lib/codemirror/mode/javascript/javascript.js"></script>
