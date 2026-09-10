@@ -167,6 +167,7 @@ class ScriptEngine {
                 }
                 cmd = cmd.trim();
                 if (!cmd) return;
+                this.client.appendMessage('> ' + cmd);
                 this.client.sendCommand(cmd);
             },
 
@@ -277,7 +278,10 @@ class ScriptEngine {
                         let cmd = cmds[i];
                         if (typeof cmd !== 'string') cmd = String(cmd);
                         cmd = cmd.trim();
-                        if (cmd) this.client.sendCommand(cmd);
+                        if (cmd) {
+                            this.client.appendMessage('> ' + cmd);
+                            this.client.sendCommand(cmd);
+                        }
                         if (i < cmds.length - 1 && delay > 0) {
                             await new Promise((resolve) => {
                                 const id = setTimeout(() => {
