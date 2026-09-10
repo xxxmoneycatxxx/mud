@@ -287,7 +287,7 @@ void gmcp_vitals_update()
 }
 
 // 构建并发送房间信息
-protected void send_room_info()
+public void send_room_info()
 {
     object ob = environment(this_object());
     if (!ob) return;
