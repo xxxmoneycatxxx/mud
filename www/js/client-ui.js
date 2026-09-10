@@ -202,7 +202,13 @@ AdvancedMUDClient.prototype._switchCharPanelTab = function (tabName) {
     const contents = document.querySelectorAll('.char-panel-content');
     contents.forEach(c => c.classList.remove('active'));
     const target = document.getElementById('charTab-' + tabName);
-    if (target) target.classList.add('active');
+    if (target) {
+        target.classList.add('active');
+        // 如果内容区仍显示"加载中…"，说明数据尚未加载，发送 GMCP 请求
+        if (target.querySelector('.char-panel-loading')) {
+            this._requestCharPanelData(tabName);
+        }
+    }
 };
 
 // 根据 tabName 发送对应的 GMCP 请求
