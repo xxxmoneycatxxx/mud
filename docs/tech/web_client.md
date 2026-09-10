@@ -262,16 +262,19 @@ www/
 
 ## 帮助浏览器
 
-复古 ASCII 风格模态框，分类导航 + 主题列表：
+复古 ASCII 风格模态框，支持分类导航 + 模态框内阅读 + 本地全文检索：
 
-- **数据源**：优先由服务端 GMCP `Help.Topics` 动态下发，回退到内置快照
-- **全文检索**：输入关键词发送 `Help.Search.Get` GMCP 请求，服务端返回匹配结果；3 秒无响应则回退到本地名称过滤（大小写不敏感）
-- **交叉引用**：文档正文中的 `help <主题>` 自动渲染为可点击链接（白名单校验避免误判）
-- **键盘操作**：F1 开关、Esc 关闭、/ 聚焦搜索、↑↓ 选择、Enter 查看
+- **数据源**：优先加载 `/storage/help.json`（服务端 `help_export_d.c` 导出，fetch + localStorage 24h 缓存）；不可用时回退到 GMCP `Help.Topics` + 内置快照
+- **阅读器**：点击主题在模态框内直接渲染 HTML 内容（`$XXX$` 颜色标记已在服务端转为 `<span style="...">`），不再向终端发 `help xxx`；支持历史栈多级返回
+- **全文检索**：help.json 可用时本地遍历 `search_text` 字段即时检索（大小写不敏感，主题名匹配优先排序）；不可用时发送 `Help.Search.Get` GMCP 请求，3 秒无响应回退到本地名称过滤
+- **交叉引用**：文档正文中的 `help <主题>` 自动渲染为可点击链接（白名单校验），点击在阅读器内跳转
+- **键盘操作**：F1 开关、Esc 阅读器内返回/关闭、/ 聚焦搜索、↑↓ 选择、Enter 查看
 - **登录门控**：未进入游戏时隐藏按钮并屏蔽 F1，避免把 `help` 命令灌进登录提示（见上文「登录门控」）
 - **安全**：主题名/描述插入 HTML 前经 `escHtml()` 转义，防御 XSS
 
-服务端 `adm/daemons/helpd.c` 首次检索时构建内存索引（去色 + 小写），后续检索直接查缓存，避免每次遍历 186 个 `/help/` 文件。管理员可在 `/help/` 目录变更后调用 `reset_help_index()` 重建索引。
+服务端组件：
+- `adm/daemons/help_export_d.c`：启动 30 秒自动导出 `/help/` 全部文件到 `/www/storage/help.json`；`$XXX$` → HTML（`color_filter` + `help_ansi_to_html`），同时生成去色纯文本 `search_text` 供搜索；管理员可执行 `exporthelp` 手动刷新
+- `adm/daemons/helpd.c`：GMCP 搜索回退路径，首次检索构建内存索引（去色 + 小写），后续直接查缓存；`reset_help_index()` 重建索引
 
 ## ANSI 渲染
 

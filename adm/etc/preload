@@ -21,6 +21,7 @@
 /adm/daemons/network/messaged
 /adm/daemons/backupd
 /adm/daemons/mapd
+/adm/daemons/help_export_d
 /adm/daemons/map_export_d
 /adm/daemons/familyd
 /adm/daemons/questd

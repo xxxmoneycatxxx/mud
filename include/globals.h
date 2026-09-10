@@ -74,6 +74,7 @@
 #define LEAGUE_D        "/adm/daemons/leagued"
 #define LOGIN_D         "/adm/daemons/logind"
 #define MAP_D           "/adm/daemons/mapd"
+#define HELP_EXPORT_D   "/adm/daemons/help_export_d"
 #define MAP_EXPORT_D    "/adm/daemons/map_export_d"
 #define MASTER_D        "/adm/daemons/masterd"
 #define MESSAGE_D       "/adm/daemons/network/messaged"

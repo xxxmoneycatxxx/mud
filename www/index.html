@@ -83,10 +83,10 @@
         </div>
     </div>
 
-    <!-- 帮助浏览模态框：复古 ASCII 风格，导航型（选中主题即在终端执行 help <主题>） -->
+    <!-- 帮助浏览模态框：复古 ASCII 风格，支持分类导航 + 模态框内阅读 -->
     <div class="help-overlay" id="helpOverlay">
         <div class="help-modal" id="helpModal" tabindex="-1">
-            <div class="help-titlebar">〔 江湖帮助 〕</div>
+            <div class="help-titlebar" id="helpTitlebar">〔 江湖帮助 〕</div>
             <div class="help-searchbar">
                 <span class="help-prompt">&gt;</span>
                 <input type="text" id="helpSearch" class="help-search" placeholder="搜索帮助文档内容…（按 / 聚焦）" autocomplete="off">
@@ -94,6 +94,13 @@
             <div class="help-content">
                 <div class="help-cats" id="helpCats"></div>
                 <div class="help-topics" id="helpTopics"></div>
+                <div class="help-reader" id="helpReader" style="display:none">
+                    <div class="help-reader-toolbar" id="helpReaderToolbar">
+                        <button class="help-reader-back" id="helpReaderBack">← 返回列表</button>
+                        <span class="help-reader-title" id="helpReaderTitle"></span>
+                    </div>
+                    <div class="help-reader-body" id="helpReaderBody"></div>
+                </div>
             </div>
             <div class="help-statusbar" id="helpFooter">↑↓ 选择 · Enter 查看 · / 搜索 · Esc 关闭</div>
         </div>
