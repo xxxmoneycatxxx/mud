@@ -58,6 +58,7 @@
 #define COMMAND_D       "/adm/daemons/commandd"
 #define CONFIG_D        "/adm/daemons/configd"
 #define CPU_D           "/adm/daemons/cpud"
+#define SELF_CHECK_D    "/adm/daemons/selfcheckd"
 #define DBASE_D         "/adm/daemons/dbased"
 #define EMOTE_D         "/adm/daemons/emoted"
 #define ENCHASE_D       "/adm/daemons/enchased"

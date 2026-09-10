@@ -1,4 +1,5 @@
 /adm/daemons/securityd
+/adm/daemons/selfcheckd
 /adm/daemons/timed
 /adm/daemons/logind
 /adm/daemons/virtuald
@@ -17,7 +18,7 @@
 /adm/daemons/closed
 /adm/daemons/pkd
 /adm/daemons/memoryd
-/adm/daemons/messaged
+/adm/daemons/network/messaged
 /adm/daemons/backupd
 /adm/daemons/mapd
 /adm/daemons/map_export_d
