@@ -167,6 +167,8 @@ class ScriptEngine {
                 }
                 cmd = cmd.trim();
                 if (!cmd) return;
+                // 未进入游戏（登录/注册界面）时静默忽略，避免脚本把命令灌进账号提示
+                if (!this.client._canAutoSend()) return;
                 this.client.appendMessage('> ' + cmd);
                 this.client.sendCommand(cmd);
             },
@@ -279,8 +281,11 @@ class ScriptEngine {
                         if (typeof cmd !== 'string') cmd = String(cmd);
                         cmd = cmd.trim();
                         if (cmd) {
-                            this.client.appendMessage('> ' + cmd);
-                            this.client.sendCommand(cmd);
+                            // 同 sendCommand：未进入游戏时不发送，但继续按间隔推进以保持批量节奏
+                            if (this.client._canAutoSend()) {
+                                this.client.appendMessage('> ' + cmd);
+                                this.client.sendCommand(cmd);
+                            }
                         }
                         if (i < cmds.length - 1 && delay > 0) {
                             await new Promise((resolve) => {

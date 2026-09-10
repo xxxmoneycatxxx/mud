@@ -101,6 +101,9 @@ AdvancedMUDClient.prototype.setupHelpModal = function () {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'F1') {
             e.preventDefault();
+            // 未进入游戏时屏蔽帮助入口：查阅主题需向终端发送 help 命令，
+            // 在登录/注册界面执行会把命令灌进账号提示
+            if (!this._loginDone && !this.helpOverlay.classList.contains('visible')) return;
             if (this.helpOverlay.classList.contains('visible')) this.closeHelpModal();
             else this.openHelpModal();
             return;
@@ -233,6 +236,10 @@ AdvancedMUDClient.prototype.helpOpenTopic = function (topic) {
     if (!topic) return;
     if (!this.connected) {
         this.helpFooter.textContent = '请先连接游戏，再查看帮助文档';
+        return;
+    }
+    if (!this._loginDone) {
+        this.helpFooter.textContent = '请先登录进入游戏，再查看帮助文档';
         return;
     }
     this.closeHelpModal();

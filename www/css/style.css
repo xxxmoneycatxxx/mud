@@ -715,6 +715,19 @@ body {
     border-top: 2px solid #0a1a0a;
     margin: 0 6px 4px 6px;
 }
+
+/* ===== 登录门控：未进入游戏时只保留底部连接状态 =====
+   body 上的 .logged-in 由 client-ui.js 的 _markLoggedIn / _resetLoginGate 增删。
+   登录、注册、创建角色阶段不渲染状态栏/小地图/快捷命令/帮助入口，
+   既避免误导玩家往登录提示里灌游戏指令，也避免用上次会话的缓存假位置渲染地图。
+   用 !important 兜底：mapper.init() 等路径可能在登录前就加上 .visible */
+body:not(.logged-in) .status-panel,
+body:not(.logged-in) .minimap-panel,
+body:not(.logged-in) .map-fullscreen,
+body:not(.logged-in) .quick-commands,
+body:not(.logged-in) #helpBtn {
+    display: none !important;
+}
 .quick-commands {
     display: none;
     flex: 1;
@@ -743,7 +756,7 @@ body {
     border-color: #0f0;
     text-shadow: 0 0 6px rgba(0, 255, 0, 0.3);
 }
-/* 帮助按钮：底部条最左、常驻（不随连接状态隐藏） */
+/* 帮助按钮：底部条最左（未登录时由登录门控隐藏，见上方 body:not(.logged-in) 规则） */
 .help-btn {
     flex-shrink: 0;
     margin-left: 12px;

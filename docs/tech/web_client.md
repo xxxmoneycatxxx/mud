@@ -50,6 +50,23 @@ www/
 | SUPPRESS_GO_AHEAD (3) | 抑制 Go Ahead |
 | MSP (90) | MUD 声音协议 |
 
+### 登录门控
+
+「连接成功」不等于「进入游戏」。登录、注册、创建角色阶段，游戏专属 UI 与自动命令一律收起：
+
+| 机制 | 实现 |
+|------|------|
+| 界面隐藏 | `body` 上的 `.logged-in` 类；CSS 以 `body:not(.logged-in)` + `display:none !important` 隐藏状态栏、小地图、地图全屏层、快捷命令、帮助按钮 |
+| 面板放行 | `_markLoggedIn()`（`client-ui.js`）检测到进入游戏后加类，并给状态栏/快捷命令加 `.visible` |
+| 登录信号 | 任一命中即可：① 进房自动 look 的房间描述 ② GMCP `Char.Vitals` ③ GMCP `Room.Info`（登录流程末尾服务端必推）④ `hp` 文本解析成功 |
+| 自动命令 | `_canAutoSend()` = 已连接 且 已进入游戏；定时器回调、触发器匹配、脚本 `sendCommand`/`sendCommands` 统一走这一道闸 |
+| 手输命令 | 不受门控影响，登录界面照常输入账号密码 |
+| 断连复位 | `_resetLoginGate()` 在 `onclose`/`forceCleanup` 移除类并关闭依赖服务端数据的模态框（帮助、角色面板、任务详情）；设置面板是纯本地配置，不关 |
+
+帮助入口（按钮 + F1）在未登录时一并屏蔽：查阅主题需向终端发送 `help <主题>`，在登录界面执行会把命令灌进账号提示。
+
+门控不会被误触发：`gmcp()` apply 只存在于 `clone/user/user.c`（继承 `F_USER_GMCP`），登录对象没有该 apply，连接阶段客户端发出的 `Client.GUI`/`Char.Vitals.Get` 在登录前得不到响应。
+
 ## GMCP 数据流
 
 ### 初始化
@@ -251,6 +268,7 @@ www/
 - **全文检索**：输入关键词发送 `Help.Search.Get` GMCP 请求，服务端返回匹配结果
 - **交叉引用**：文档正文中的 `help <主题>` 自动渲染为可点击链接（白名单校验避免误判）
 - **键盘操作**：F1 开关、Esc 关闭、/ 聚焦搜索、↑↓ 选择、Enter 查看
+- **登录门控**：未进入游戏时隐藏按钮并屏蔽 F1，避免把 `help` 命令灌进登录提示（见上文「登录门控」）
 
 ## ANSI 渲染
 

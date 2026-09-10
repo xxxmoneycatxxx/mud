@@ -2958,6 +2958,7 @@ AdvancedMUDClient.prototype.processGMCPData = function (data) {
         switch (data.module) {
             case 'Char.Vitals':
                 this._vitalsReceived = true;
+                this._markLoggedIn();
                 this.updateCharacterStatus(data.data);
                 break;
             case 'Char.Score':
@@ -3066,6 +3067,9 @@ AdvancedMUDClient.prototype.updateCharacterStatus = function (vitals) {
 AdvancedMUDClient.prototype.updateRoomInfo = function (roomInfo) {
     // 存储最新房间信息，供脚本 API getCurrentRoom() 使用
     this._lastRoomInfo = roomInfo;
+
+    // 收到房间信息说明已在游戏内，作为登录完成的补充信号
+    this._markLoggedIn();
 
     const panel = document.getElementById('minimapPanel');
     const title = document.getElementById('minimapTitle');
@@ -3223,6 +3227,7 @@ AdvancedMUDClient.prototype.parseHpOutput = function (text) {
     // 避免其他含【标签】数字的文本部分匹配后覆盖状态栏
     if (stats.hp !== undefined && stats.jing !== undefined) {
         this._vitalsReceived = true;
+        this._markLoggedIn();
         this.updateCharacterStatus(stats);
     }
 };
@@ -3400,12 +3405,51 @@ AdvancedMUDClient.prototype.sendCommand = function (command) {
     this.ws.send(command);
 };
 
+// ===== 登录门控：未进入游戏（登录/注册/创建角色界面）时不渲染游戏专属 UI、不发自动命令 =====
+// 连接成功不等于登录成功，故这些面板改由「已进入游戏」驱动，信号任一命中即可：
+// 1) 进房自动 look 的房间描述 2) GMCP Char.Vitals 推送 3) GMCP Room.Info 推送 4) hp 文本解析成功
+
+// 标记已进入游戏：放出游戏专属面板，并放行自动命令
+AdvancedMUDClient.prototype._markLoggedIn = function () {
+    if (this._loginDone) return;
+    this._loginDone = true;
+    document.body.classList.add('logged-in');
+    const statusBar = document.getElementById('statusBar');
+    const quickCmds = document.getElementById('quickCommands');
+    if (statusBar) statusBar.classList.add('visible');
+    if (quickCmds) quickCmds.classList.add('visible');
+};
+
+// 收回登录门控：断连/重连时隐藏游戏专属 UI，并停止放行自动命令
+// 登录标志由本函数统一复位，调用方不需再单独置 _loginDone
+AdvancedMUDClient.prototype._resetLoginGate = function () {
+    this._loginDone = false;
+    document.body.classList.remove('logged-in');
+    const statusBar = document.getElementById('statusBar');
+    const quickCmds = document.getElementById('quickCommands');
+    const minimap = document.getElementById('minimapPanel');
+    if (statusBar) statusBar.classList.remove('visible');
+    if (quickCmds) quickCmds.classList.remove('visible');
+    if (minimap) minimap.classList.remove('visible');
+    // 关闭依赖服务端数据的模态框（数据已失效）；设置面板是纯本地配置，不关
+    if (this.helpOverlay && this.helpOverlay.classList.contains('visible')) this.closeHelpModal();
+    this._closeCharPanel();
+    const questDetail = document.getElementById('questDetailOverlay');
+    if (questDetail) questDetail.classList.remove('visible');
+};
+
+// 自动命令（定时器/触发器/脚本）的统一放行条件：已连接且已进入游戏
+// 玩家手输命令不走这里，登录界面照常可以输入账号密码
+AdvancedMUDClient.prototype._canAutoSend = function () {
+    return !!this.connected && !!this._loginDone;
+};
+
 AdvancedMUDClient.prototype.appendMessage = function (message, className) {
     if (className === undefined) className = '';
     // 检测登录完成：进入游戏后自动 look 的房间描述是可靠信号
     // 避免在登录界面误发 hp 等游戏指令
     if (!this._loginDone && /这里明显的出口是|这里唯一的出口是|这里没有任何明显的出路的/.test(message)) {
-        this._loginDone = true;
+        this._markLoggedIn();
         if (!this._vitalsReceived && !this._hpFallbackSent) {
             this._hpFallbackSent = true;
             setTimeout(() => {
@@ -3486,7 +3530,7 @@ AdvancedMUDClient.prototype._checkSpeedwalkTriggers = function (message) {
 
 // 触发器处理：遍历规则表，匹配则自动发送命令
 AdvancedMUDClient.prototype._processTriggers = function (message) {
-    if (!this._triggers || !this.connected) return;
+    if (!this._triggers || !this._canAutoSend()) return;
     const now = Date.now();
     for (const trigger of this._triggers) {
         if (!trigger.enabled) continue;

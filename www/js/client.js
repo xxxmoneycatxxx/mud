@@ -201,15 +201,11 @@ class AdvancedMUDClient {
         // 清空终端缓冲区，避免残留消息
         this.terminal.innerHTML = '';
 
-        // 隐藏状态栏和快捷命令
-        const statusBar = document.getElementById('statusBar');
-        const quickCmds = document.getElementById('quickCommands');
-        if (statusBar) statusBar.classList.remove('visible');
-        if (quickCmds) quickCmds.classList.remove('visible');
+        // 收回登录门控：隐藏状态栏/快捷命令/小地图，移除 body.logged-in，并复位 _loginDone
+        this._resetLoginGate();
 
         this._vitalsReceived = false;
         this._gmcpInitSent = false;
-        this._loginDone = false;
         this._hpFallbackSent = false;
         this._lastVitals = null;
         this.connected = false;
@@ -290,16 +286,14 @@ class AdvancedMUDClient {
                 this.appendMessage('═══════════════════════════════════════', 'system');
                 this.appendMessage('', '');
 
-                // 显示状态栏和快捷命令
-                const statusBar = document.getElementById('statusBar');
-                const quickCmds = document.getElementById('quickCommands');
-                if (statusBar) statusBar.classList.add('visible');
-                if (quickCmds) quickCmds.classList.add('visible');
+                // 游戏专属面板（状态栏/快捷命令/小地图/帮助）不在这里放出：
+                // 连接成功不等于登录成功，登录界面提前显示会误导玩家发出游戏指令
+                // 统一由 _markLoggedIn 在检测到进入游戏后放行（见 client-ui.js 登录门控）
 
                 // 启动心跳检测
                 this.startHeartbeat();
 
-                // 启动所有已启用的定时器
+                // 注册定时器；发送前由 _canAutoSend 校验，未进入游戏时不会向登录提示灌命令
                 this._startAllTimers();
 
                 // 延迟初始化 Telnet 协商，确保连接稳定（协商过程不再打扰用户，仅出错时提示）
@@ -329,13 +323,8 @@ class AdvancedMUDClient {
                 this.commandInput.disabled = true;
                 this.sendBtn.disabled = true;
 
-                // 隐藏状态栏、快捷命令和小地图
-                const statusBar = document.getElementById('statusBar');
-                const quickCmds = document.getElementById('quickCommands');
-                const minimap = document.getElementById('minimapPanel');
-                if (statusBar) statusBar.classList.remove('visible');
-                if (quickCmds) quickCmds.classList.remove('visible');
-                if (minimap) minimap.classList.remove('visible');
+                // 收回登录门控：隐藏状态栏、快捷命令和小地图
+                this._resetLoginGate();
 
                 this.appendMessage('══ 连接已断开 ══', 'error');
 
@@ -900,7 +889,8 @@ class AdvancedMUDClient {
     _startTimer(timer) {
         if (!timer.enabled || this._timerIntervals.has(timer.name)) return;
         const id = setInterval(() => {
-            if (this.connected) {
+            // 已连接且已进入游戏才发送，避免登录/注册界面被定时命令污染
+            if (this._canAutoSend()) {
                 this.sendCommand(timer.command);
             }
         }, timer.interval * 1000);
