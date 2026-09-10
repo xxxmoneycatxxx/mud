@@ -27,6 +27,7 @@ services:
       - TZ=Asia/Shanghai
       - LANG=zh_CN.UTF-8
     restart: unless-stopped
+    stop_grace_period: 30s
     stdin_open: true
     tty: true
 
@@ -47,5 +48,6 @@ services:
       - TZ=Asia/Shanghai
       - LANG=zh_CN.UTF-8
     command: ["config.cfg", "-d"]
+    stop_grace_period: 30s
     stdin_open: true
     tty: true

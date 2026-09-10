@@ -38,14 +38,14 @@ void create()
     if (! restore() && ! mapp(save_dbase))
         save_dbase = ([]);
 
-    // auto save per 15 minute (900s)
-    set_heart_beat(900 + random(20));
+    // auto save per 3 minute (180s)
+    set_heart_beat(180 + random(20));
 }
 
 // 心跳函数，自动保存所有的数据
 protected int heart_beat()
 {
-    set_heart_beat(900 + random(20));
+    set_heart_beat(180 + random(20));
     announce_all_save_object(ONLY_SAVE);
 }
 

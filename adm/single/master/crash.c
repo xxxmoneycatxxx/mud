@@ -66,5 +66,20 @@ void crash(string error, object command_giver, object current_object)
         }
         ob->save();
     }
+
+    // 保存守护进程数据 (防止 SIGTERM/崩溃时数据丢失)
+    reset_eval_cost();
+    if (find_object(DBASE_D))
+        catch(DBASE_D->mud_shutdown());
+    if (find_object(NAME_D))
+        catch(NAME_D->mud_shutdown());
+    if (find_object(FAMILY_D))
+        catch(FAMILY_D->mud_shutdown());
+    if (find_object(LEAGUE_D))
+        catch(LEAGUE_D->mud_shutdown());
+    if (find_object(CLOSE_D))
+        catch(CLOSE_D->mud_shutdown());
+    if (find_object(NEWS_D))
+        catch(NEWS_D->mud_shutdown());
 #endif
 }

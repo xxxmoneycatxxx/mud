@@ -25,10 +25,22 @@ int main(object me, string arg)
     }
 
     if (find_object(DNS_MASTER))
-        catch (DNS_MASTER->send_shutdown());
-
+        catch(DNS_MASTER->send_shutdown());
+    
+    // 保存所有守护进程数据
+    reset_eval_cost();
     if (find_object(DBASE_D))
-        catch (DBASE_D->mud_shutdown());
+        catch(DBASE_D->mud_shutdown());
+    if (find_object(NAME_D))
+        catch(NAME_D->mud_shutdown());
+    if (find_object(FAMILY_D))
+        catch(FAMILY_D->mud_shutdown());
+    if (find_object(LEAGUE_D))
+        catch(LEAGUE_D->mud_shutdown());
+    if (find_object(CLOSE_D))
+        catch(CLOSE_D->mud_shutdown());
+    if (find_object(NEWS_D))
+        catch(NEWS_D->mud_shutdown());
 
     shutdown(0);
     return 1;
@@ -39,7 +51,7 @@ int help (object me)
     write(@HELP
 指令格式: shutdown
 
-强行重新起动游戏，并且不保存任何运行中的数据。
+强行重新起动游戏，保存所有玩家和守护进程数据后关闭系统。
 
 HELP );
     return 1;
