@@ -35,7 +35,7 @@ class ScriptEngine {
                 'onMessage', 'sendCommand', 'getVitals', 'getCurrentRoom',
                 'registerTimer', 'sleep', 'log', 'isConnected',
                 'getStore', 'onGMCP',
-                'stripAnsi', 'waitMessage',
+                'waitMessage', 'sendCommands',
                 script.code
             );
         } catch (e) {
@@ -50,7 +50,7 @@ class ScriptEngine {
                 api.getCurrentRoom, api.registerTimer, api.sleep,
                 api.log, api.isConnected,
                 api.getStore, api.onGMCP,
-                api.stripAnsi, api.waitMessage
+                api.waitMessage, api.sendCommands
             );
         } catch (e) {
             this._reportError(script.name, '初始化失败: ' + e.message);
@@ -88,12 +88,14 @@ class ScriptEngine {
     // ===== 消息分发 =====
 
     // 将每条收到的消息喂给所有已启用脚本的 onMessage 回调
+    // 默认分发脱色后的纯文本，避免 ANSI 转义码干扰正则匹配
     feedMessage(message) {
+        const stripped = this._stripAnsi(message);
         for (const [name, runtime] of this._runtime) {
             for (const handler of runtime.messageHandlers) {
                 try {
-                    if (handler.pattern.test(message)) {
-                        handler.callback(message, handler.pattern.exec(message));
+                    if (handler.pattern.test(stripped)) {
+                        handler.callback(stripped, handler.pattern.exec(stripped));
                     }
                 } catch (e) {
                     this._reportError(name, '消息回调异常: ' + e.message);
@@ -138,11 +140,16 @@ class ScriptEngine {
         };
     }
 
+    // 去除 ANSI 转义码（内部复用）
+    _stripAnsi(text) {
+        return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\].*?\x07/g, '');
+    }
+
     // ===== 内部方法 =====
 
     _buildApi(scriptName, runtime) {
         return {
-            // 注册消息匹配回调
+            // 注册消息匹配回调（分发脱色后的纯文本）
             onMessage: (pattern, callback) => {
                 if (!(pattern instanceof RegExp)) {
                     throw new TypeError('onMessage 第一个参数必须是 RegExp');
@@ -261,10 +268,27 @@ class ScriptEngine {
                 runtime.gmcpHandlers.push({ module: module.trim(), callback });
             },
 
-            // 去除 ANSI 转义码，返回纯文本
-            stripAnsi: (text) => {
-                if (typeof text !== 'string') return '';
-                return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\].*?\x07/g, '');
+            // 批量发送命令，命令之间间隔 delayMs 毫秒（默认 200ms），返回 Promise
+            sendCommands: (cmds, delayMs) => {
+                if (!Array.isArray(cmds) || cmds.length === 0) return Promise.resolve();
+                const delay = (typeof delayMs === 'number' && delayMs >= 0) ? delayMs : 200;
+                return (async () => {
+                    for (let i = 0; i < cmds.length; i++) {
+                        let cmd = cmds[i];
+                        if (typeof cmd !== 'string') cmd = String(cmd);
+                        cmd = cmd.trim();
+                        if (cmd) this.client.sendCommand(cmd);
+                        if (i < cmds.length - 1 && delay > 0) {
+                            await new Promise((resolve) => {
+                                const id = setTimeout(() => {
+                                    runtime.timers = runtime.timers.filter(t => t !== id);
+                                    resolve();
+                                }, delay);
+                                runtime.timers.push(id);
+                            });
+                        }
+                    }
+                })();
             },
 
             // 等待匹配消息出现，返回 Promise（resolve true=匹配到 / false=超时）

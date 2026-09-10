@@ -1579,7 +1579,7 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
                 'onMessage', 'sendCommand', 'getVitals', 'getCurrentRoom',
                 'registerTimer', 'sleep', 'log', 'isConnected',
                 'getStore', 'onGMCP',
-                'stripAnsi', 'waitMessage',
+                'waitMessage', 'sendCommands',
                 code
             );
             errHint.style.display = 'none';
@@ -1624,7 +1624,7 @@ AdvancedMUDClient.prototype._buildEditorApiPanel = function (container) {
     const apis = [
         {
             sig: 'onMessage(pattern, callback)',
-            desc: '注册消息匹配回调，当收到的文本匹配 pattern 时调用。',
+            desc: '注册消息匹配回调，分发脱色后的纯文本（已自动去除 ANSI 转义码）。',
             params: ['pattern: RegExp — 匹配消息的正则表达式', 'callback: function(matchedText, matchResult)'],
             example: 'onMessage(/你盘膝坐下/, () => sendCommand("meditation"));'
         },
@@ -1683,16 +1683,16 @@ AdvancedMUDClient.prototype._buildEditorApiPanel = function (container) {
             example: 'onGMCP("Char.Vitals", (data) => {\n    if (data.hp < data.max_hp * 0.3) log("气血危急!");\n});'
         },
         {
-            sig: 'stripAnsi(text)',
-            desc: '去除字符串中的 ANSI 转义码，返回纯文本。脚本收到的消息含颜色码，匹配前应先脱色。',
-            params: ['text: string — 含 ANSI 转义码的原始文本', '返回: string — 纯文本'],
-            example: 'onMessage(/杀死/, (text) => {\n    const clean = stripAnsi(text);\n    log("脱色后: " + clean);\n});'
-        },
-        {
             sig: 'waitMessage(pattern, timeout)',
             desc: '等待匹配的消息出现，返回 Promise。resolve(true)=匹配到，resolve(false)=超时。',
             params: ['pattern: RegExp — 匹配模式', 'timeout: number — 超时毫秒数（默认 30000）', '返回: Promise<boolean>'],
             example: '(async () => {\n    sendCommand("practice sword");\n    const ok = await waitMessage(/已练到极限/, 10000);\n    if (ok) log("练剑完成");\n    else log("超时");\n})();'
+        },
+        {
+            sig: 'sendCommands(cmds, delayMs)',
+            desc: '批量发送命令，命令之间间隔 delayMs 毫秒（默认 200ms）。返回 Promise，可 await。',
+            params: ['cmds: string[] — 命令数组', 'delayMs: number — 可选，命令间隔毫秒数（默认 200）', '返回: Promise'],
+            example: 'await sendCommands(["get all from corpse", "north", "look"], 300);'
         }
     ];
 
@@ -1798,7 +1798,7 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
         {
             name: 'onMessage',
             sig: 'onMessage(pattern, callback)',
-            desc: '注册消息匹配回调，当收到的文本匹配 pattern 时调用 callback。',
+            desc: '注册消息匹配回调，分发脱色后的纯文本（已自动去除 ANSI 转义码）。',
             params: [
                 'pattern: RegExp — 匹配消息的正则表达式（必须）',
                 'callback: function(matchedText, matchResult) — 匹配时执行的回调'
@@ -1875,16 +1875,6 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
             example: 'onGMCP("Char.Vitals", (data) => {\n    if (data.hp < data.max_hp * 0.3) log("气血危急!");\n});'
         },
         {
-            name: 'stripAnsi',
-            sig: 'stripAnsi(text)',
-            desc: '去除字符串中的 ANSI 转义码，返回纯文本。脚本收到的消息含颜色码，匹配前应先脱色。',
-            params: [
-                'text: string — 含 ANSI 转义码的原始文本',
-                '返回: string — 纯文本'
-            ],
-            example: 'onMessage(/杀死/, (text) => {\n    const clean = stripAnsi(text);\n    log("脱色后: " + clean);\n});'
-        },
-        {
             name: 'waitMessage',
             sig: 'waitMessage(pattern, timeout)',
             desc: '等待匹配的消息出现，返回 Promise。resolve(true)=匹配到，resolve(false)=超时。',
@@ -1894,6 +1884,17 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
                 '返回: Promise<boolean>'
             ],
             example: '(async () => {\n    sendCommand("practice sword");\n    const ok = await waitMessage(/已练到极限/, 10000);\n    if (ok) log("练剑完成");\n    else log("超时");\n})();'
+        },
+        {
+            name: 'sendCommands',
+            sig: 'sendCommands(cmds, delayMs)',
+            desc: '批量发送命令，命令之间间隔 delayMs 毫秒（默认 200ms）。返回 Promise，可 await。',
+            params: [
+                'cmds: string[] — 命令数组',
+                'delayMs: number — 可选，命令间隔毫秒数（默认 200）',
+                '返回: Promise'
+            ],
+            example: 'await sendCommands(["get all from corpse", "north", "look"], 300);'
         }
     ];
 
