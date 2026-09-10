@@ -18,6 +18,8 @@ class AdvancedMUDClient {
         this.currentInput = '';
         this.heartbeat = null;
         this.cleanupTimeout = null;
+        this._wtm = null;               // Worker 定时器管理器（init 中初始化）
+        this._wakeLock = null;          // Screen Wake Lock（防止锁屏/休眠导致定时器节流）
         this._expectPassword = false;  // 密码输入状态标记
         this._vitalsReceived = false;   // 是否已收到属性数据
         this._gmcpInitSent = false;     // GMCP 初始化是否已发送
@@ -124,8 +126,11 @@ class AdvancedMUDClient {
             const saved = localStorage.getItem('mud_command_history');
             if (saved) this.history = JSON.parse(saved);
         } catch (e) { /* 解析失败则使用空历史 */ }
+        // 初始化 Worker 定时器管理器（后台/锁屏不被浏览器节流）
+        this._wtm = new WorkerTimerManager('js/timer-worker.js');
+
         // 初始化脚本引擎 + 恢复已启用脚本
-        this.scriptEngine = new ScriptEngine(this);
+        this.scriptEngine = new ScriptEngine(this, this._wtm);
         this._loadScripts();
         this._loadTimers();
         this._loadHighlights();
@@ -137,6 +142,8 @@ class AdvancedMUDClient {
         this.setupStatusBar();
         this.setupTerminalExits();
         this.setupHelpModal();
+        // 请求屏幕常亮 Wake Lock，防止锁屏/休眠导致定时器被浏览器节流
+        this._acquireWakeLock();
         // 高度定制客户端：无需首屏配置，加载后直接自动连接
         this.connect(this.resolveWsUrl());
     }
@@ -168,8 +175,14 @@ class AdvancedMUDClient {
             this.cleanupTimeout = null;
         }
 
+        // 清理待执行的重连定时器
+        if (this._reconnectTimeout) {
+            this._wtm.clear(this._reconnectTimeout);
+            this._reconnectTimeout = null;
+        }
+
         if (this.heartbeat) {
-            clearInterval(this.heartbeat);
+            this._wtm.clear(this.heartbeat);
             this.heartbeat = null;
         }
 
@@ -226,10 +239,10 @@ class AdvancedMUDClient {
     // 启动心跳检测
     startHeartbeat() {
         if (this.heartbeat) {
-            clearInterval(this.heartbeat);
+            this._wtm.clear(this.heartbeat);
         }
 
-        this.heartbeat = setInterval(() => {
+        this.heartbeat = this._wtm.setInterval(() => {
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                 try {
                     // 发送空消息检测连接状态
@@ -248,8 +261,34 @@ class AdvancedMUDClient {
     // 停止心跳检测
     stopHeartbeat() {
         if (this.heartbeat) {
-            clearInterval(this.heartbeat);
+            this._wtm.clear(this.heartbeat);
             this.heartbeat = null;
+        }
+    }
+
+    // ===== Screen Wake Lock =====
+    // 阻止屏幕自动锁定/系统休眠，确保后台定时器不被浏览器节流
+    // Wake Lock 在标签页隐藏时会被系统释放，需在 visibilitychange 回到可见时重新获取
+
+    _acquireWakeLock() {
+        if (!('wakeLock' in navigator)) return;
+        navigator.wakeLock.request('screen')
+            .then((lock) => {
+                this._wakeLock = lock;
+                // 锁被释放时（如标签页切到后台）自动置空
+                lock.addEventListener('release', () => {
+                    this._wakeLock = null;
+                });
+                console.log('[WakeLock] 屏幕常亮已启用');
+            })
+            .catch((e) => {
+                console.warn('[WakeLock] 启用失败:', e.message);
+            });
+    }
+
+    _reacquireWakeLock() {
+        if ('wakeLock' in navigator && !this._wakeLock) {
+            this._acquireWakeLock();
         }
     }
 
@@ -335,7 +374,7 @@ class AdvancedMUDClient {
 
                 if (this.retryCount < this.maxRetries) {
                     this.retryCount++;
-                    setTimeout(() => {
+                    this._reconnectTimeout = this._wtm.setTimeout(() => {
                         this.appendMessage(`══ 正在重连 (${this.retryCount}/${this.maxRetries}) ══`, 'system');
                         this.connect(this.resolveWsUrl());
                     }, 2000 * this.retryCount);
@@ -888,7 +927,7 @@ class AdvancedMUDClient {
     // 启动单个定时器
     _startTimer(timer) {
         if (!timer.enabled || this._timerIntervals.has(timer.name)) return;
-        const id = setInterval(() => {
+        const id = this._wtm.setInterval(() => {
             // 已连接且已进入游戏才发送，避免登录/注册界面被定时命令污染
             if (this._canAutoSend()) {
                 this.sendCommand(timer.command);
@@ -901,7 +940,7 @@ class AdvancedMUDClient {
     _stopTimer(name) {
         const id = this._timerIntervals.get(name);
         if (id) {
-            clearInterval(id);
+            this._wtm.clear(id);
             this._timerIntervals.delete(name);
         }
     }
@@ -916,7 +955,7 @@ class AdvancedMUDClient {
     // 停止所有定时器（断连时调用）
     _stopAllTimers() {
         for (const id of this._timerIntervals.values()) {
-            clearInterval(id);
+            this._wtm.clear(id);
         }
         this._timerIntervals.clear();
     }

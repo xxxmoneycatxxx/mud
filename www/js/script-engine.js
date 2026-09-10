@@ -3,11 +3,12 @@
 // 脚本内无法直接访问 window/document，仅能通过注入的 API 与客户端交互
 
 class ScriptEngine {
-    constructor(client) {
+    constructor(client, workerTimerManager) {
         this.client = client;
+        this._wtm = workerTimerManager;
         // 每个已启用脚本的运行时状态
-        // Map<name, { timers: number[], messageHandlers: {pattern, callback}[], fn: Function }>
-        // timers 混合存储 setInterval 和 setTimeout 的 ID，stop 时双重清理
+        // Map<name, { timers: string[], messageHandlers: {pattern, callback}[], fn: Function }>
+        // timers 混合存储 setInterval 和 setTimeout 的 Worker ID，stop 时统一通过 _wtm.clear 清理
         this._runtime = new Map();
     }
 
@@ -54,8 +55,8 @@ class ScriptEngine {
             );
         } catch (e) {
             this._reportError(script.name, '初始化失败: ' + e.message);
-            // 清理已注册的定时器（setTimeout + setInterval ID 双重清理）
-            runtime.timers.forEach(id => { clearTimeout(id); clearInterval(id); });
+            // 清理已注册的定时器（通过 WorkerTimerManager 统一清理）
+            runtime.timers.forEach(id => { this._wtm.clear(id); });
             this._runtime.delete(script.name);
             return;
         }
@@ -68,8 +69,8 @@ class ScriptEngine {
         const runtime = this._runtime.get(name);
         if (!runtime) return;
 
-        // 清理所有定时器（setTimeout + setInterval ID 双重清理）
-        runtime.timers.forEach(id => { clearTimeout(id); clearInterval(id); });
+        // 通过 WorkerTimerManager 统一清理所有定时器
+        runtime.timers.forEach(id => { this._wtm.clear(id); });
         // 清理消息处理器和 GMCP 处理器
         runtime.messageHandlers.length = 0;
         runtime.gmcpHandlers.length = 0;
@@ -185,6 +186,7 @@ class ScriptEngine {
             },
 
             // 注册定时执行（毫秒），返回定时器 ID（脚本内可用于 clearInterval）
+            // 通过 Worker 线程调度，后台/锁屏时不被浏览器节流
             registerTimer: (intervalMs, callback) => {
                 if (typeof intervalMs !== 'number' || intervalMs < 100) {
                     throw new RangeError('registerTimer 间隔至少 100ms');
@@ -192,7 +194,7 @@ class ScriptEngine {
                 if (typeof callback !== 'function') {
                     throw new TypeError('registerTimer 第二个参数必须是函数');
                 }
-                const id = setInterval(() => {
+                const id = this._wtm.setInterval(() => {
                     try {
                         callback();
                     } catch (e) {
@@ -210,7 +212,7 @@ class ScriptEngine {
                     throw new RangeError('sleep 延迟至少 100ms');
                 }
                 return new Promise((resolve) => {
-                    const id = setTimeout(() => {
+                    const id = this._wtm.setTimeout(() => {
                         runtime.timers = runtime.timers.filter(t => t !== id);
                         resolve();
                     }, ms);
@@ -289,7 +291,7 @@ class ScriptEngine {
                         }
                         if (i < cmds.length - 1 && delay > 0) {
                             await new Promise((resolve) => {
-                                const id = setTimeout(() => {
+                                const id = this._wtm.setTimeout(() => {
                                     runtime.timers = runtime.timers.filter(t => t !== id);
                                     resolve();
                                 }, delay);
@@ -308,7 +310,7 @@ class ScriptEngine {
                 const ms = (typeof timeout === 'number' && timeout >= 100) ? timeout : 30000;
                 return new Promise((resolve) => {
                     let done = false;
-                    const timer = setTimeout(() => {
+                    const timer = this._wtm.setTimeout(() => {
                         if (!done) { done = true; resolve(false); }
                     }, ms);
                     runtime.timers.push(timer);
@@ -317,7 +319,7 @@ class ScriptEngine {
                         callback: (text) => {
                             if (!done) {
                                 done = true;
-                                clearTimeout(timer);
+                                this._wtm.clear(timer);
                                 runtime.timers = runtime.timers.filter(t => t !== timer);
                                 // 移除本次 handler，避免后续消息继续匹配
                                 const idx = runtime.messageHandlers.indexOf(handler);

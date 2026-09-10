@@ -2943,10 +2943,11 @@ AdvancedMUDClient.prototype.setupTerminalFeatures = function () {
         }
     });
 
-    // 标签页切回时重新渲染地图（浏览器可能在隐藏时丢弃 Canvas 绘制）
+    // 标签页切回时重新渲染地图（浏览器可能在隐藏时丢弃 Canvas 绘制）+ 重新获取 Wake Lock
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && typeof mapper !== 'undefined') {
-            mapper.render();
+        if (!document.hidden) {
+            if (typeof mapper !== 'undefined') mapper.render();
+            if (this._reacquireWakeLock) this._reacquireWakeLock();
         }
     });
 };

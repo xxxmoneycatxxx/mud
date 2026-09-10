@@ -196,11 +196,12 @@
     <!-- CodeMirror 5 脚本编辑器 -->
     <script src="lib/codemirror/codemirror.js"></script>
     <script src="lib/codemirror/mode/javascript/javascript.js"></script>
-    <!-- 脚本按依赖顺序加载：常量 → 地图 → 寻路 → 脚本引擎 → 类定义 → 原型扩展 → 实例化 -->
+    <!-- 脚本按依赖顺序加载：常量 → 地图 → 寻路 → Worker定时器 → 脚本引擎 → 类定义 → 原型扩展 → 实例化 -->
     <script src="js/telnet.js"></script>
     <script src="js/ansi.js"></script>
     <script src="js/mapper.js"></script>
     <script src="js/pathfinder.js"></script>
+    <script src="js/worker-timer-manager.js"></script>
     <script src="js/script-engine.js"></script>
     <script src="js/client.js"></script>
     <script src="js/client-ui.js"></script>
