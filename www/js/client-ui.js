@@ -136,6 +136,45 @@ AdvancedMUDClient.prototype._setupCharPanelEvents = function () {
             this._closeCharPanel();
         }
     });
+    // 江湖任务卡片点击 → 请求详情
+    overlay.addEventListener('click', (e) => {
+        const card = e.target.closest('.quest-clickable');
+        if (!card) return;
+        const index = parseInt(card.getAttribute('data-index'), 10);
+        if (index > 0 && this.sendGMCP) {
+            this.sendGMCP('Char.QuestDetail.Get', { index: index });
+        }
+    });
+
+    // —— 任务详情弹窗事件 ——
+    const detailOverlay = document.getElementById('questDetailOverlay');
+    const detailCloseBtn = document.getElementById('questDetailClose');
+    if (detailOverlay) {
+        // 关闭按钮
+        if (detailCloseBtn) {
+            detailCloseBtn.addEventListener('click', () => detailOverlay.classList.remove('visible'));
+        }
+        // 点击背景关闭
+        detailOverlay.addEventListener('click', (e) => {
+            if (e.target === detailOverlay) detailOverlay.classList.remove('visible');
+        });
+        // Esc 关闭（复用已有监听，判断 detail overlay 是否可见）
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && detailOverlay.classList.contains('visible')) {
+                detailOverlay.classList.remove('visible');
+            }
+        });
+        // 放弃任务按钮（事件委托）
+        detailOverlay.addEventListener('click', (e) => {
+            const btn = e.target.closest('.quest-giveup-btn');
+            if (!btn) return;
+            const idx = btn.getAttribute('data-index');
+            if (idx && confirm('确定要放弃任务 #' + idx + ' 吗？')) {
+                if (this.sendCommand) this.sendCommand('quest2 ' + idx + ' -d');
+                detailOverlay.classList.remove('visible');
+            }
+        });
+    }
 };
 
 // 打开角色面板，切到指定 tab，发送 GMCP 请求
@@ -365,6 +404,167 @@ AdvancedMUDClient.prototype._renderCharSkills = function (d) {
     }
 
     container.innerHTML = html;
+};
+
+// 渲染任务 tab：师门/每日/江湖任务
+AdvancedMUDClient.prototype._renderCharQuests = function (d) {
+    const container = document.getElementById('charTab-quests');
+    if (!container || !d) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // 将 ANSI 转义码转为 HTML span（保留服务端颜色设计）
+    const ansi = (s) => this.parseANSI(String(s == null ? '' : s));
+
+    let html = '';
+
+    // —— 师门任务 ——
+    html += '<div class="char-quest-section">';
+    html += '<div class="char-quest-section-title">师门任务</div>';
+    var fq = d.family_quest || {};
+    if (fq.type) {
+        var typeLabel = fq.type === 'kill' ? '刺杀' : fq.type === 'letter' ? '送信' : fq.type;
+        html += '<div class="char-quest-card">';
+        html += '<div class="quest-title">' + esc(typeLabel) + '</div>';
+        html += '<div class="quest-desc">';
+        html += esc(fq.master_name || '') + '吩咐你';
+        if (fq.type === 'kill') {
+            html += '在期限内割下 <b>' + esc(fq.name) + '</b> 的人头';
+        } else if (fq.type === 'letter') {
+            html += '在期限内把信件送到 <b>' + esc(fq.name) + '</b> 手中';
+        }
+        html += '，回' + esc(fq.family || '') + '交差。';
+        if (fq.place) html += '<br><span style="color:#888">线索：' + esc(fq.place) + '</span>';
+        html += '</div>';
+        html += '</div>';
+        if (d.quest_count) {
+            html += '<div class="char-quest-hint">已连续完成 <span style="color:#cc0">' + d.quest_count + '</span> 个师门任务</div>';
+        }
+    } else {
+        html += '<div class="char-quest-empty">你现在没有领任何师门任务。</div>';
+    }
+    html += '</div>';
+
+    // —— 每日任务 ——
+    html += '<div class="char-quest-section">';
+    html += '<div class="char-quest-section-title">每日任务</div>';
+    html += '<div class="char-quest-card">';
+    html += '<div class="quest-title">扬州武庙祈福</div>';
+    html += '<div class="quest-desc">';
+    if (d.daily_done) {
+        html += '<span class="hi-green">已完成</span>';
+    } else {
+        html += '<span class="hi-red">未领取</span>';
+    }
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+
+    // —— 江湖任务 ——
+    html += '<div class="char-quest-section">';
+    html += '<div class="char-quest-section-title">江湖任务</div>';
+    var todo = d.todo || [];
+    if (todo.length) {
+        todo.forEach(function (q, idx) {
+            html += '<div class="char-quest-card quest-clickable" data-index="' + (idx + 1) + '" title="点击查看任务详情">';
+            html += '<div class="quest-title">Lv.' + (q.level || 0) + '</div>';
+            html += '<div class="quest-desc">' + ansi(q.name) + '</div>';
+            html += '</div>';
+        });
+    } else {
+        html += '<div class="char-quest-empty">当前没有接受的江湖任务。</div>';
+    }
+    var solved = d.solved || [];
+    if (solved.length) {
+        html += '<div class="char-quest-hint">已完成 ' + solved.length + ' 个江湖任务';
+        var newlyCount = solved.filter(function (q) { return q.newly; }).length;
+        if (newlyCount) html += '（' + newlyCount + ' 个可重复）';
+        html += '</div>';
+    }
+    html += '</div>';
+
+    container.innerHTML = html;
+};
+
+// 渲染江湖任务详情弹窗
+AdvancedMUDClient.prototype._renderCharQuestDetail = function (d) {
+    const overlay = document.getElementById('questDetailOverlay');
+    const titleEl = document.getElementById('questDetailTitle');
+    const bodyEl = document.getElementById('questDetailBody');
+    if (!overlay || !bodyEl || !d) return;
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // 将 ANSI 转义码转为 HTML span（保留服务端任务描述的颜色设计）
+    const ansi = (s) => this.parseANSI(String(s == null ? '' : s));
+
+    // 错误处理
+    if (d.error) {
+        bodyEl.innerHTML = '<div class="char-quest-empty">' + esc(d.error) + '</div>';
+        overlay.classList.add('visible');
+        return;
+    }
+
+    // 标题
+    if (titleEl) titleEl.innerHTML = '任务详情 #' + d.index + '：' + ansi(d.name);
+
+    let html = '';
+
+    // 任务描述（带 ANSI 颜色）
+    if (d.detail) {
+        html += '<div class="quest-detail-section">';
+        html += '<div class="quest-detail-label">任务描述</div>';
+        html += '<div class="quest-detail-text">' + ansi(d.detail).replace(/\n/g, '<br>') + '</div>';
+        html += '</div>';
+    }
+
+    // 击杀进度
+    var kills = d.kills || [];
+    if (kills.length) {
+        html += '<div class="quest-detail-section">';
+        html += '<div class="quest-detail-label">击杀进度</div>';
+        kills.forEach(function (k) {
+            var cls = k.done ? 'quest-progress-done' : 'quest-progress-pending';
+            html += '<div class="quest-progress-item ' + cls + '">';
+            html += '<span class="quest-progress-name">' + esc(k.name);
+            if (k.id) html += ' <span style="color:#666">(' + esc(k.id) + ')</span>';
+            html += '</span>';
+            html += '<span class="quest-progress-ratio">' + k.killed + ' / ' + k.target + '</span>';
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+
+    // 收集进度
+    var items = d.items || [];
+    if (items.length) {
+        html += '<div class="quest-detail-section">';
+        html += '<div class="quest-detail-label">收集进度</div>';
+        items.forEach(function (it) {
+            var cls = it.done ? 'quest-progress-done' : 'quest-progress-pending';
+            html += '<div class="quest-progress-item ' + cls + '">';
+            html += '<span class="quest-progress-name">' + esc(it.name);
+            if (it.id) html += ' <span style="color:#666">(' + esc(it.id) + ')</span>';
+            html += '</span>';
+            html += '<span class="quest-progress-ratio">' + it.got + ' / ' + it.target + '</span>';
+            html += '</div>';
+        });
+        html += '</div>';
+    }
+
+    // 任务奖励（带 ANSI 颜色）
+    if (d.reward) {
+        html += '<div class="quest-detail-section">';
+        html += '<div class="quest-detail-label">任务奖励</div>';
+        html += '<div class="quest-detail-text quest-reward">' + ansi(d.reward).replace(/\n/g, '<br>') + '</div>';
+        html += '</div>';
+    }
+
+    // 放弃按钮
+    if (!d.no_give_up) {
+        html += '<div class="quest-detail-footer">';
+        html += '<button class="quest-giveup-btn" data-index="' + d.index + '">放弃任务</button>';
+        html += '</div>';
+    }
+
+    bodyEl.innerHTML = html;
+    overlay.classList.add('visible');
 };
 
 // 全套导出：打包所有配置为 JSON 文件下载
@@ -2681,6 +2881,12 @@ AdvancedMUDClient.prototype.processGMCPData = function (data) {
                 break;
             case 'Char.Skills':
                 this._renderCharSkills(data.data);
+                break;
+            case 'Char.Quests':
+                this._renderCharQuests(data.data);
+                break;
+            case 'Char.QuestDetail':
+                this._renderCharQuestDetail(data.data);
                 break;
             case 'Room.Info':
                 this.updateRoomInfo(data.data);

@@ -1740,6 +1740,130 @@ body {
 }
 .char-quest-daily-item .done { color: #4f4; }
 .char-quest-daily-item .undone { color: #f44; }
+.char-quest-hint {
+    color: #888;
+    font-size: 10px;
+    margin-top: 4px;
+}
+
+/* 江湖任务详情弹窗 */
+.quest-detail-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.82);
+    z-index: 210;
+    align-items: center;
+    justify-content: center;
+}
+.quest-detail-overlay.visible {
+    display: flex;
+}
+.quest-detail-modal {
+    width: min(480px, 90vw);
+    max-height: 75vh;
+    display: flex;
+    flex-direction: column;
+    background: #020502;
+    border: 1px solid #1a3a1a;
+    border-radius: 4px;
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.08);
+}
+.quest-detail-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #1a3a1a;
+    color: #cc0;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+.quest-detail-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+    line-height: 1;
+}
+.quest-detail-close:hover {
+    color: #f44;
+}
+.quest-detail-body {
+    padding: 14px;
+    overflow-y: auto;
+    flex: 1;
+}
+.quest-detail-section {
+    margin-bottom: 12px;
+}
+.quest-detail-label {
+    color: #cc0;
+    font-size: 11px;
+    font-weight: bold;
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+}
+.quest-detail-text {
+    color: #bbb;
+    font-size: 11px;
+    line-height: 1.6;
+}
+.quest-reward {
+    color: #4f4;
+}
+.quest-progress-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 11px;
+    border-bottom: 1px solid #0f0f0f;
+}
+.quest-progress-done {
+    color: #4f4;
+}
+.quest-progress-pending {
+    color: #bbb;
+}
+.quest-progress-name {
+    flex: 1;
+}
+.quest-progress-ratio {
+    min-width: 60px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.quest-detail-footer {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #1a3a1a;
+    text-align: right;
+}
+.quest-giveup-btn {
+    background: #2a0a0a;
+    color: #f44;
+    border: 1px solid #522;
+    padding: 4px 14px;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.quest-giveup-btn:hover {
+    background: #3a1010;
+}
+
+/* 江湖任务卡片可点击样式 */
+.quest-clickable {
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.quest-clickable:hover {
+    border-color: #4a8a4a;
+}
 
 /* ===== 输入区紧凑化（增大终端显示区域） ===== */
 .command-input {

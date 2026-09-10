@@ -260,6 +260,200 @@ protected void send_char_inventory()
     catch(efun::send_gmcp(msg));
 }
 
+// 构建并发送角色任务列表（quest 命令的结构化数据，供 Web 角色面板使用）
+protected void send_char_quests()
+{
+    object ob = this_object();
+    mapping q, family_quest;
+    mixed *solved_keys;
+    mixed *solved_list, *todo_list;
+    string *keys;
+    int i, quest_count, festival_done;
+    int *date;
+    string festival;
+
+    if (!has_gmcp())
+        return;
+
+    // —— 师门任务 ——
+    family_quest = ([]);
+    quest_count = (int)ob->query("quest_count");
+    if (mapp(q = ob->query("quest")) && q["type"])
+    {
+        family_quest = ([
+            "type"       : q["type"],
+            "master_name": q["master_name"] || "",
+            "name"       : q["name"] || "",
+            "id"         : q["id"] || "",
+            "place"      : q["place"] || "",
+            "family"     : q["family"] || "",
+            "limit"      : q["limit"] || 0,
+        ]);
+    }
+
+    // —— 每日任务（扬州武庙祈福）——
+    date = localtime(time());
+    festival = "festival/" + (date[5] + 1900) + "/" + (date[4] + 1);
+    festival_done = ((int)ob->query(festival) == date[3]) ? 1 : 0;
+
+    // —— 江湖任务 ——
+    todo_list = ({});
+    solved_list = ({});
+
+    mapping toDoList = ob->getToDoList();
+    if (mapp(toDoList))
+    {
+        keys = keys(toDoList);
+        todo_list = allocate(sizeof(keys));
+        for (i = 0; i < sizeof(keys); i++)
+        {
+            // keys[i] 是任务文件路径字符串，需要 load_object 加载
+            object qob = load_object(keys[i]);
+            if (objectp(qob))
+            {
+                todo_list[i] = ([
+                    "name"  : remove_ansi(qob->getName()) || "",
+                    "level" : qob->getLevel() || 0,
+                ]);
+            }
+        }
+    }
+
+    solved_keys = ob->getSolved();
+    if (sizeof(solved_keys))
+    {
+        solved_list = allocate(sizeof(solved_keys));
+        for (i = 0; i < sizeof(solved_keys); i++)
+        {
+            // solved_keys[i] 是任务文件路径字符串，需要 load_object 加载
+            object qob = load_object(solved_keys[i]);
+            if (objectp(qob))
+            {
+                solved_list[i] = ([
+                    "name"    : remove_ansi(qob->getName()) || "",
+                    "level"   : qob->getLevel() || 0,
+                    "newly"   : qob->isNewly() ? 1 : 0,
+                ]);
+            }
+        }
+    }
+
+    mapping data = ([
+        "family_quest" : family_quest,
+        "quest_count"  : quest_count,
+        "daily_done"   : festival_done,
+        "todo"         : todo_list,
+        "solved"       : solved_list,
+    ]);
+
+    string msg = "Char.Quests " + json_encode(data);
+    log_gmcp("Sending: " + msg);
+    catch(efun::send_gmcp(msg));
+}
+
+// 构建并发送单个江湖任务详情（quest2 <编号> 的结构化数据）
+protected void send_char_quest_detail(int index)
+{
+    object ob = this_object();
+    mapping toDoList;
+    string *keys;
+    object qob;
+    mapping kill_req, item_req;
+    string *k_keys, *i_keys;
+    mixed *k_values, *i_values;
+    mixed *kill_list, *item_list;
+    int i, ksize, isize;
+
+    if (!has_gmcp())
+        return;
+
+    toDoList = ob->getToDoList();
+    if (!mapp(toDoList) || !sizeof(toDoList))
+    {
+        sendGMCP(([ "error": "没有任务" ]), "Char", "QuestDetail");
+        return;
+    }
+
+    keys = keys(toDoList);
+    if (index < 1 || index > sizeof(keys))
+    {
+        sendGMCP(([ "error": "编号超出范围" ]), "Char", "QuestDetail");
+        return;
+    }
+
+    qob = load_object(keys[index - 1]);
+    if (!objectp(qob))
+    {
+        sendGMCP(([ "error": "任务对象无效" ]), "Char", "QuestDetail");
+        return;
+    }
+
+    // 击杀进度
+    kill_list = ({});
+    kill_req = qob->getKill();
+    if (mapp(kill_req))
+    {
+        k_keys = keys(kill_req);
+        k_values = values(kill_req);
+        ksize = sizeof(k_keys);
+        kill_list = allocate(ksize);
+        for (i = 0; i < ksize; i++)
+        {
+            object nob = load_object(k_keys[i]);
+            int killed = ob->getKilled(qob, k_keys[i]);
+            int target = k_values[i];
+            kill_list[i] = ([
+                "name"   : objectp(nob) ? remove_ansi(nob->name()) : k_keys[i],
+                "id"     : objectp(nob) ? (nob->query("id") || "") : "",
+                "killed" : killed,
+                "target" : target,
+                "done"   : killed >= target ? 1 : 0,
+            ]);
+            if (objectp(nob)) destruct(nob);
+        }
+    }
+
+    // 收集进度
+    item_list = ({});
+    item_req = qob->getItem();
+    if (mapp(item_req))
+    {
+        i_keys = keys(item_req);
+        i_values = values(item_req);
+        isize = sizeof(i_keys);
+        item_list = allocate(isize);
+        for (i = 0; i < isize; i++)
+        {
+            object iob = load_object(i_keys[i]);
+            int got = ob->getItem(qob, i_keys[i]);
+            int target = i_values[i];
+            item_list[i] = ([
+                "name"   : objectp(iob) ? remove_ansi(iob->name()) : i_keys[i],
+                "id"     : objectp(iob) ? (iob->query("id") || "") : "",
+                "got"    : got,
+                "target" : target,
+                "done"   : got >= target ? 1 : 0,
+            ]);
+            if (objectp(iob)) destruct(iob);
+        }
+    }
+
+    mapping data = ([
+        "index" : index,
+        "name"  : remove_ansi(qob->getName()) || "",
+        "level" : qob->getLevel() || 0,
+        "detail": qob->getDetail() || "",
+        "reward": qob->getReward() || "",
+        "kills" : kill_list,
+        "items" : item_list,
+        "no_give_up": qob->noGiveUp() ? 1 : 0,
+    ]);
+
+    string msg = "Char.QuestDetail " + json_encode(data);
+    log_gmcp("Sending: " + msg);
+    catch(efun::send_gmcp(msg));
+}
+
 // 辅助：构建单个技能分类（必须在 send_char_skills 之前定义）
 private mapping _build_skill_category(string name, string *skill_ids, mapping skl, mapping lrn, string *mapped)
 {
@@ -529,6 +723,20 @@ void gmcp(string req)
     else if (module == "Char.Skills.Get" || module == "Char.Skills")
     {
         send_char_skills();
+    }
+    else if (module == "Char.Quests.Get" || module == "Char.Quests")
+    {
+        send_char_quests();
+    }
+    else if (module == "Char.QuestDetail.Get")
+    {
+        mapping payload;
+        if (data && (payload = json_decode(data)) && mapp(payload))
+        {
+            int idx = payload["index"];
+            if (intp(idx) && idx > 0)
+                send_char_quest_detail(idx);
+        }
     }
     else if (module == "Room.Info.Get" || module == "Room.Info")
     {
