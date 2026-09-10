@@ -148,6 +148,46 @@ git submodule update --init
 
 > 推荐使用浏览器打开 `http://localhost:8888` 体验 Web 客户端，也可使用 [Mudlet](https://github.com/Mudlet/Mudlet) 等传统客户端通过 Telnet 端口连接。推荐使用 UTF-8 编码进行游戏。
 
+## 数据迁移
+
+项目提供了数据导出脚本，将 `data/` 下的运行时数据（玩家、NPC、商店、门派等 `.o` 持久化文件）打包为带时间戳的 ZIP，方便服务器迁移。
+
+**导出：**
+
+```powershell
+# Windows
+.\tools\data-export.ps1
+```
+
+```bash
+# Linux / Mac
+./tools/data-export.sh
+```
+
+脚本会自动排除 `.env`（环境配置）和 `.gitignore`，输出到 `backup/mud-data-YYYYMMDD-HHmmss.zip`。
+
+**迁移到新服务器：**
+
+```bash
+# 1. 克隆代码
+git clone --recurse-submodules <repo-url>
+cd mud
+
+# 2. 解压数据
+unzip backup/mud-data-*.zip -d .
+
+# 3. 生成新环境配置
+cp data/.env.example data/.env
+# 按需修改 data/.env 中的 DB_HOST 等
+
+# 4. 启动服务
+./docker-deploy.sh
+```
+
+> 游戏内置的 `backupd` 守护进程会在每日凌晨 6:00 自动备份整个 `data/` 目录到 `backup/YYYY-M-D/`，也可作为迁移数据源。管理员可使用 `restore` 命令从备份中恢复单个玩家数据。
+
+---
+
 注册 ID 为 `mudren` 的帐号为游戏管理员 (admin)。
 
 求助答疑请访问：https://bbs.mud.ren/nodes/6
