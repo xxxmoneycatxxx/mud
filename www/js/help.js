@@ -1,5 +1,10 @@
 // ===== 帮助浏览器 — AdvancedMUDClient 原型扩展 =====
 
+// HTML 转义（防御性：主题名/描述来自服务端文本，理论上不含 <>& 但以防万一）
+function escHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // 分类树优先由服务端 GMCP Help.Topics 动态下发（见 applyHelpTopics）；下方内嵌数据为 GMCP 未就绪时的回退快照
 AdvancedMUDClient.prototype.getHelpTree = function () {
     if (!this._helpTree) {
@@ -165,7 +170,7 @@ AdvancedMUDClient.prototype.closeHelpModal = function () {
 AdvancedMUDClient.prototype.renderHelpCats = function () {
     this.helpCats.innerHTML = this.getHelpTree().map((c, i) =>
         '<div class="help-cat' + (i === this._helpCat ? ' active' : '') +
-        '" data-idx="' + i + '">【' + c.cat + '】</div>'
+        '" data-idx="' + i + '">【' + escHtml(c.cat) + '】</div>'
     ).join('');
 };
 
@@ -173,7 +178,6 @@ AdvancedMUDClient.prototype.renderHelpTopics = function () {
     const q = (this.helpSearch.value || '').trim();
     this._helpSel = -1;
     if (q) {
-        // 全文搜索结果（来自 GMCP Help.Search）
         if (this._helpSearchResults) {
             if (!this._helpSearchResults.length) {
                 this.helpTopics.innerHTML = '<div class="help-empty">无匹配主题</div>';
@@ -183,14 +187,16 @@ AdvancedMUDClient.prototype.renderHelpTopics = function () {
             const descMap = {};
             tree.forEach(c => c.topics.forEach(t => descMap[t[0]] = t[1]));
             this.helpTopics.innerHTML = this._helpSearchResults.map(topic =>
-                '<div class="help-topic" data-topic="' + topic + '">' +
-                '<span class="t-name">〖' + topic + '〗</span>' +
-                (descMap[topic] ? '<span class="t-desc">' + descMap[topic] + '</span>' : '') +
+                '<div class="help-topic" data-topic="' + escHtml(topic) + '">' +
+                '<span class="t-name">〖' + escHtml(topic) + '〗</span>' +
+                (descMap[topic] ? '<span class="t-desc">' + escHtml(descMap[topic]) + '</span>' : '') +
                 '</div>'
             ).join('');
-        } else {
-            // 等待 GMCP 响应
+        } else if (this._helpSearchPending) {
             this.helpTopics.innerHTML = '<div class="help-empty">搜索中…</div>';
+        } else {
+            // 超时/未连接：用本地名称过滤结果（可能为空）
+            this.helpTopics.innerHTML = '<div class="help-empty">无匹配主题</div>';
         }
         return;
     }
@@ -202,34 +208,68 @@ AdvancedMUDClient.prototype.renderHelpTopics = function () {
         return;
     }
     this.helpTopics.innerHTML = list.map(t =>
-        '<div class="help-topic" data-topic="' + t[0] + '">' +
-        '<span class="t-name">〖' + t[0] + '〗</span>' +
-        '<span class="t-desc">' + t[1] + '</span></div>'
+        '<div class="help-topic" data-topic="' + escHtml(t[0]) + '">' +
+        '<span class="t-name">〖' + escHtml(t[0]) + '〗</span>' +
+        '<span class="t-desc">' + escHtml(t[1]) + '</span></div>'
     ).join('');
 };
 
 AdvancedMUDClient.prototype.searchHelpTopics = function () {
     const q = (this.helpSearch.value || '').trim();
+    clearTimeout(this._helpSearchTimeout);
     if (!q) {
         this._helpSearchResults = null;
+        this._helpSearchPending = false;
         this.renderHelpTopics();
         return;
     }
-    // 发送 GMCP 全文检索请求
+    // 本地名称过滤（即时响应，兜底用）
+    const localMatches = this._filterHelpTopicsByName(q);
+    
     if (this.connected && this.sendGMCP) {
+        this._helpSearchPending = true;
         this.sendGMCP('Help.Search.Get', { keyword: q });
+        // 3 秒超时：服务端无响应则回退到本地名称过滤
+        this._helpSearchTimeout = setTimeout(() => {
+            if (this._helpSearchPending) {
+                this._helpSearchPending = false;
+                this._helpSearchResults = localMatches;
+                this.renderHelpTopics();
+            }
+        }, 3000);
+        this.helpTopics.innerHTML = '<div class="help-empty">搜索中…</div>';
+    } else {
+        // 未连接：直接用本地名称过滤
+        this._helpSearchPending = false;
+        this._helpSearchResults = localMatches;
+        this.renderHelpTopics();
     }
-    // 显示等待状态
-    this.helpTopics.innerHTML = '<div class="help-empty">搜索中…</div>';
 };
 
 AdvancedMUDClient.prototype.applyHelpSearchResults = function (data) {
     if (!data || !Array.isArray(data.matches)) return;
-    // 仅当当前搜索关键字与返回匹配时才应用（避免过期响应覆盖）
     const q = (this.helpSearch.value || '').trim();
-    if (data.keyword !== q) return;
+    if (data.keyword !== q) {
+        // 过期响应：忽略，不覆盖当前结果
+        return;
+    }
+    this._helpSearchPending = false;
+    clearTimeout(this._helpSearchTimeout);
     this._helpSearchResults = data.matches;
     this.renderHelpTopics();
+};
+
+// 按名称/描述本地过滤（大小写不敏感）
+AdvancedMUDClient.prototype._filterHelpTopicsByName = function (q) {
+    const tree = this.getHelpTree();
+    const ql = q.toLowerCase();
+    const matches = [];
+    tree.forEach(c => c.topics.forEach(t => {
+        if (t[0].toLowerCase().indexOf(ql) !== -1 || t[1].toLowerCase().indexOf(ql) !== -1) {
+            matches.push(t[0]);
+        }
+    }));
+    return matches;
 };
 
 AdvancedMUDClient.prototype.helpOpenTopic = function (topic) {
