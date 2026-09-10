@@ -153,8 +153,12 @@ class ScriptEngine {
 
             // 发送命令到服务端
             sendCommand: (cmd) => {
-                if (typeof cmd !== 'string' || !cmd.trim()) return;
-                this.client.sendCommand(cmd.trim());
+                if (typeof cmd !== 'string') {
+                    cmd = String(cmd);
+                }
+                cmd = cmd.trim();
+                if (!cmd) return;
+                this.client.sendCommand(cmd);
             },
 
             // 获取当前角色状态（返回副本，防止脚本篡改内部数据）
