@@ -22,6 +22,9 @@
 
 nosave int exporting;
 
+// 前向声明
+void do_export(object me);
+
 // ===== 守护进程生命周期 =====
 
 void create()
