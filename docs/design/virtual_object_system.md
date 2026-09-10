@@ -1,586 +1,546 @@
-# 炎黄群侠传虚拟对象系统设计方案
+# 炎黄群侠传副本系统设计方案
 
 ## 系统概述
 
-本方案实现了一个兼容现有架构的虚拟对象系统，通过SQLite3数据库统一管理游戏对象，支持动态生成房间、NPC和物品，无需创建大量物理文件。
+本方案实现一个数据驱动的副本/实例系统，支持动态生成独立的副本空间（房间、NPC、物品），每个队伍或玩家拥有自己的副本实例，互不干扰。
 
-## 数据库设计
+### 设计目标
 
-### 1. 核心表结构
+- **独立副本**：每个实例拥有独立的房间、NPC 和物品，玩家之间互不影响
+- **数据驱动**：副本结构由 LPC mapping 配置文件定义，无需编写房间文件
+- **复用现有体系**：基于 virtual_d.c 的虚拟对象机制和 area/map.c 的坐标地图体系
 
-```sql
--- 区域基础信息表
-CREATE TABLE areas (
-    area_code VARCHAR(50) PRIMARY KEY,
-    area_name VARCHAR(100) NOT NULL,
-    area_type VARCHAR(20) NOT NULL,        -- 区域类型：city, village, wilderness, dungeon, instance, system
-    description TEXT,
-    extra_data TEXT
-);
+### 设计原则
 
--- 统一对象表（NPC、物品、道具等所有游戏对象）
-CREATE TABLE objects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    area_code VARCHAR(50) NOT NULL,
-    obj_code VARCHAR(100) NOT NULL,
-    obj_name VARCHAR(100) NOT NULL,
-    obj_type VARCHAR(30) NOT NULL,        -- npc, food, weapon, armor, hands等
-    obj_subtype VARCHAR(30),
-    value INTEGER DEFAULT 0,              -- 通用：价格/价值（NPC为悬赏金额）
-    weight INTEGER DEFAULT 1,             -- 通用：重量
-    unit VARCHAR(10) DEFAULT "个",         -- 通用：单位
-    description TEXT,                     -- 通用：详细描述
-    material VARCHAR(30),                 -- 物品专用：材料
-    level INTEGER,                        -- NPC专用：等级/经验等级
-    age INTEGER,                          -- NPC专用：年龄
-    gender VARCHAR(10),                   -- NPC专用：性别
-    combat_exp INTEGER DEFAULT 0,         -- NPC专用：战斗经验
-    armor_prop INTEGER,                   -- 防具专用：防御值
-    weapon_prop INTEGER,                  -- 武器专用：攻击力
-    food_supply INTEGER,                  -- 食物专用：补给值
-    extra_data TEXT,                      -- JSON格式存储额外属性
-    UNIQUE(area_code, obj_code),
-    FOREIGN KEY (area_code) REFERENCES areas(area_code)
-);
+1. **文件优先**：物理文件存在时优先加载，副本系统仅在需要动态生成时介入
+2. **LPC 原生**：使用 LPC mapping 作为配置格式，不引入外部数据库
+3. **零侵入**：不修改任何现有房间、NPC、物品文件
+4. **渐进增强**：从最简单的单房间副本开始，逐步支持多房间、门/锁、程序化地形
 
--- 房间数据表
-CREATE TABLE rooms (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    area_code VARCHAR(50) NOT NULL,
-    room_code VARCHAR(100) NOT NULL,
-    room_type VARCHAR(30) NOT NULL,
-    short_desc TEXT NOT NULL,
-    long_desc TEXT NOT NULL,
-    is_outdoors INTEGER DEFAULT 1,
-    -- 地图和寻路支持字段
-    coord_x INTEGER DEFAULT 0,            -- X坐标（地图用）
-    coord_y INTEGER DEFAULT 0,            -- Y坐标（地图用）
-    coord_z INTEGER DEFAULT 0,            -- Z坐标（楼层用）
-    map_icon VARCHAR(5) DEFAULT '□',       -- 地图图标
-    walk_cost INTEGER DEFAULT 1,          -- 行走代价（寻路用）
-    is_walkable INTEGER DEFAULT 1,        -- 是否可通行
-    extra_data TEXT,
-    UNIQUE(area_code, room_code),
-    FOREIGN KEY (area_code) REFERENCES areas(area_code)
-);
+### 与现有系统的关系
 
--- 房间出口关系表
-CREATE TABLE room_exits (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    area_code VARCHAR(50) NOT NULL,
-    room_code VARCHAR(100) NOT NULL,
-    direction VARCHAR(20) NOT NULL,
-    target_area VARCHAR(50) NOT NULL,
-    target_room VARCHAR(100) NOT NULL,
-    exit_type VARCHAR(20) DEFAULT 'normal',           -- 出口类型：normal, door, gate, locked, hidden
-    door_name VARCHAR(50),                            -- 门名称，如"木门"、"铁门"
-    door_desc TEXT,                                   -- 门描述
-    door_status INTEGER DEFAULT 0,                    -- 门状态：0=开放, 1=关闭, 2=上锁, 4=破坏
-    key_code VARCHAR(50),                             -- 开锁所需的钥匙代码
-    lock_difficulty INTEGER DEFAULT 0                -- 开锁难度等级
-    UNIQUE(area_code, room_code, direction),
-    FOREIGN KEY (area_code) REFERENCES areas(area_code)
-);
+| 现有系统 | 定位 |
+|---|---|
+| `mudcore/system/daemons/virtual_d.c` | 坐标虚拟房间（野外/迷宫），副本系统独立于它，不修改其路由逻辑 |
+| `mudcore/inherit/area/map.c` | 坐标地图渲染，副本房间可选继承其坐标体系 |
+| `mudcore/world/area_pattern/` | 程序化地形模板，副本可引用 |
+| `inherit/room/buildroom.c` | 玩家私有房屋系统，与副本不冲突 |
+| `feature/user_gmcp.c` | GMCP Room.Info 推送，副本房间自动兼容 |
 
--- 房间对象关联表（统一处理NPC和物品）
-CREATE TABLE room_objects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    area_code VARCHAR(50) NOT NULL,
-    room_code VARCHAR(100) NOT NULL,
-    obj_area VARCHAR(50) NOT NULL,
-    obj_code VARCHAR(100) NOT NULL,
-    base_count INTEGER DEFAULT 1,
-    random_add INTEGER DEFAULT 0,
-    count_expression TEXT,
-    spawn_rate INTEGER DEFAULT 100,       -- 出现概率百分比(0-100)
-    UNIQUE(area_code, room_code, obj_area, obj_code),
-    FOREIGN KEY (area_code) REFERENCES areas(area_code)
-);
+## 副本模板配置
 
--- 索引优化
-CREATE INDEX idx_rooms_area_room ON rooms(area_code, room_code);
-CREATE INDEX idx_objects_area_code ON objects(area_code);
-CREATE INDEX idx_exits_area_room ON room_exits(area_code, room_code);
-CREATE INDEX idx_room_objects_composite ON room_objects(area_code, room_code, obj_area, obj_code);
-```
+副本模板定义为 LPC 文件，存放在 `/d/instance/templates/` 目录下，每个文件返回一个 mapping 描述副本结构。
 
-### 2. 数据示例
-
-```sql
--- 区域类型示例
-INSERT INTO areas (area_code, area_name, area_type, description) VALUES
-('chengdu', '成都城', 'city', '天府之国的中心，物产丰富'),
-('shaolin', '少林寺', 'dungeon', '武学圣地，高手云集'),
-('huashan', '华山', 'wilderness', '五岳之一，险峻异常'),
-('yangzhou', '扬州城', 'city', '江南水乡，商贾云集'),
-('xiangyang', '襄阳城', 'city', '军事重镇，兵家必争'),
-('system', '系统通用', 'system', '系统通用对象和模板'),
-('instance', '桃花岛', 'instance', '副本地图，限制进入');
-
--- 东大街房间
-INSERT INTO rooms (area_code, room_code, room_type, short_desc, long_desc, is_outdoors, extra_data) VALUES
-('chengdu', 'eastroad1', 'street', '东大街', 
-'你走在东大街坚实的青石板地面上。南边可以通向东城门
-路边有一个简陋的茶摊，一块洗得发白了的旧帆布正顶着头顶
-火辣辣的阳光，一张长几上放着几只大号粗瓷碗。碗中盛满着
-可口的茶水。往西北通往北大街，东北方一座大店面里传出阵
-阵划拳的喧闹。', 1, '{"resource":{"water":1}}');
-
--- 对象数据
-INSERT INTO objects (area_code, obj_code, obj_name, obj_type, obj_subtype, value, weight, unit, description, age, gender, combat_exp) VALUES
--- NPC示例
-('chengdu', 'xiaozei', '小贼', 'npc', 'thief', 50, 70, '个', '一个鬼鬼祟祟的小贼', 25, '男性', 800),
-('chengdu', 'tanghua', '唐掌柜', 'npc', 'boss', 0, 70, '个', '蓉城酒楼掌柜，财大势大', 46, '男性', 50000),
-
--- 物品示例
-('chengdu', 'peanut', '花生', 'food', 'snack', 5, 50, '袋', '一袋香喷喷的花生', NULL, NULL, NULL),
-('chengdu', 'fruit', '水果', 'food', 'fruit', 10, 100, '个', '新鲜的水果', NULL, NULL, NULL),
-('chengdu', 'mint', '薄荷糖', 'food', 'candy', 2, 20, '个', '清凉的薄荷糖', NULL, NULL, NULL),
-
--- 武器示例
-('system', 'changjian', '长剑', 'weapon', 'sword', 200, 5000, '柄', '普通的精钢剑，剑客标准配备', NULL, NULL, NULL, 25),
-('system', 'zhitao', '指套', 'weapon', 'hands', 6000, 500, '副', '五个环环相链的铁指套，前端锋利如刃', NULL, NULL, NULL, 15);
-
--- 出口数据
-INSERT INTO room_exits (area_code, room_code, direction, target_area, target_room, exit_type, door_name, door_desc, door_status, key_code, lock_difficulty) VALUES
-('chengdu', 'eastroad1', 'northeast', 'chengdu', 'jiudian', 'normal', NULL, NULL, 0, NULL, 0),
-('chengdu', 'eastroad1', 'northwest', 'chengdu', 'northroad3', 'normal', NULL, NULL, 0, NULL, 0),
-('chengdu', 'eastroad1', 'south', 'chengdu', 'eastroad2', 'normal', NULL, NULL, 0, NULL, 0),
-('chengdu', 'temple', 'north', 'chengdu', 'inner_court', 'door', '木门', '一扇厚重的木门', 1, NULL, 0),
-('chengdu', 'treasury', 'east', 'chengdu', 'secret_room', 'locked', '铁门', '一扇坚固的铁门，上着锁', 3, 'treasury_key', 5);
-
--- 房间对象关联
-INSERT INTO room_objects (area_code, room_code, obj_area, obj_code, base_count, random_add, count_expression) VALUES
-('chengdu', 'eastroad1', 'chengdu', 'xiaozei', 1, 0, '1'),
-('chengdu', 'eastroad1', 'chengdu', 'peanut', 5, 25, '5 + random(25)'),
-('chengdu', 'eastroad1', 'chengdu', 'fruit', 1, 5, '1 + random(5)'),
-('chengdu', 'eastroad1', 'chengdu', 'mint', 1, 5, '1 + random(5)');
-```
-
-## 虚拟对象实现
-
-### 1. 主路由守护进程 (`/adm/daemons/virtual_d.c`)
+### 模板文件结构
 
 ```lpc
-mixed compile_object(string file)
+// /d/instance/templates/taohua_island.c
+
+mapping query_template()
 {
-    mapping path_data;
-    
-    // 解析虚拟对象路径
-    path_data = PATH_PARSER->parse_path(file);
-    if (!path_data) {
-        return 0; // 不是虚拟对象路径，让驱动处理
-    }
-    
-    // 根据类型路由到相应虚拟对象
-    switch(path_data["type"]) {
-        case "room":
-            return new("/d/virtual/room", path_data["area"], path_data["code"]);
-        case "npc":
-            return new("/d/virtual/object", path_data["area"], path_data["code"]);
-        case "object":
-            return new("/d/virtual/object", path_data["area"], path_data["code"]);
-    }
-    
-    return 0;
+    return ([
+        // 基本信息
+        "id"             : "taohua_island",
+        "name"           : "桃花岛",
+        "type"           : "instance",    // instance / dungeon / event
+        "max_players"    : 6,
+        "time_limit"     : 3600,          // 秒，0 = 不限时
+        "reset_cooldown" : 1800,          // 重置冷却时间（秒）
+
+        // 入口（玩家从哪里进入副本）
+        "entry_room"     : "entrance",
+
+        // 出口（离开副本回到哪里）
+        "exit_to"        : ([
+            "file" : "/d/taohua/dock",
+            "x"    : 5,
+            "y"    : 10,
+        ]),
+
+        // 房间定义
+        "rooms"          : ({ /* 见下方 */ }),
+
+        // NPC 定义（全局，可放置在任意房间）
+        "npcs"           : ({ /* 见下方 */ }),
+
+        // 物品定义（全局，可放置在任意房间）
+        "items"          : ({ /* 见下方 */ }),
+    ]);
 }
 ```
 
-### 2. 路径解析工具 (`/adm/daemons/path_parser.c`)
+### 副本类型
+
+| 类型 | 说明 | 典型场景 |
+|---|---|---|
+| `instance` | 独立副本，每支队伍独立实例 | 桃花岛、黑木崖密道 |
+| `dungeon` | 持久副本，所有玩家共享同一实例 | 少林寺地牢、古墓派墓穴 |
+| `event` | 限时事件副本，按时间触发 | 武林大会、襄阳保卫战 |
+
+### 房间定义
+
+每个房间是一个 mapping，通过 `id` 互相引用出口：
 
 ```lpc
-mapping parse_path(string file)
+"rooms" : ({
+    ([
+        "id"       : "entrance",
+        "short"    : "桃花岛码头",
+        "long"     : @LONG
+你踏上了一座海岛。海风带着咸味拂面而来，码头上停泊着
+几艘小渔船。北面是一条蜿蜒的山路，通往岛深处。
+LONG,
+        "outdoors" : "taohua_island",
+        "exits"    : ([
+            "north" : "path1",           // 引用同副本内其他房间 id
+        ]),
+        "objects"  : ([
+            "/clone/npc/fisher" : 2,     // 文件路径 : 数量
+        ]),
+    ]),
+    ([
+        "id"       : "path1",
+        "short"    : "山间小路",
+        "long"     : "一条蜿蜒的山间小路，两旁桃花盛开。",
+        "outdoors" : "taohua_island",
+        "exits"    : ([
+            "south" : "entrance",
+            "north" : "secret_door",
+        ]),
+        "objects"  : ([
+            "/clone/npc/peach_bird" : 1 + random(2),  // 支持 LPC 表达式
+        ]),
+    ]),
+    ([
+        "id"       : "secret_door",
+        "short"    : "石门前",
+        "long"     : "你来到一扇巨大的石门前，门上刻着奇异的符文。",
+        "outdoors" : "taohua_island",
+        "exits"    : ([
+            "south" : "path1",
+            "enter" : "treasure_room",   // 需要满足门/锁条件
+        ]),
+        "door"     : ([                  // 门/锁配置
+            "name"       : "石门",
+            "desc"       : "一扇巨大的石门，上面刻着奇异的符文。",
+            "status"     : "locked",      // open / closed / locked / hidden
+            "key_id"     : "taohua_key",
+            "difficulty" : 5,
+        ]),
+    ]),
+    ([
+        "id"       : "treasure_room",
+        "short"    : "藏宝室",
+        "long"     : "室内金光闪闪，到处是珍贵的宝物。",
+        "outdoors" : 0,
+        "exits"    : ([
+            "out" : "secret_door",
+        ]),
+        "objects"  : ([
+            "/clone/weapon/jian" : 1,
+            "/clone/herb/lingzhi" : 2 + random(3),
+        ]),
+    ]),
+})
+```
+
+### NPC 定义
+
+NPC 可在模板中预定义属性覆盖，无需单独创建 NPC 文件：
+
+```lpc
+"npcs" : ({
+    ([
+        "id"     : "guard",
+        "base"   : "/clone/npc/guard",    // 基础 NPC 文件
+        "name"   : "桃花岛弟子",           // 覆盖名称
+        "short"  : "一个手持长剑的桃花岛弟子",
+        "level"  : 30,
+        "combat_exp" : 50000,
+        "skills" : ([
+            "sword"  : 80,
+            "dodge"  : 60,
+            "force"  : 70,
+        ]),
+        "room"   : "entrance",            // 放置在哪个房间
+        "respawn": 300,                   // 死亡后多少秒重生，0 = 不重生
+    ]),
+    ([
+        "id"     : "boss",
+        "base"   : "/clone/npc/master",
+        "name"   : "黄药师",
+        "level"  : 80,
+        "combat_exp" : 500000,
+        "room"   : "treasure_room",
+        "respawn": 0,                     // Boss 不重生
+    ]),
+})
+```
+
+### 物品定义
+
+物品同样支持属性覆盖：
+
+```lpc
+"items" : ({
+    ([
+        "id"     : "taohua_sword",
+        "base"   : "/clone/weapon/changjian",
+        "name"   : "桃花剑",
+        "value"  : 5000,
+        "weapon_prop/damage" : 35,
+        "room"   : "treasure_room",
+        "respawn": 600,
+    ]),
+})
+```
+
+### 门/锁配置
+
+门配置挂在房间的 `exits` 中特定方向上，支持以下状态：
+
+| 状态 | 说明 | 玩家行为 |
+|---|---|---|
+| `open` | 门已开放 | 直接通过 |
+| `closed` | 门已关闭 | `open door` 打开后通过 |
+| `locked` | 门已上锁 | 需要对应 `key_id` 的钥匙，或满足 `difficulty` 的开锁技能 |
+| `hidden` | 隐藏出口 | 需要 `search` 命令发现，或满足特定条件 |
+
+```lpc
+"door" : ([
+    "name"       : "石门",
+    "desc"       : "一扇巨大的石门，上面刻着奇异的符文。",
+    "status"     : "locked",
+    "key_id"     : "taohua_key",       // 钥匙物品 id
+    "difficulty" : 5,                  // 开锁难度（对应开锁技能等级）
+])
+```
+
+## 副本守护进程
+
+新增 `/adm/daemons/instance_d.c`，管理所有副本实例的生命周期。
+
+### 核心接口
+
+```lpc
+// 创建副本实例
+// 返回 instance_id，失败返回 0
+string create_instance(string template_id, object team_leader);
+
+// 玩家进入副本
+// 将玩家传送到副本入口房间
+int enter_instance(object player, string instance_id);
+
+// 玩家离开副本
+// 将玩家传送到副本出口（exit_to 指定的外部房间）
+int exit_instance(object player);
+
+// 重置副本（NPC/物品刷新）
+int reset_instance(string instance_id);
+
+// 销毁副本实例
+int destroy_instance(string instance_id);
+
+// 查询副本状态
+mapping query_instance_info(string instance_id);
+
+// 查询玩家当前所在副本
+string query_player_instance(object player);
+```
+
+### 内部数据结构
+
+```lpc
+// 所有活跃副本实例
+nosave mapping instances = ([
+    /*
+    "inst_001" : ([
+        "template_id"  : "taohua_island",
+        "instance_id"  : "inst_001",
+        "leader"       : <object>,        // 队长
+        "players"      : ({ <object>, ... }),
+        "rooms"        : ([
+            "entrance"      : <object>,    // room_id -> room object
+            "path1"         : <object>,
+            "secret_door"   : <object>,
+            "treasure_room" : <object>,
+        ]),
+        "created_at"   : 1726000000,
+        "status"       : "active",        // active / resetting / destroyed
+        "time_limit"   : 3600,
+        "reset_cooldown": 1800,
+    ]),
+    */
+]);
+
+// 玩家 -> 副本实例 的反向索引
+nosave mapping player_instances = ([
+    /*
+    <player_object> : "inst_001",
+    */
+]);
+```
+
+### 生命周期
+
+```
+create_instance()          玩家触发副本入口
+    │                      │
+    ▼                      ▼
+加载模板 ──► 创建房间对象 ──► 传送玩家到入口房间
+    │                           │
+    ▼                           ▼
+spawn NPC/物品            玩家在副本内活动
+    │                           │
+    ▼                           ▼
+心跳检查 ◄────────────── 玩家离开 / 超时
+    │
+    ├── 全员离开 ──► destroy_instance()
+    ├── 超时 ──► destroy_instance()
+    └── 需要重置 ──► reset_instance()
+```
+
+### 心跳与自动清理
+
+```lpc
+protected int heart_beat()
 {
-    mapping result = ([ ]);
-    
-    // 房间路径: /d/{area}/{room_code}
-    if (sscanf(file, "/d/%s/%s", result["area"], result["code"])) {
-        // 排除npc和obj子目录
-        if (result["code"][0..3] == "npc/" || result["code"][0..3] == "obj/") {
-            return 0;
+    set_heart_beat(60);  // 每分钟检查一次
+
+    string *ids = keys(instances);
+    foreach (string id in ids)
+    {
+        mapping inst = instances[id];
+
+        // 检查超时
+        if (inst["time_limit"] > 0 &&
+            time() - inst["created_at"] > inst["time_limit"])
+        {
+            destroy_instance(id);
+            continue;
         }
-        result["type"] = "room";
-        return result;
+
+        // 检查是否还有玩家
+        object *alive_players = filter(inst["players"], (: objectp($1) && userp($1) :));
+        if (!sizeof(alive_players))
+        {
+            destroy_instance(id);
+            continue;
+        }
+
+        // 更新玩家列表（清除已断线的）
+        inst["players"] = alive_players;
     }
-    
-    // NPC路径: /d/{area}/npc/{npc_code}
-    if (sscanf(file, "/d/%s/npc/%s", result["area"], result["code"])) {
-        result["type"] = "npc";
-        return result;
-    }
-    
-    // 物品路径: /d/{area}/obj/{obj_code}
-    if (sscanf(file, "/d/%s/obj/%s", result["area"], result["code"])) {
-        result["type"] = "object";
-        return result;
-    }
-    
-    return 0;
+
+    return 1;
 }
 ```
 
-### 3. 虚拟房间实现 (`/d/virtual/room.c`)
+## 虚拟房间实现
+
+新增 `/d/instance/room.c`，继承 ROOM，由 instance_d 在创建实例时动态实例化。
+
+### 实现要点
 
 ```lpc
+// /d/instance/room.c
 inherit ROOM;
-#include <dbase.h>
 
-void create(string area, string room_code)
+void create(mapping room_data, string instance_id, object daemon)
 {
-    mapping room_data;
-    mapping exits_data;
-    
-    // 从数据库加载房间数据
-    room_data = DBASE_D->query_room(area, room_code);
-    if (!room_data) {
-        setup_default_room(area, room_code);
-        return;
-    }
-    
-    // 设置基本属性
-    set("short", room_data["short_desc"]);
-    set("long", room_data["long_desc"]);
-    set("outdoors", room_data["is_outdoors"] ? area : 0);
-    
-    // 设置额外属性
-    if (room_data["extra_data"]) {
-        mapping extra = json_decode(room_data["extra_data"]);
-        foreach (string key, mixed value in extra) {
-            set(key, value);
-        }
-    }
-    
-    // 设置出口和门
-    setup_exits(area, room_code);
-    
-    // 设置对象
-    setup_objects(area, room_code);
-    
-    setup();
-}
+    // 基本属性
+    set("short", room_data["short"]);
+    set("long", room_data["long"]);
 
-private void setup_objects(string area, string room_code)
-{
-    mapping objects = ([ ]);
-    mixed obj_data = DBASE_D->query_room_objects(area, room_code);
-    
-    foreach (mapping obj in obj_data) {
-        int count = calculate_count(obj);
-        if (count > 0) {
-            string full_path = sprintf("/d/%s/%s", obj["obj_area"], obj["obj_code"]);
-            objects[full_path] = count;
-        }
-    }
-    
-    if (sizeof(objects) > 0) {
-        set("objects", objects);
-    }
-}
+    if (room_data["outdoors"])
+        set("outdoors", room_data["outdoors"]);
 
-// 设置出口和门
-private void setup_exits(string area, string room_code)
-{
-    mapping exits = ([ ]);
-    mixed exits_data = DBASE_D->query_exits(area, room_code);
-    
-    foreach (mapping exit in exits_data) {
-        string target_path = sprintf("/d/%s/%s", exit["target_area"], exit["target_room"]);
-        
-        if (exit["exit_type"] == "normal") {
-            exits[exit["direction"]] = target_path;
-        } else {
-            // 创建门对象
-            string door_id = sprintf("%s_%s_%s", area, room_code, exit["direction"]);
-            string door_path = sprintf("/d/virtual/door", door_id);
-            
-            exits[exit["direction"]] = ([
-                "file": target_path,
-                "door": door_id,
-                "name": exit["exit_name"] || "门",
-                "type": exit["exit_type"],
-                "locked": exit["is_locked"],
-                "closed": exit["is_closed"],
-                "key": exit["key_code"],
-                "difficulty": exit["lock_difficulty"],
-                "desc": exit["door_desc"]
-            ]);
+    // 出口（此时指向同副本内其他房间的路径）
+    if (mapp(room_data["exits"]))
+    {
+        mapping exits = ([ ]);
+        foreach (string dir, string target_id in room_data["exits"])
+        {
+            // 出口目标在 instance_d 创建完所有房间后统一解析
+            exits[dir] = sprintf("/d/instance/room/%s/%s", instance_id, target_id);
         }
-    }
-    
-    if (sizeof(exits) > 0) {
         set("exits", exits);
     }
-}
 
-private int calculate_count(mapping obj)
-{
-    if (obj["count_expression"]) {
-        return parse_expression(obj["count_expression"]);
+    // 门/锁
+    if (mapp(room_data["door"]))
+    {
+        // 门的状态存储在房间的 temp dbase 中
+        set("door", room_data["door"]);
     }
-    
-    // 检查出现概率
-    if (obj["spawn_rate"] < 100 && random(100) > obj["spawn_rate"]) {
-        return 0;
-    }
-    
-    return obj["base_count"] + random(obj["random_add"]);
-}
 
-private int parse_expression(string expr)
-{
-    if (sscanf(expr, "%d + random(%d)", int base, int rand)) {
-        return base + random(rand);
-    }
-    if (sscanf(expr, "random(%d)", int rand)) {
-        return random(rand);
-    }
-    return to_int(expr);
-}
+    // 副本标记
+    set("instance_id", instance_id);
+    set("room_id", room_data["id"]);
 
-private void setup_default_room(string area, string room_code)
-{
-    set("short", sprintf("%s街道", capitalize(area)));
-    set("long", sprintf("这是一条普通的%s街道。", capitalize(area)));
-    set("outdoors", area);
+    setup();
+
+    // 放置 NPC 和物品
+    if (mapp(room_data["objects"]))
+    {
+        foreach (string file, int count in room_data["objects"])
+        {
+            for (int i = 0; i < count; i++)
+            {
+                object ob = new(file);
+                if (ob) ob->move(this_object());
+            }
+        }
+    }
 }
 ```
 
-### 4. 数据库访问接口 (`/adm/daemons/dbase_d.c`)
+### 路径约定
 
-基于CORE_DB的链式调用实现：
+副本房间的 object path 格式为：
+
+```
+/d/instance/room/{instance_id}/{room_id}
+```
+
+例如：`/d/instance/room/inst_001/entrance`
+
+这确保了：
+- 每个副本实例的房间路径唯一，不会互相冲突
+- GMCP `Room.Info` 的 hash 计算基于 `base_name()`，自然唯一
+- 与现有 `virtual_d.c` 的坐标虚拟房间路径格式不冲突
+
+### 地图渲染集成
+
+副本房间可选支持坐标体系，复用 `mudcore/inherit/area/map.c` 的地图渲染：
 
 ```lpc
-#include <DB.h>
-
-mapping query_room(string area, string room_code)
-{
-    mixed result = DB->table("rooms")
-        ->where("area_code", area)
-        ->where("room_code", room_code)
-        ->first();
-    
-    return result;
-}
-
-mixed query_exits(string area, string room_code)
-{
-    return DB->table("room_exits")
-        ->where("area_code", area)
-        ->where("room_code", room_code)
-        ->get();
-}
-
-mixed query_room_objects(string area, string room_code)
-{
-    return DB->table("room_objects")
-        ->select("room_objects.*, objects.obj_type, objects.obj_name")
-        ->join("objects", "room_objects.obj_area = objects.area_code AND room_objects.obj_code = objects.obj_code")
-        ->where("room_objects.area_code", area)
-        ->where("room_objects.room_code", room_code)
-        ->get();
-}
-
-mapping query_object(string area, string obj_code)
-{
-    mixed result = DB->table("objects")
-        ->where("area_code", area)
-        ->where("obj_code", obj_code)
-        ->first();
-    
-    return result;
-}
-
-// 批量查询优化
-mixed query_rooms_by_area(string area)
-{
-    return DB->table("rooms")
-        ->where("area_code", area)
-        ->orderBy("room_code")
-        ->get();
-}
-
-// 聚合查询示例
-int count_rooms_in_area(string area)
-{
-    return DB->table("rooms")
-        ->where("area_code", area)
-        ->count();
-}
+// 在模板的房间定义中增加坐标字段
+([
+    "id"    : "entrance",
+    "short" : "桃花岛码头",
+    // ...
+    "coord" : ([ "x" : 5, "y" : 10, "z" : 0 ]),
+    "icon"  : "🏠",
+    "block" : 0,
+])
 ```
+
+instance_d 在创建房间时，如果模板包含 `coord` 字段，则额外继承 area/map.c 的坐标能力，使副本内也能显示小地图。
+
+## 与现有系统的集成
+
+### GMCP Room.Info 兼容
+
+副本房间的 `base_name()` 格式为 `/d/instance/room/inst_001/entrance`，经 `send_room_info()` 中的 hash 计算后自然唯一。Web 客户端无需任何修改即可正确显示副本房间信息。
+
+`exit_targets` 同样正常工作：副本内部出口指向同实例的其他房间路径，跨副本/外部出口（如 `exit_to`）指向外部真实房间路径，hash 均正确。
+
+### 自动寻路兼容
+
+副本房间使用标准的 `set("exits", ([ ... ]))` 设置出口，与现有房间完全一致。Web 客户端的 `pathfinder.js` 基于 `Room.Info` 的 `exits` 和 `exit_targets` 构建图，无需特殊处理副本场景。
+
+### 自动拾取兼容
+
+副本中的物品由标准 LPC 对象承载，现有的自动拾取触发器可正常识别和操作。
 
 ## 使用指南
 
-### 1. 数据管理
+### 创建新副本模板
 
-```sql
--- 添加新区域
-INSERT INTO areas (area_code, area_name, area_type) VALUES ('beijing', '北京城', 'city');
+1. 在 `/d/instance/templates/` 下创建模板文件：
 
--- 添加新房间
-INSERT INTO rooms (area_code, room_code, room_type, short_desc, long_desc, is_outdoors) VALUES
-('beijing', 'tiananmen', 'landmark', '天安门', '雄伟的天安门城楼...', 1);
-
--- 添加出口
-INSERT INTO room_exits VALUES ('beijing', 'tiananmen', 'north', 'beijing', 'forbidden_city');
-
--- 添加房间对象
-INSERT INTO room_objects (area_code, room_code, obj_area, obj_code, base_count, random_add, count_expression) VALUES
-('beijing', 'tiananmen', 'system', 'common_guard', 2, 0, '2'),
-('chengdu', 'eastroad1', 'chengdu', 'xiaozei', 1, 0, '1'),
-('chengdu', 'eastroad1', 'chengdu', 'peanut', 5, 25, '5 + random(25)');
-```
-
-### 2. 访问方式
-
-无需修改现有代码，系统会自动处理：
-- `/d/chengdu/eastroad1` → 虚拟房间
-- `/d/chengdu/npc/xiaozei` → 虚拟NPC
-- `/d/chengdu/obj/peanut` → 虚拟物品
-
-### 3. count_expression和spawn_rate详解
-
-#### 3.1 count_expression - 动态数量计算
-
-支持多种数量计算模式：
-
-```sql
--- 固定数量
-('chengdu', 'eastroad1', 'chengdu', 'xiaozei', 1, 0, '1', 100)
-
--- 随机数量：基础2个，随机增加0-5个
-('chengdu', 'market', 'chengdu', 'vendor', 2, 5, '2 + random(5)', 90)
-
--- 基于时间的动态数量
-('beijing', 'day', 'system', 'guard', 3, 2, 'hour > 6 && hour < 20 ? 5 : 2', 100)
-
--- 基于玩家数量
-('shaolin', 'training', 'shaolin', 'monk', 1, 0, '1 + online_players/10', 80)
-```
-
-#### 3.2 spawn_rate - 出现概率控制
-
-控制对象的生成概率：
-
-```sql
--- 100%必定出现
-('chengdu', 'temple', 'chengdu', 'abbot', 1, 0, '1', 100)
-
--- 30%概率出现（稀有NPC）
-('chengdu', 'eastroad1', 'system', 'rare_master', 1, 0, '1', 30)
-
--- 50%概率出现（随机事件）
-('huashan', 'cliff', 'system', 'hermit', 1, 0, '1', 50)
-
--- 80%概率出现（常见物品）
-('beijing', 'market', 'beijing', 'goods', 5, 10, '5 + random(10)', 80)
-```
-
-#### 3.3 实际应用场景
-
-```sql
--- 成都东大街动态场景
-INSERT INTO room_objects VALUES
-('chengdu', 'eastroad1', 'chengdu', 'xiaozei', 1, 0, '1', 100),                    -- 必出1个小贼
-('chengdu', 'eastroad1', 'chengdu', 'peanut', 5, 25, '5 + random(25)', 90),        -- 90%概率出5-30个花生
-('chengdu', 'eastroad1', 'system', 'rare_vendor', 1, 0, '1', 20),                  -- 20%概率出稀有商人
-('chengdu', 'eastroad1', 'chengdu', 'patrol_guard', 2, 1, '2 + random(1)', 60);   -- 60%概率出2-3个巡逻守卫
-```
-
-### 4. obj_area字段详解
-
-`obj_area`字段实现了**跨区域资源复用**功能，支持以下使用场景：
-
-#### 3.1 本地对象引用
-```sql
--- 使用本区域的对象
-('chengdu', 'eastroad1', 'chengdu', 'xiaozei', 1, 0, '1', 'npc')
--- 实际路径：/d/chengdu/xiaozei
-```
-
-#### 3.2 系统通用对象
-```sql
--- 创建系统通用区域
-INSERT INTO areas (area_code, area_name, area_type) VALUES 
-('system', '系统通用', 'system'),
-('common', '公共资源', 'common');
-
--- 创建通用守卫对象
-INSERT INTO objects VALUES 
-('system', 'common_guard', '守卫', 'npc', 'guard', 10, 0, 70, '通用守卫');
-
--- 任何区域都可以使用
-('beijing', 'tiananmen', 'system', 'common_guard', 2, 0, '2', 'npc')
-('changan', 'citygate', 'system', 'common_guard', 1, 0, '1', 'npc')
-```
-
-#### 3.3 特色对象共享
-```sql
--- 北京特色小吃被成都商人贩卖
-('chengdu', 'market', 'beijing', 'beijing_snack', 1, 0, '1', 'food')
--- 实际路径：/d/beijing/beijing_snack
-```
-
-#### 3.4 管理优势
-- **减少重复数据**：通用对象只需创建一次
-- **统一更新**：修改系统级对象影响所有引用区域
-- **灵活组合**：任意区域可自由组合使用其他区域资源
-- **路径清晰**：通过obj_area+obj_code唯一定位对象
-
-### 4. 区域类型(area_type)设计用途
-
-`area_type`字段用于支持未来的扩展功能：
-
-#### 4.1 区域类型分类
-- **city**: 城市区域（如成都、北京、长安）
-- **village**: 村庄区域（如新手村、小村庄）
-- **wilderness**: 野外区域（如华山、泰山）
-- **dungeon**: 副本区域（如少林寺、古墓派）
-- **instance**: 副本地图（如桃花岛、特殊任务地图）
-- **system**: 系统通用区域（存放通用对象模板）
-
-#### 4.2 未来扩展应用
 ```lpc
-// 基于区域类型进行特殊处理
-switch(area_type) {
-    case "city":
-        // 城市区域：允许摆摊、有守卫巡逻
-        break;
-    case "wilderness":
-        // 野外区域：随机遭遇、天气影响
-        break;
-    case "dungeon":
-        // 副本区域：限制进入、特殊规则
-        break;
-    case "instance":
-        // 副本地图：独立副本、重置机制
-        break;
+// /d/instance/templates/heimu_climb.c
+mapping query_template()
+{
+    return ([
+        "id"          : "heimu_climb",
+        "name"        : "黑木崖密道",
+        "type"        : "dungeon",
+        "max_players" : 4,
+        "time_limit"  : 7200,
+        "entry_room"  : "cave_entrance",
+        "exit_to"     : ([
+            "file" : "/d/heimuya/road3",
+        ]),
+        "rooms"       : ({
+            ([
+                "id"    : "cave_entrance",
+                "short" : "山洞入口",
+                "long"  : "一个阴暗的山洞入口，空气中弥漫着潮湿的气息。",
+                "exits" : ([ "east" : "tunnel1" ]),
+            ]),
+            ([
+                "id"    : "tunnel1",
+                "short" : "地下通道",
+                "long"  : "曲折的地下通道，墙壁上有微弱的火光。",
+                "exits" : ([
+                    "west"  : "cave_entrance",
+                    "north" : "boss_room",
+                ]),
+                "objects" : ([
+                    "/clone/npc/ cultist" : 2 + random(2),
+                ]),
+            ]),
+            ([
+                "id"    : "boss_room",
+                "short" : "密室",
+                "long"  : "一间宽敞的密室，中央端坐着一个黑衣人。",
+                "exits" : ([ "south" : "tunnel1" ]),
+            ]),
+        }),
+        "npcs"        : ({
+            ([
+                "id"   : "boss",
+                "base" : "/clone/npc/leader",
+                "name" : "魔教长老",
+                "room" : "boss_room",
+            ]),
+        }),
+        "items"       : ({
+            ([
+                "id"   : "heimu_token",
+                "base" : "/clone/misc/token",
+                "name" : "黑木令",
+                "room" : "boss_room",
+            ]),
+        }),
+    ]);
 }
 ```
 
-#### 4.3 数据查询优化
-```sql
--- 查询所有城市区域
-SELECT * FROM areas WHERE area_type = 'city';
+### 入口房间设置
 
--- 查询适合新手的区域
-SELECT * FROM areas WHERE area_type IN ('city', 'village');
+在普通区域中放置副本入口，例如在 `/d/heimuya/road3.c` 中添加：
 
--- 查询副本地图
-SELECT * FROM areas WHERE area_type = 'instance';
+```lpc
+// 在 create() 中添加
+set("instance_entry/heimu_climb", "黑木崖密道");
 ```
 
-### 5. 兼容性保证
+玩家看到入口提示后，使用命令进入：
 
-1. **文件优先**：物理文件存在时优先加载
-2. **路径兼容**：保持现有 `/d/{area}/{code}` 格式
-3. **功能完整**：支持所有现有功能
-4. **渐进迁移**：可逐步将现有文件转换为数据库记录
+```
+> enter 黑木崖密道
+```
 
-## 系统优势
+### 命令接口
 
-1. **零文件架构**：无需创建大量物理文件
-2. **动态配置**：修改数据库即可更新游戏内容
-3. **统一管理**：所有游戏对象统一数据库管理
-4. **跨区支持**：支持对象和房间的跨区域关联
-5. **灵活扩展**：新增区域只需数据库配置
-6. **表达式支持**：支持复杂的数量计算表达式
+| 命令 | 说明 |
+|---|---|
+| `enter <副本名>` | 进入副本（在入口房间使用） |
+| `leave` | 离开副本，返回入口外部 |
+| `instance info` | 查看当前副本信息（剩余时间、玩家数等） |
+| `instance reset` | 重置副本（需队长权限） |
+
+## 兼容性保证
+
+1. **文件房间优先**：物理文件存在时直接加载，副本系统仅在需要动态生成时介入
+2. **零侵入**：不修改任何现有房间、NPC、物品文件
+3. **路径隔离**：副本房间路径 `/d/instance/room/` 与现有 `/d/{area}/` 完全隔离
+4. **渐进扩展**：
+   - 第一阶段：支持基本多房间副本（房间 + 出口 + NPC/物品放置）
+   - 第二阶段：增加门/锁机制和钥匙系统
+   - 第三阶段：集成 area/map.c 坐标体系，支持副本内地图渲染
+   - 第四阶段：支持 area_pattern 程序化地形生成
