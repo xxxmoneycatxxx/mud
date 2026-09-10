@@ -35,6 +35,7 @@ class ScriptEngine {
                 'onMessage', 'sendCommand', 'getVitals', 'getCurrentRoom',
                 'registerTimer', 'sleep', 'log', 'isConnected',
                 'getStore', 'onGMCP',
+                'stripAnsi', 'waitMessage',
                 script.code
             );
         } catch (e) {
@@ -48,7 +49,8 @@ class ScriptEngine {
                 api.onMessage, api.sendCommand, api.getVitals,
                 api.getCurrentRoom, api.registerTimer, api.sleep,
                 api.log, api.isConnected,
-                api.getStore, api.onGMCP
+                api.getStore, api.onGMCP,
+                api.stripAnsi, api.waitMessage
             );
         } catch (e) {
             this._reportError(script.name, '初始化失败: ' + e.message);
@@ -257,6 +259,42 @@ class ScriptEngine {
                     throw new TypeError('onGMCP 第二个参数必须是函数');
                 }
                 runtime.gmcpHandlers.push({ module: module.trim(), callback });
+            },
+
+            // 去除 ANSI 转义码，返回纯文本
+            stripAnsi: (text) => {
+                if (typeof text !== 'string') return '';
+                return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\].*?\x07/g, '');
+            },
+
+            // 等待匹配消息出现，返回 Promise（resolve true=匹配到 / false=超时）
+            waitMessage: (pattern, timeout) => {
+                if (!(pattern instanceof RegExp)) {
+                    throw new TypeError('waitMessage 第一个参数必须是 RegExp');
+                }
+                const ms = (typeof timeout === 'number' && timeout >= 100) ? timeout : 30000;
+                return new Promise((resolve) => {
+                    let done = false;
+                    const timer = setTimeout(() => {
+                        if (!done) { done = true; resolve(false); }
+                    }, ms);
+                    runtime.timers.push(timer);
+                    const handler = {
+                        pattern: pattern,
+                        callback: (text) => {
+                            if (!done) {
+                                done = true;
+                                clearTimeout(timer);
+                                runtime.timers = runtime.timers.filter(t => t !== timer);
+                                // 移除本次 handler，避免后续消息继续匹配
+                                const idx = runtime.messageHandlers.indexOf(handler);
+                                if (idx >= 0) runtime.messageHandlers.splice(idx, 1);
+                                resolve(true);
+                            }
+                        },
+                    };
+                    runtime.messageHandlers.push(handler);
+                });
             },
         };
     }

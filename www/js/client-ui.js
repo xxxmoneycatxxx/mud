@@ -1579,6 +1579,7 @@ AdvancedMUDClient.prototype._showScriptEditorModal = function (index) {
                 'onMessage', 'sendCommand', 'getVitals', 'getCurrentRoom',
                 'registerTimer', 'sleep', 'log', 'isConnected',
                 'getStore', 'onGMCP',
+                'stripAnsi', 'waitMessage',
                 code
             );
             errHint.style.display = 'none';
@@ -1680,6 +1681,18 @@ AdvancedMUDClient.prototype._buildEditorApiPanel = function (container) {
             desc: '订阅 GMCP 模块推送事件，收到数据时调用。',
             params: ['module: string — GMCP 模块名（如 "Char.Vitals"）', 'callback: function(data) — 收到数据时的回调'],
             example: 'onGMCP("Char.Vitals", (data) => {\n    if (data.hp < data.max_hp * 0.3) log("气血危急!");\n});'
+        },
+        {
+            sig: 'stripAnsi(text)',
+            desc: '去除字符串中的 ANSI 转义码，返回纯文本。脚本收到的消息含颜色码，匹配前应先脱色。',
+            params: ['text: string — 含 ANSI 转义码的原始文本', '返回: string — 纯文本'],
+            example: 'onMessage(/杀死/, (text) => {\n    const clean = stripAnsi(text);\n    log("脱色后: " + clean);\n});'
+        },
+        {
+            sig: 'waitMessage(pattern, timeout)',
+            desc: '等待匹配的消息出现，返回 Promise。resolve(true)=匹配到，resolve(false)=超时。',
+            params: ['pattern: RegExp — 匹配模式', 'timeout: number — 超时毫秒数（默认 30000）', '返回: Promise<boolean>'],
+            example: '(async () => {\n    sendCommand("practice sword");\n    const ok = await waitMessage(/已练到极限/, 10000);\n    if (ok) log("练剑完成");\n    else log("超时");\n})();'
         }
     ];
 
@@ -1712,7 +1725,7 @@ AdvancedMUDClient.prototype._buildEditorApiPanel = function (container) {
         + this._escHtml('onMessage(/战斗结束/, async () => {\n    sendCommand("get all from corpse");\n    await sleep(1000);\n    sendCommand("north");\n});')
         + '</pre></div>'
         + '<div class="api-pattern-item"><b>等待指定消息（循环直至检测到）</b><pre>'
-        + this._escHtml('function waitFor(pattern, timeout) {\n    return new Promise((resolve) => {\n        let done = false;\n        const t = setTimeout(() => {\n            if (!done) { done = true; resolve(false); }\n        }, timeout || 30000);\n        onMessage(pattern, () => {\n            if (!done) { done = true; clearTimeout(t); resolve(true); }\n        });\n    });\n}\n\n(async () => {\n    while (true) {\n        sendCommand("practice sword");\n        if (await waitFor(/你已练到极限/, 10000)) {\n            log("练剑完成");\n            break;\n        }\n    }\n})();')
+        + this._escHtml('(async () => {\n    while (true) {\n        sendCommand("practice sword");\n        if (await waitMessage(/你已练到极限/, 10000)) {\n            log("练剑完成");\n            break;\n        }\n    }\n})();')
         + '</pre></div>';
     scroll.appendChild(patterns);
 
@@ -1860,6 +1873,27 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
                 'callback: function(data) — 收到数据时的回调，参数为解析后的对象'
             ],
             example: 'onGMCP("Char.Vitals", (data) => {\n    if (data.hp < data.max_hp * 0.3) log("气血危急!");\n});'
+        },
+        {
+            name: 'stripAnsi',
+            sig: 'stripAnsi(text)',
+            desc: '去除字符串中的 ANSI 转义码，返回纯文本。脚本收到的消息含颜色码，匹配前应先脱色。',
+            params: [
+                'text: string — 含 ANSI 转义码的原始文本',
+                '返回: string — 纯文本'
+            ],
+            example: 'onMessage(/杀死/, (text) => {\n    const clean = stripAnsi(text);\n    log("脱色后: " + clean);\n});'
+        },
+        {
+            name: 'waitMessage',
+            sig: 'waitMessage(pattern, timeout)',
+            desc: '等待匹配的消息出现，返回 Promise。resolve(true)=匹配到，resolve(false)=超时。',
+            params: [
+                'pattern: RegExp — 匹配模式',
+                'timeout: number — 超时毫秒数（默认 30000）',
+                '返回: Promise<boolean>'
+            ],
+            example: '(async () => {\n    sendCommand("practice sword");\n    const ok = await waitMessage(/已练到极限/, 10000);\n    if (ok) log("练剑完成");\n    else log("超时");\n})();'
         }
     ];
 
@@ -1892,7 +1926,7 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
         + this._escHtml('onMessage(/战斗结束/, async () => {\n    sendCommand("get all from corpse");\n    await sleep(1000);\n    sendCommand("north");\n});')
         + '</pre></div>'
         + '<div class="api-pattern-item"><b>等待指定消息（循环直至检测到）</b><pre>'
-        + this._escHtml('function waitFor(pattern, timeout) {\n    return new Promise((resolve) => {\n        let done = false;\n        const t = setTimeout(() => {\n            if (!done) { done = true; resolve(false); }\n        }, timeout || 30000);\n        onMessage(pattern, () => {\n            if (!done) { done = true; clearTimeout(t); resolve(true); }\n        });\n    });\n}\n\n(async () => {\n    while (true) {\n        sendCommand("practice sword");\n        if (await waitFor(/你已练到极限/, 10000)) {\n            log("练剑完成");\n            break;\n        }\n    }\n})();')
+        + this._escHtml('(async () => {\n    while (true) {\n        sendCommand("practice sword");\n        if (await waitMessage(/你已练到极限/, 10000)) {\n            log("练剑完成");\n            break;\n        }\n    }\n})();')
         + '</pre></div>';
     body.appendChild(patterns);
 
