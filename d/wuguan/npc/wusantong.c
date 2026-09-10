@@ -89,8 +89,8 @@ int recognize_apprentice(object ob, string skill)
            && skill != "parry")
         {
                 command("hmm");
-                command("say 我最多传授你一些" HIY "内功" NOR + CYN "、" HIY
-                        "轻功" NOR + CYN "和" HIY "招架" NOR + CYN "的基本常识。" NOR);
+                command("say 我最多传授你一些" HIY "内功(force)" NOR + CYN "、" HIY
+                        "轻功(dodge)" NOR + CYN "和" HIY "招架(parry)" NOR + CYN "的基本常识。" NOR);
                 command("say 其它的还是等你将来拜师后找师父学吧。");
                 return -1;
         }
