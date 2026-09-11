@@ -3677,7 +3677,7 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
             }
         }, 2000);
     }
-    
+
     // 断线重连检测：服务端 reconnect() 发送 "重新连线完毕" 但不会触发房间描述正则，
     // 需单独捕获此信号以恢复 _loginDone 门控和小地图等游戏专属面板
     if (!this._loginDone && /重新连线完毕/.test(message)) {
@@ -3964,17 +3964,28 @@ AdvancedMUDClient.prototype._handleGotoRoom = async function (keyword) {
         }
     }
 
-    // 先尝试按 hash 精确匹配
-    const byHash = pathfinder.getRoom(keyword);
-    if (byHash) {
-        this._startPathwalk(byHash.hash, byHash.name);
-        return;
+    // 解析 @区域 语法：gtr 客栈@北京 → keyword="客栈", areaFilter="北京"
+    let areaFilter = null;
+    const atIndex = keyword.lastIndexOf('@');
+    if (atIndex > 0) {
+        areaFilter = keyword.slice(atIndex + 1).trim();
+        keyword = keyword.slice(0, atIndex).trim();
     }
 
-    // 按名称搜索
-    const results = pathfinder.searchRoom(keyword);
+    // 先尝试按 hash 精确匹配（无区域过滤时）
+    if (!areaFilter) {
+        const byHash = pathfinder.getRoom(keyword);
+        if (byHash) {
+            this._startPathwalk(byHash.hash, byHash.name);
+            return;
+        }
+    }
+
+    // 按名称搜索（可选区域过滤）
+    const results = pathfinder.searchRoom(keyword, areaFilter);
+    const searchDesc = areaFilter ? '「' + keyword + '」（区域含「' + areaFilter + '」）' : '「' + keyword + '」';
     if (results.length === 0) {
-        this.appendMessage('未找到匹配「' + keyword + '」的房间', 'system');
+        this.appendMessage('未找到匹配' + searchDesc + '的房间', 'system');
         return;
     }
 
@@ -3984,7 +3995,6 @@ AdvancedMUDClient.prototype._handleGotoRoom = async function (keyword) {
     }
 
     // 多个匹配，显示可点击列表
-    this.appendMessage('找到 ' + results.length + ' 个匹配房间：', 'system');
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const dirShort = (d) => (typeof DIR_SHORT !== 'undefined' ? DIR_SHORT[d] : d) || d;
 
@@ -4003,7 +4013,23 @@ AdvancedMUDClient.prototype._handleGotoRoom = async function (keyword) {
         });
     }
 
+    // 区域分布统计
+    const areaCounts = {};
+    for (const r of results) {
+        const a = r.area || '未知';
+        areaCounts[a] = (areaCounts[a] || 0) + 1;
+    }
+    const areaSummary = Object.entries(areaCounts)
+        .sort((x, y) => y[1] - x[1])
+        .map(([a, c]) => a + '(' + c + ')')
+        .join(' ');
+
     let html = '';
+    html += '<div class="message system" style="color:#888">'
+        + '找到 ' + results.length + ' 个匹配' + esc(searchDesc) + '：'
+        + '<span style="color:#666;margin-left:6px">' + esc(areaSummary) + '</span>'
+        + (areaFilter ? '' : ' <span style="color:#555;font-size:0.9em">提示: gtr ' + esc(keyword) + '@区域名 可缩小范围</span>')
+        + '</div>';
     const maxShow = Math.min(results.length, 20);
     for (let i = 0; i < maxShow; i++) {
         const r = results[i];

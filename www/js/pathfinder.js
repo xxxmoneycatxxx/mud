@@ -188,14 +188,17 @@ class Pathfinder {
     // ===== 房间搜索 =====
 
     // 按名称搜索房间（子串匹配，不区分大小写）
+    // areaFilter: 可选，按区域名精确过滤
     // 返回 [{ hash, name, area, exits }]
-    searchRoom(keyword) {
+    searchRoom(keyword, areaFilter) {
         if (!this.loaded || !keyword) return [];
         const kw = keyword.toLowerCase();
+        const areaKw = areaFilter ? areaFilter.toLowerCase() : null;
         const results = [];
 
         for (const [hash, room] of this.rooms) {
             if (room.n && room.n.toLowerCase().includes(kw)) {
+                if (areaKw && (!room.a || !room.a.toLowerCase().includes(areaKw))) continue;
                 results.push({ hash, name: room.n, area: room.a || '', exits: room.e || [] });
             }
         }
