@@ -237,7 +237,7 @@ int recognize_apprentice(object ob, string skill)
     {
         command("shake");
         command("say 我最多传授你几项较为基本的特殊技能，复杂了你领悟不了。");
-        command("say 你可以跟我学郭氏心法、飞檐走壁、太祖长拳和一些基本技能。\n");
+        command("say 你可以跟我学郭氏心法(guoshi-xinfa)、飞檐走壁(feiyan-zoubi)、太祖长拳(changquan)和一些基本技能。\n");
         return -1;
     }
 
