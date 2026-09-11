@@ -846,6 +846,59 @@ protected void send_help_search(string keyword)
     sendGMCP((["matches": matches, "keyword": keyword]), "Help", "Search");
 }
 
+// 构建并发送环境变量设置（set 指令的结构化数据，供 Web 底部设置面板使用）
+public void send_env_settings()
+{
+    object ob = this_object();
+    mapping env, term_map, env_domains;
+    string *term_keys;
+    mapping meta, current;
+    int i;
+
+    if (!has_gmcp())
+        return;
+
+    env = ob->query("env");
+    if (!mapp(env)) env = ([]);
+
+    // 复用 set.c 的定义：获取所有可用参数及其类型
+    term_map = (mapping)call_other("/cmds/usr/set", "query_terms");
+    if (!mapp(term_map)) term_map = ([]);
+
+    env_domains = (mapping)call_other("/cmds/usr/set", "query_env_domains");
+    if (!mapp(env_domains)) env_domains = ([]);
+
+    // 过滤掉巫师专属参数，构建元数据
+    meta = ([]);
+    term_keys = keys(term_map);
+    for (i = 0; i < sizeof(term_keys); i++)
+    {
+        string t = term_keys[i];
+        int flags = term_map[t];
+
+        if (flags & 0x40)  // WIZ_ONLY
+            continue;
+
+        meta[t] = ([
+            "type": (flags & 0x1) ? "list" :
+                    (flags & 0x4) ? "number" :
+                    (flags & 0x2) ? "string" : "toggle",
+        ]);
+        if (mapp(env_domains[t]))
+            meta[t]["options"] = env_domains[t];
+    }
+
+    // 当前已设置的值
+    current = env + ([]);
+
+    mapping data = ([
+        "current": current,
+        "meta"   : meta,
+    ]);
+
+    sendGMCP(data, "Env", "Settings");
+}
+
 protected void init_gmcp()
 {
     if (!has_gmcp())
@@ -862,10 +915,11 @@ protected void init_gmcp()
         sendGMCP((["url":env("Map")]), "Client", "Map");
     }
 
-    // 登录完成后延迟推送角色状态、房间信息与帮助主题索引（等待GMCP通道就绪）
+    // 登录完成后延迟推送角色状态、房间信息、帮助主题索引与环境变量（等待GMCP通道就绪）
     call_out("send_char_vitals", 1);
     call_out("send_room_info", 1);
     call_out("send_help_topics", 1);
+    call_out("send_env_settings", 1);
 
     if (wizardp(this_player()))
     {
@@ -935,11 +989,84 @@ void gmcp(string req)
         }
     }
     // Web 客户端刷新重连后发送 Client.GUI，此时玩家环境已完全恢复
-    // 延迟重推房间信息、状态和帮助，确保地图等组件能正常渲染
+    // 延迟重推房间信息、状态、帮助和环境变量，确保地图等组件能正常渲染
     else if (module == "Client.GUI")
     {
         call_out("send_char_vitals", 1);
         call_out("send_room_info", 1);
         call_out("send_help_topics", 1);
+        call_out("send_env_settings", 1);
+    }
+    // 客户端请求环境变量列表
+    else if (module == "Env.Settings.Get" || module == "Env.Settings")
+    {
+        send_env_settings();
+    }
+    // 客户端修改环境变量（toggle / enum / 数值）
+    else if (module == "Env.Set")
+    {
+        mapping payload;
+        object ob = this_object();
+        if (data && (payload = json_decode(data)) && mapp(payload))
+        {
+            string term = payload["term"];
+            mixed value = payload["value"];
+            mapping tm;
+
+            if (!term || term == "")
+                return;
+
+            tm = (mapping)call_other("/cmds/usr/set", "query_terms");
+            if (!mapp(tm) || undefinedp(tm[term]))
+                return;
+
+            // 不允许客户端设置巫师专属参数
+            if (tm[term] & 0x40)
+                return;
+
+            // toggle 类型：value 为 1/true 则设置，0/false 则删除
+            if (!(tm[term] & 0x7))  // 非 list/number/string → toggle
+            {
+                if (value)
+                    ob->set("env/" + term, 1);
+                else
+                    ob->delete("env/" + term);
+            }
+            else
+            {
+                // 枚举/数值/字符串：直接设置
+                if (tm[term] & 0x4)  // NUMBER_TERM
+                {
+                    if (intp(value))
+                        ob->set("env/" + term, value);
+                    else
+                    {
+                        int num = 0;
+                        sscanf((string)value, "%d", num);
+                        ob->set("env/" + term, num);
+                    }
+                }
+                else
+                {
+                    // 枚举类型：值可能是字符串键（如 "damage"），需映射为数字
+                    mapping domains = (mapping)call_other("/cmds/usr/set", "query_env_domains");
+                    if (mapp(domains[term]) && stringp(value))
+                    {
+                        mapping d = domains[term];
+                        if (!undefinedp(d[value]))
+                            ob->set("env/" + term, d[value]);
+                        else
+                            ob->set("env/" + term, value);
+                    }
+                    else
+                    {
+                        ob->set("env/" + term, value);
+                    }
+                }
+            }
+
+            // 推送更新后的完整环境变量给客户端
+            send_env_settings();
+        }
     }
 }

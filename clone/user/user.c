@@ -383,6 +383,7 @@ void reconnect()
     // 此处延迟补推一次，确保 GMCP 通道就绪后数据可达
     call_out("send_room_info", 1);
     call_out("send_char_vitals", 1);
+    call_out("send_env_settings", 1);
 }
 
 // skill variable & function

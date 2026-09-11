@@ -707,6 +707,157 @@ body {
     cursor: crosshair;
 }
 
+/* ===== 游戏环境变量设置抽屉：底部栏上方滑出 ===== */
+.env-settings-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: rgba(2, 8, 2, 0.97);
+    border-top: 2px solid #0a3a0a;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.7);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.env-settings-drawer.visible {
+    transform: translateY(0);
+}
+.env-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    border-bottom: 1px solid #0a2a0a;
+    position: sticky;
+    top: 0;
+    background: rgba(2, 8, 2, 0.98);
+    z-index: 1;
+}
+.env-drawer-title {
+    color: #0f0;
+    font-weight: bold;
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+.env-drawer-close {
+    background: none;
+    border: 1px solid #1a3a1a;
+    color: #4f4;
+    cursor: pointer;
+    padding: 2px 8px;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 3px;
+}
+.env-drawer-close:hover {
+    color: #0f0;
+    border-color: #0f0;
+}
+.env-drawer-body {
+    padding: 8px 12px 12px;
+}
+.env-drawer-loading {
+    color: #666;
+    text-align: center;
+    padding: 16px;
+    font-size: 12px;
+}
+/* 设置分组 */
+.env-group {
+    margin-bottom: 10px;
+}
+.env-group-title {
+    color: #4f4;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid #0a2a0a;
+}
+/* 设置项行 */
+.env-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 0;
+    gap: 8px;
+}
+.env-row + .env-row {
+    border-top: 1px solid rgba(10, 30, 10, 0.4);
+}
+.env-label {
+    color: #ccc;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+.env-label .env-key {
+    color: #666;
+    font-size: 10px;
+    margin-left: 4px;
+}
+/* Toggle 开关（复用触发器面板风格） */
+.env-toggle {
+    position: relative;
+    width: 36px;
+    height: 18px;
+    flex-shrink: 0;
+}
+.env-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.env-toggle .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 18px;
+    transition: 0.2s;
+}
+.env-toggle .slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+    background: #666;
+    border-radius: 50%;
+    transition: 0.2s;
+}
+.env-toggle input:checked + .slider {
+    background: #0a3a0a;
+    border-color: #0f0;
+}
+.env-toggle input:checked + .slider:before {
+    transform: translateX(18px);
+    background: #0f0;
+}
+/* 枚举下拉 */
+.env-select {
+    background: #0a0a0a;
+    color: #4f4;
+    border: 1px solid #1a3a1a;
+    padding: 2px 6px;
+    font-size: 11px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.env-select:focus {
+    outline: none;
+    border-color: #0f0;
+}
+/* 登录前隐藏 */
+body:not(.logged-in) .env-settings-drawer {
+    display: none !important;
+}
+
 /* ===== 底部条：终端双线边框 ===== */
 .bottom-bar {
     display: flex;

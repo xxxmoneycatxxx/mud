@@ -40,10 +40,20 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
     settingsBtn.addEventListener('click', () => this._openSettings());
     qcContainer.appendChild(settingsBtn);
 
+    // 游戏设置按钮：打开环境变量抽屉面板
+    const envBtn = document.createElement('button');
+    envBtn.className = 'qc-btn qc-env-btn';
+    envBtn.textContent = '选项';
+    envBtn.title = '游戏环境变量 (set)';
+    envBtn.addEventListener('click', () => this._toggleEnvDrawer());
+    qcContainer.appendChild(envBtn);
+
     // 设置面板事件绑定
     this._setupSettingsEvents();
     // 角色面板事件绑定
     this._setupCharPanelEvents();
+    // 游戏设置抽屉事件绑定
+    this._setupEnvDrawerEvents();
 };
 
 // 设置面板：事件绑定（只调用一次）
@@ -223,6 +233,199 @@ AdvancedMUDClient.prototype._requestCharPanelData = function (tabName) {
     if (module && this.sendGMCP) {
         this.sendGMCP(module, {});
     }
+};
+
+// ===== 游戏环境变量设置抽屉 =====
+
+// 环境变量中文标签
+const ENV_LABELS = {
+    auto_get:        ['自动拾取', '拾取尸体时自动 get all'],
+    auto_drinkout:   ['自动喝光', '自动喝光容器中的液体'],
+    auto_regenerate: ['自动打坐', '空闲时自动打坐修炼'],
+    auto_say:        ['自动说话', '重复上次说话内容'],
+    brief:           ['简要描述', '移动时只显示房间名'],
+    careful:         ['小心模式', '战斗时更加谨慎'],
+    combatd:         ['战斗消息', '战斗消息显示模式'],
+    halt_age:        ['停止年龄', '达到指定年龄停止增长'],
+    jam_talk:        ['消息过滤', '过滤部分频道消息'],
+    keep_idle:       ['保持空闲', '保持空闲状态不被踢出'],
+    look_window:     ['窗口模式', 'look 输出适配窗口宽度'],
+    no_autoultra:    ['禁止超杀', '禁止自动超杀'],
+    no_emote:        ['屏蔽表情', '屏蔽指定玩家的表情'],
+    no_follow:       ['拒绝跟随', '拒绝跟随其他玩家'],
+    no_more:         ['关闭分页', '关闭长文本分页显示'],
+    no_story:        ['屏蔽故事', '屏蔽故事频道消息'],
+    no_teach:        ['拒绝拜师', '拒绝其他玩家的拜师'],
+    no_tell:         ['屏蔽私聊', '屏蔽指定玩家的私聊'],
+    prompt:          ['提示符', '显示命令行提示符'],
+    public:          ['公开模式', '允许其他玩家查看属性'],
+    pure_say:        ['纯净说话', '说话时不附加额外信息'],
+    show_map:        ['显示地图', '显示小地图面板'],
+    wimpy:           ['胆小模式', '气血低时自动逃跑'],
+    wimpy_apply:     ['胆小应用', '将胆小模式应用到战斗'],
+    default_sign:    ['默认签名', '默认个人签名序号'],
+};
+
+// 环境变量分组
+const ENV_GROUPS = [
+    { title: '自动化', keys: ['auto_get', 'auto_drinkout', 'auto_regenerate', 'auto_say', 'no_autoultra'] },
+    { title: '战斗',   keys: ['combatd', 'careful', 'wimpy', 'wimpy_apply'] },
+    { title: '显示',   keys: ['brief', 'no_more', 'look_window', 'show_map', 'prompt'] },
+    { title: '社交',   keys: ['public', 'no_follow', 'no_emote', 'no_tell', 'no_story', 'no_teach', 'jam_talk'] },
+    { title: '其他',   keys: ['keep_idle', 'halt_age', 'pure_say', 'default_sign'] },
+];
+
+// 抽屉事件绑定
+AdvancedMUDClient.prototype._setupEnvDrawerEvents = function () {
+    const drawer = document.getElementById('envSettingsDrawer');
+    const closeBtn = document.getElementById('envDrawerClose');
+    if (!drawer) return;
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => this._closeEnvDrawer());
+    }
+    // Esc 关闭
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && drawer.classList.contains('visible')) {
+            this._closeEnvDrawer();
+        }
+    });
+    // 事件委托：toggle 和 select 变更
+    drawer.addEventListener('change', (e) => {
+        const toggle = e.target.closest('.env-toggle input');
+        if (toggle) {
+            const term = toggle.getAttribute('data-term');
+            this._sendEnvSet(term, toggle.checked ? 1 : 0);
+            return;
+        }
+        const select = e.target.closest('.env-select');
+        if (select) {
+            const term = select.getAttribute('data-term');
+            this._sendEnvSet(term, select.value);
+        }
+    });
+};
+
+// 切换抽屉开关
+AdvancedMUDClient.prototype._toggleEnvDrawer = function () {
+    const drawer = document.getElementById('envSettingsDrawer');
+    if (!drawer) return;
+    if (drawer.classList.contains('visible')) {
+        this._closeEnvDrawer();
+    } else {
+        this._openEnvDrawer();
+    }
+};
+
+AdvancedMUDClient.prototype._openEnvDrawer = function () {
+    const drawer = document.getElementById('envSettingsDrawer');
+    if (!drawer) return;
+    drawer.classList.add('visible');
+    // 如果还没有收到过数据，请求一次
+    if (!this._envSettingsData) {
+        if (this.sendGMCP) this.sendGMCP('Env.Settings.Get', {});
+    }
+};
+
+AdvancedMUDClient.prototype._closeEnvDrawer = function () {
+    const drawer = document.getElementById('envSettingsDrawer');
+    if (drawer) drawer.classList.remove('visible');
+};
+
+// 发送环境变量变更
+AdvancedMUDClient.prototype._sendEnvSet = function (term, value) {
+    if (this.sendGMCP) {
+        this.sendGMCP('Env.Set', { term: term, value: value });
+    }
+};
+
+// 渲染环境变量设置面板
+AdvancedMUDClient.prototype._renderEnvSettings = function (data) {
+    this._envSettingsData = data;
+    const body = document.getElementById('envDrawerBody');
+    if (!body) return;
+
+    const current = data.current || {};
+    const meta = data.meta || {};
+
+    body.innerHTML = '';
+
+    ENV_GROUPS.forEach(group => {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'env-group';
+
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'env-group-title';
+        titleDiv.textContent = group.title;
+        groupDiv.appendChild(titleDiv);
+
+        group.keys.forEach(key => {
+            const m = meta[key];
+            if (!m) return;  // 服务端未返回该参数元数据
+
+            const row = document.createElement('div');
+            row.className = 'env-row';
+
+            // 标签
+            const labelInfo = ENV_LABELS[key] || [key, ''];
+            const label = document.createElement('span');
+            label.className = 'env-label';
+            label.innerHTML = labelInfo[0] + '<span class="env-key" title="' + (labelInfo[1] || '') + '">' + key + '</span>';
+            row.appendChild(label);
+
+            if (m.type === 'toggle') {
+                // 布尔开关
+                const toggleLabel = document.createElement('label');
+                toggleLabel.className = 'env-toggle';
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.setAttribute('data-term', key);
+                input.checked = !!current[key];
+                toggleLabel.appendChild(input);
+                const slider = document.createElement('span');
+                slider.className = 'slider';
+                toggleLabel.appendChild(slider);
+                row.appendChild(toggleLabel);
+            } else if (m.options) {
+                // 枚举下拉
+                const select = document.createElement('select');
+                select.className = 'env-select';
+                select.setAttribute('data-term', key);
+                const opts = m.options;
+                const optKeys = Object.keys(opts);
+                // 找到当前值对应的键名
+                const curVal = current[key];
+                optKeys.forEach(ok => {
+                    const opt = document.createElement('option');
+                    opt.value = ok;
+                    opt.textContent = ok;
+                    if (opts[ok] === curVal || ok === String(curVal)) {
+                        opt.selected = true;
+                    }
+                    select.appendChild(opt);
+                });
+                row.appendChild(select);
+            } else if (m.type === 'number') {
+                // 数值输入
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'env-select';
+                input.setAttribute('data-term', key);
+                input.value = current[key] || 0;
+                input.style.width = '60px';
+                // 数值输入用 blur 提交
+                input.addEventListener('change', () => {
+                    this._sendEnvSet(key, parseInt(input.value, 10) || 0);
+                });
+                row.appendChild(input);
+            }
+            // list 类型暂不在抽屉中显示（需要复杂编辑）
+
+            groupDiv.appendChild(row);
+        });
+
+        body.appendChild(groupDiv);
+    });
 };
 
 // 渲染属性 tab：角色详细属性
@@ -2991,6 +3194,9 @@ AdvancedMUDClient.prototype.processGMCPData = function (data) {
             case 'Help.Search':
                 this.applyHelpSearchResults(data.data);
                 break;
+            case 'Env.Settings':
+                this._renderEnvSettings(data.data);
+                break;
             case 'Client.GUI':
                 break;
         }
@@ -3435,6 +3641,8 @@ AdvancedMUDClient.prototype._resetLoginGate = function () {
     // 关闭依赖服务端数据的模态框（数据已失效）；设置面板是纯本地配置，不关
     if (this.helpOverlay && this.helpOverlay.classList.contains('visible')) this.closeHelpModal();
     this._closeCharPanel();
+    this._closeEnvDrawer();
+    this._envSettingsData = null;  // 重连后重新请求环境变量
     const questDetail = document.getElementById('questDetailOverlay');
     if (questDetail) questDetail.classList.remove('visible');
 };
