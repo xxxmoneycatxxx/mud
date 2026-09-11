@@ -3604,11 +3604,21 @@ AdvancedMUDClient.prototype.sendCommand = function (command) {
     if (!this.connected) return;
 
     if (!command) {
-        command = '\n';
-    } else if (!command.endsWith('\n')) {
-        command += '\n';
+        this.ws.send('\n');
+        return;
     }
 
+    // gtr 拦截：所有入口（用户输入/触发器/定时器/脚本）统一路由到寻路组件
+    const trimmed = command.trim();
+    if (/^gtr\s+/i.test(trimmed)) {
+        const keyword = trimmed.replace(/^gtr\s+/i, '').trim();
+        if (keyword) this._handleGotoRoom(keyword);
+        return;
+    }
+
+    if (!trimmed.endsWith('\n')) {
+        command = trimmed + '\n';
+    }
     this.ws.send(command);
 };
 
@@ -3887,12 +3897,7 @@ AdvancedMUDClient.prototype.handleSendCommand = function () {
             this.appendMessage('> ' + commands.join('; '), 'system');
         }
         for (const cmd of commands) {
-            if (/^gtr\s+/i.test(cmd)) {
-                const keyword = cmd.replace(/^gtr\s+/i, '').trim();
-                if (keyword) this._handleGotoRoom(keyword);
-            } else {
-                this.sendCommand(cmd);
-            }
+            this.sendCommand(cmd);
         }
         this.addToHistory(command);
     } else if (command) {
@@ -3906,15 +3911,8 @@ AdvancedMUDClient.prototype.handleSendCommand = function () {
             }
         }
 
-        // 拦截 gtr 命令，路由到寻路组件
-        if (/^gtr\s+/i.test(command)) {
-            const keyword = command.replace(/^gtr\s+/i, '').trim();
-            if (keyword) this._handleGotoRoom(keyword);
-            else this.appendMessage('用法: gtr 房间名|房间hash', 'system');
-        } else {
-            this.addToHistory(command);
-            this.sendCommand(command);
-        }
+        this.addToHistory(command);
+        this.sendCommand(command);
     } else {
         this.sendCommand('\n');
     }

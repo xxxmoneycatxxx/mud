@@ -931,6 +931,7 @@ class AdvancedMUDClient {
             // 已连接且已进入游戏才发送，避免登录/注册界面被定时命令污染
             if (this._canAutoSend()) {
                 this.sendCommand(timer.command);
+                this.appendMessage('⏱ [' + timer.name + '] → ' + timer.command, 'system');
             }
         }, timer.interval * 1000);
         this._timerIntervals.set(timer.name, id);
