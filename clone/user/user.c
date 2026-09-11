@@ -378,6 +378,11 @@ void reconnect()
     net_dead = 0;
     remove_call_out("user_dump");
     tell_object(this_object(), "重新连线完毕。\n");
+
+    // 断线重连时 init_gmcp() 不会重新执行，客户端小地图等组件依赖 Room.Info 才能恢复；
+    // 此处延迟补推一次，确保 GMCP 通道就绪后数据可达
+    call_out("send_room_info", 1);
+    call_out("send_char_vitals", 1);
 }
 
 // skill variable & function

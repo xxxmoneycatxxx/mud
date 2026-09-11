@@ -3455,7 +3455,7 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
             this._hpFallbackSent = true;
             setTimeout(() => {
                 if (this.connected && !this._vitalsReceived) {
-                    console.warn('GMCP未生效，发送hp作为兑底');
+                    console.warn('GMCP未生效，发送hp作为兜底');
                     this.sendCommand('hp\n');
                 }
             }, 1500);
@@ -3465,6 +3465,20 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
         // send_room_info 因 environment() 为空而跳过；此处补发一次请求作为兜底
         setTimeout(() => {
             if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.sendGMCP('Room.Info.Get', {});
+            }
+        }, 2000);
+    }
+    
+    // 断线重连检测：服务端 reconnect() 发送 "重新连线完毕" 但不会触发房间描述正则，
+    // 需单独捕获此信号以恢复 _loginDone 门控和小地图等游戏专属面板
+    if (!this._loginDone && /重新连线完毕/.test(message)) {
+        this._markLoggedIn();
+        // 服务端 reconnect() 已延迟推送 Room.Info / Char.Vitals，
+        // 此处再补发一次请求作为兜底，确保 GMCP 通道就绪后数据可达
+        setTimeout(() => {
+            if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.sendGMCP('Char.Vitals.Get', {});
                 this.sendGMCP('Room.Info.Get', {});
             }
         }, 2000);
