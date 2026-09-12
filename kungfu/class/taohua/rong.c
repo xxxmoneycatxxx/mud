@@ -7,13 +7,14 @@ inherit F_MASTER;
 void create()
 {
         set_name("黄蓉", ({"huang rong", "huang", "rong"}));
-        set("title", "东海桃花岛主之女");
+        set("title", "郭靖之妻");
         set("nickname", HIY "丐帮前任帮主" NOR);
         set("gender", "女性");
-        set("age", 28);
-        set("long", "这便是桃花岛岛主的独生女儿。由于岛主夫人\n"
-                    "早死，岛主对这个女儿备加疼爱。她生性跳脱\n"
-                    "飞扬，喜欢四处乱跑。\n");
+        set("age", 43);
+        set("long", "她是郭靖的妻子，桃花岛主黄药师之女。\n"
+                    "当年那个机灵古怪的少女如今已为人妻母，\n"
+                    "眉宇间多了几分沉稳，目光中透着睿智从容。\n"
+                    "襄阳守城的家事军务，大半由她操持打理。\n");
         set("attitude", "peaceful");
         set("class", "scholar");
         set("str", 28);

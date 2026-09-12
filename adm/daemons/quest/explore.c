@@ -54,8 +54,8 @@ mapping rcv_npcs = ([
             "/d/fuzhou/shiqiao":"sha tianjiang",
            "/d/fuzhou/fzroad10":"yu renyan",
 
-        "/d/xiangyang/westjie2":"wu santong",
-     "/d/xiangyang/juyihuayuan":"guo fu",
+        "/d/wuguan/guofu_lang4":"wu santong",
+       "/d/wuguan/guofu_dating":"guo fu",
     "/d/xiangyang/jiangjuntang":"wang jian",
           "/d/xiangyang/dangpu":"qiu hang",
       "/d/xiangyang/xinluofang":"gaoli shang",

@@ -22,7 +22,6 @@ LONG );
         "southeast" : __DIR__"juyiwupin",
     ]));
     set("objects", ([
-        __DIR__"npc/guofu" : 1,
     ]));
     setup();
 }

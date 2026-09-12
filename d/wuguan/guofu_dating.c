@@ -20,6 +20,9 @@ LONG);
         "east" : __DIR__"guofu_shilu-1",
     ]));
 
+    set("objects", ([
+        "/d/xiangyang/npc/guofu" : 1,
+    ]));
     setup();
     "/d/wuguan/npc/guojing"->come_here();
 }

@@ -6,6 +6,7 @@ void create()
         set_name("武三通", ({"wu santong", "wu", "santong"}));
         set("gender", "男性");
         set("age", 55);
+        set("startroom", "/d/wuguan/guofu_lang4");
         set("title", HIY "南帝四大弟子" NOR);
         set("long", @LONG
 朱子柳乃是一灯大师的四大弟子之一，现在正协助
