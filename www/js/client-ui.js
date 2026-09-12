@@ -3268,7 +3268,37 @@ AdvancedMUDClient.prototype.updateCharacterStatus = function (vitals) {
     });
 
     statsLine.innerHTML = html;
-    document.getElementById('statusBar').classList.add('visible');
+
+    // 同步更新底部纯文本状态栏
+    var vitalsBar = document.getElementById('vitalsBar');
+    if (vitalsBar) {
+        var ratioStats = [
+            { key: 'hp',     cur: v.hp,     max: v.max_hp },
+            { key: 'jing',   cur: v.jing,   max: v.max_jing },
+            { key: 'jingli', cur: v.jingli, max: v.max_jingli },
+            { key: 'neili',  cur: v.neili,  max: v.max_neili },
+            { key: 'food',   cur: v.food,   max: v.max_food },
+            { key: 'water',  cur: v.water,  max: v.max_water }
+        ];
+        ratioStats.forEach(function (s) {
+            var el = vitalsBar.querySelector('[data-stat="' + s.key + '"]');
+            if (!el) return;
+            var cur = s.cur || 0, max = s.max || 0;
+            el.textContent = cur + '/' + max;
+            el.classList.remove('v-green', 'v-yellow', 'v-red');
+            if (max > 0) {
+                var pct = cur / max;
+                el.classList.add(pct >= 0.6 ? 'v-green' : pct >= 0.3 ? 'v-yellow' : 'v-red');
+            } else {
+                el.classList.add('v-green');
+            }
+        });
+        var expEl = vitalsBar.querySelector('[data-stat="exp"]');
+        if (expEl) expEl.textContent = (v.exp || 0).toLocaleString();
+        var potEl = vitalsBar.querySelector('[data-stat="pot"]');
+        if (potEl) potEl.textContent = String(v.pot || 0);
+        vitalsBar.classList.add('visible');
+    }
 };
 
 AdvancedMUDClient.prototype.updateRoomInfo = function (roomInfo) {
@@ -3320,23 +3350,30 @@ AdvancedMUDClient.prototype.toggleMinimap = function () {
     }
 };
 
-// 切换状态栏折叠/展开
+// 切换悬浮状态栏显示/隐藏（唤出式）
 AdvancedMUDClient.prototype.toggleStatusBar = function () {
     const panel = document.getElementById('statusBar');
-    const toggle = document.getElementById('statusToggle');
     if (!panel) return;
-    panel.classList.toggle('collapsed');
-    if (toggle) {
-        toggle.textContent = panel.classList.contains('collapsed') ? '+' : '\u2212';
-    }
+    panel.classList.toggle('visible');
 };
 
-// 状态栏面板：折叠按钮 + 拖拽（鼠标 + 触摸）
+// 状态栏面板：关闭按钮 + 底部唤出按钮 + 拖拽（鼠标 + 触摸）
 AdvancedMUDClient.prototype.setupStatusBar = function () {
-    // 折叠/展开按钮
-    const toggleBtn = document.getElementById('statusToggle');
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', () => this.toggleStatusBar());
+    const self = this;
+    // 关闭按钮
+    const closeBtn = document.getElementById('statusClose');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function () {
+            const panel = document.getElementById('statusBar');
+            if (panel) panel.classList.remove('visible');
+        });
+    }
+    // 底部栏唤出按钮
+    const triggerBtn = document.getElementById('statusTriggerBtn');
+    if (triggerBtn) {
+        triggerBtn.addEventListener('click', function () {
+            self.toggleStatusBar();
+        });
     }
 
     // 拖拽（与 minimap 相同逻辑）
@@ -3374,7 +3411,7 @@ AdvancedMUDClient.prototype.setupStatusBar = function () {
 
     // 鼠标
     header.addEventListener('mousedown', (e) => {
-        if (e.target.closest('.status-toggle')) return;
+        if (e.target.closest('.status-close')) return;
         e.preventDefault();
         onStart(e.clientX, e.clientY);
     });
@@ -3383,7 +3420,7 @@ AdvancedMUDClient.prototype.setupStatusBar = function () {
 
     // 触摸
     header.addEventListener('touchstart', (e) => {
-        if (e.target.closest('.status-toggle')) return;
+        if (e.target.closest('.status-close')) return;
         const t = e.touches[0];
         onStart(t.clientX, t.clientY);
     }, { passive: true });
@@ -3631,9 +3668,7 @@ AdvancedMUDClient.prototype._markLoggedIn = function () {
     if (this._loginDone) return;
     this._loginDone = true;
     document.body.classList.add('logged-in');
-    const statusBar = document.getElementById('statusBar');
     const quickCmds = document.getElementById('quickCommands');
-    if (statusBar) statusBar.classList.add('visible');
     if (quickCmds) quickCmds.classList.add('visible');
 };
 
@@ -3648,6 +3683,8 @@ AdvancedMUDClient.prototype._resetLoginGate = function () {
     if (statusBar) statusBar.classList.remove('visible');
     if (quickCmds) quickCmds.classList.remove('visible');
     if (minimap) minimap.classList.remove('visible');
+    var vitalsBar = document.getElementById('vitalsBar');
+    if (vitalsBar) vitalsBar.classList.remove('visible');
     // 关闭依赖服务端数据的模态框（数据已失效）；设置面板是纯本地配置，不关
     if (this.helpOverlay && this.helpOverlay.classList.contains('visible')) this.closeHelpModal();
     this._closeCharPanel();

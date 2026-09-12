@@ -8,11 +8,11 @@
     <link rel="stylesheet" href="lib/codemirror/codemirror.css">
 </head>
 <body>
-    <!-- 状态栏浮动面板：角色属性 Gauge 可视化 -->
+    <!-- 状态栏浮动面板：唤出式 Gauge 可视化，默认隐藏 -->
     <div class="status-panel" id="statusBar">
         <div class="status-header">
             <span class="status-title">〔 角色状态 〕</span>
-            <button class="status-toggle" id="statusToggle" title="收起/展开状态栏">−</button>
+            <button class="status-close" id="statusClose" title="关闭状态栏">✕</button>
         </div>
         <div class="status-body" id="statusBody">
             <div class="stats-line" id="statsLine">
@@ -72,6 +72,25 @@
         <button class="send-btn" id="sendBtn" disabled>发送</button>
     </div>
 
+    <!-- 底部状态栏：纯文本数值显示，位于输入区与底部条之间 -->
+    <div class="vitals-bar" id="vitalsBar">
+        <span class="vitals-item"><span class="vitals-label">气血</span> <span class="vitals-val" data-stat="hp">--/--</span></span>
+        <span class="vitals-sep">│</span>
+        <span class="vitals-item"><span class="vitals-label">精气</span> <span class="vitals-val" data-stat="jing">--/--</span></span>
+        <span class="vitals-sep">│</span>
+        <span class="vitals-item"><span class="vitals-label">精力</span> <span class="vitals-val" data-stat="jingli">--/--</span></span>
+        <span class="vitals-sep">│</span>
+        <span class="vitals-item"><span class="vitals-label">内力</span> <span class="vitals-val" data-stat="neili">--/--</span></span>
+        <span class="vitals-sep">│</span>
+        <span class="vitals-item"><span class="vitals-label">食物</span> <span class="vitals-val" data-stat="food">--/--</span></span>
+        <span class="vitals-sep">│</span>
+        <span class="vitals-item"><span class="vitals-label">水</span> <span class="vitals-val" data-stat="water">--/--</span></span>
+        <span class="vitals-sep">│</span>
+        <span class="vitals-item"><span class="vitals-label">经验</span> <span class="vitals-val vitals-text" data-stat="exp">--</span></span>
+        <span class="vitals-sep">│</span>
+        <span class="vitals-item"><span class="vitals-label">潜能</span> <span class="vitals-val vitals-text" data-stat="pot">--</span></span>
+    </div>
+
     <!-- 游戏环境变量设置抽屉：从底部栏上方滑出 -->
     <div class="env-settings-drawer" id="envSettingsDrawer">
         <div class="env-drawer-header">
@@ -83,8 +102,9 @@
         </div>
     </div>
 
-    <!-- 底部条：帮助按钮 + 快捷命令 + 连接状态 -->
+    <!-- 底部条：状态唤出 + 帮助按钮 + 快捷命令 + 连接状态 -->
     <div class="bottom-bar">
+        <button class="qc-btn status-trigger-btn" id="statusTriggerBtn" title="查看角色详细状态">状态</button>
         <button class="qc-btn help-btn" id="helpBtn" title="浏览帮助文档 (F1)">帮助</button>
         <div class="quick-commands" id="quickCommands"></div>
         <div class="status-container">

@@ -255,11 +255,11 @@ body {
     flex: 1;
     min-width: 0;
 }
-.status-toggle {
+.status-close {
     background: none;
     border: 1px solid #333;
     color: #888;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1;
     width: 20px;
     height: 20px;
@@ -272,19 +272,13 @@ body {
     flex-shrink: 0;
     transition: all 0.15s;
 }
-.status-toggle:hover {
-    color: #0f0;
-    border-color: #0f0;
+.status-close:hover {
+    color: #f44;
+    border-color: #f44;
 }
 .status-body {
     overflow: hidden;
-    transition: max-height 0.25s ease;
     padding: 6px 8px;
-}
-.status-panel.collapsed .status-body {
-    max-height: 0;
-    padding: 0 8px;
-    overflow: hidden;
 }
 .stats-line {
     display: flex;
@@ -867,6 +861,46 @@ body:not(.logged-in) .env-settings-drawer {
     margin: 0 6px 4px 6px;
 }
 
+/* ===== 底部状态栏：纯文本数值显示，位于输入区与底部条之间 ===== */
+.vitals-bar {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 3px 10px;
+    background: #030803;
+    border-top: 1px solid #0a1a0a;
+    margin: 0 6px 0 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    user-select: none;
+}
+.vitals-bar.visible { display: flex; }
+.vitals-item {
+    white-space: nowrap;
+    padding: 0 4px;
+}
+.vitals-label {
+    color: #666;
+    font-size: 11px;
+}
+.vitals-val {
+    font-weight: bold;
+    transition: color 0.3s ease;
+}
+/* 颜色状态指示：绿 ≥60%  黄 30~60%  红 <30% */
+.vitals-val.v-green  { color: #3f3; text-shadow: 0 0 4px rgba(0,255,0,0.25); }
+.vitals-val.v-yellow { color: #cc0; text-shadow: 0 0 4px rgba(204,204,0,0.25); }
+.vitals-val.v-red    { color: #f44; text-shadow: 0 0 4px rgba(255,68,68,0.3); }
+/* 纯文本项（经验/潜能）默认绿色 */
+.vitals-val.vitals-text { color: #3f3; }
+.vitals-sep {
+    color: #1a3a1a;
+    padding: 0 2px;
+    user-select: none;
+}
+
 /* ===== 登录门控：未进入游戏时只保留底部连接状态 =====
    body 上的 .logged-in 由 client-ui.js 的 _markLoggedIn / _resetLoginGate 增删。
    登录、注册、创建角色阶段不渲染状态栏/小地图/快捷命令/帮助入口，
@@ -876,7 +910,9 @@ body:not(.logged-in) .status-panel,
 body:not(.logged-in) .minimap-panel,
 body:not(.logged-in) .map-fullscreen,
 body:not(.logged-in) .quick-commands,
-body:not(.logged-in) #helpBtn {
+body:not(.logged-in) #helpBtn,
+body:not(.logged-in) #statusTriggerBtn,
+body:not(.logged-in) .vitals-bar {
     display: none !important;
 }
 .quick-commands {
@@ -907,10 +943,14 @@ body:not(.logged-in) #helpBtn {
     border-color: #0f0;
     text-shadow: 0 0 6px rgba(0, 255, 0, 0.3);
 }
-/* 帮助按钮：底部条最左（未登录时由登录门控隐藏，见上方 body:not(.logged-in) 规则） */
-.help-btn {
+/* 状态唤出按钮 + 帮助按钮：底部条左侧 */
+.status-trigger-btn {
     flex-shrink: 0;
     margin-left: 12px;
+}
+.help-btn {
+    flex-shrink: 0;
+    margin-left: 4px;
 }
 
 /* ===== 帮助浏览模态框：复古 ASCII 风格（双线边框+磷光绿+等宽）===== */
@@ -1142,6 +1182,12 @@ body:not(.logged-in) #helpBtn {
     .bottom-bar {
         margin: 0 3px 2px 3px;
     }
+    .vitals-bar {
+        font-size: 11px;
+        padding: 2px 4px;
+        margin: 0 3px 0 3px;
+    }
+    .vitals-label { font-size: 10px; }
     .qc-btn {
         font-size: 10px;
         padding: 2px 7px;
