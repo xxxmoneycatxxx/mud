@@ -17,6 +17,7 @@ LONG);
     ]));
     set("objects", ([
         CLASS_D("taohua") + "/rong" : 1,
+        "/d/xiangyang/npc/guoxiang" : 1,
     ]));
     setup();
     replace_program(ROOM);

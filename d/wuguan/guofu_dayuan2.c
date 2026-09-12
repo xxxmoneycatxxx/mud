@@ -15,6 +15,7 @@ LONG);
         ]));
         set("objects", ([
                 __DIR__"npc/yelvqi" : 1,
+                "/d/xiangyang/npc/guopolu" : 1,
         ]));
         setup();
         replace_program(ROOM);
