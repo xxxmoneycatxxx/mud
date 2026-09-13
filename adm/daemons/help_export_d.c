@@ -227,10 +227,9 @@ void export_finalize()
     keys = keys(export_topics);
 
     // 第一步：写入 JSON 头部（覆盖模式）
-    chunk = sprintf("{\"ts\":%d,\"index\":\"%s\",\"topics\":{",
-                    time(),
-                    replace_string(replace_string(export_topics_raw,
-                        "\\", "\\\\"), "\"", "\\\""));
+    // 用 json_encode 对 index 文本做完整的 JSON 转义（换行、控制字符等）
+    chunk = sprintf("{\"ts\":%d,\"index\":%s,\"topics\":{" ,
+                    time(), json_encode(export_topics_raw));
     if (!write_file(HELP_OUTPUT, chunk, 1))
     {
         log_file("help_export", sprintf("%s 导出失败：无法写入头部 %s\n",
@@ -246,9 +245,8 @@ void export_finalize()
     for (i = 0; i < sizeof(keys); i++)
     {
         string entry_json = json_encode(export_topics[keys[i]]);
-        string key_escaped = replace_string(replace_string(keys[i],
-                               "\\", "\\\\"), "\"", "\\\"");
-        chunk = (i > 0 ? "," : "") + "\"" + key_escaped + "\":" + entry_json;
+        string key_json = json_encode(keys[i]);
+        chunk = (i > 0 ? "," : "") + key_json + ":" + entry_json;
         write_file(HELP_OUTPUT, chunk, 0);
         total += strlen(chunk);
     }
