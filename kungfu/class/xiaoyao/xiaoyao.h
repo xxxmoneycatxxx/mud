@@ -10,7 +10,7 @@ int permit_recruit(object ob)
 
         if (ob->query("betrayer/times"))
         {
-                command("say 我们逍遥派乃名门正派，决不收判师之徒！");
+                command("say 我们逍遥派乃名门正派，决不收叛师之徒！");
                 return 0;
         }
 
@@ -23,7 +23,7 @@ int permit_recruit(object ob)
 
         if (ob->query("per") < 28)
         {
-                command("look "+ ob->query("id")); 
+                command("look "+ ob->query("id"));
                 command("say " + RANK_D->query_respect(ob) + "的尊容未免次了"
                         "点，这样可入不了我们逍遥派！");
                 return 0;

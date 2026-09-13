@@ -150,7 +150,7 @@ void attempt_apprentice(object ob)
                 {
                         command("sigh");
                         command("say 你破了珍珑，和我是有缘人，可是你"
-                                "曾经判师，却不能收你。");
+                                "曾经叛师，却不能收你。");
                         return;
                 }
 

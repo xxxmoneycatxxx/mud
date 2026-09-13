@@ -224,7 +224,7 @@ mixed ask_me()
 
         if (me->query("betrayer/times"))
         {
-                command("say 你这判师之人，家师是绝对不会收你为徒的！");
+                command("say 你这叛师之人，家师是绝对不会收你为徒的！");
                 return 1;
         }
         command("say 好吧，我带你过桃花阵，你自己去找黄岛主吧。");

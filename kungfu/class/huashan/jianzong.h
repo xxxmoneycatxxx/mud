@@ -18,7 +18,7 @@ int permit_recruit(object ob)
 
         if( ob->query("betrayer/times") )
         {
-                command("say 华山派讲究的就是信义，你这判师之人焉能理解？");
+                command("say 华山派讲究的就是信义，你这叛师之人焉能理解？");
                 return 0;
         }
 

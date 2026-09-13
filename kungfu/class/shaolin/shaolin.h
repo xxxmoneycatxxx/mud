@@ -12,7 +12,7 @@ int permit_recruit(object ob)
 
         if (ob->query("betrayer/times"))
         {
-                command("say 你大逆不道，私自判师，不能容于少林！");
+                command("say 你大逆不道，私自叛师，不能容于少林！");
                 return 0;
         }
 
