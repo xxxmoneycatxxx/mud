@@ -19,11 +19,20 @@
 
 #define HELP_OUTPUT   "/www/storage/help.json"
 #define AUTO_DELAY    30
+#define BATCH_SIZE    20
 
 nosave int exporting;
+nosave object export_requestor;
+nosave string *export_files;
+nosave string export_topics_raw;
+nosave mapping export_topics;
+nosave int export_batch_idx;
 
 // 前向声明
 void do_export(object me);
+void export_batch_step();
+void export_finalize();
+void export_cleanup();
 
 // ===== 守护进程生命周期 =====
 
@@ -141,70 +150,130 @@ private string help_to_text(string raw)
     return remove_ansi(color_filter(raw));
 }
 
-// ===== 核心导出逻辑 =====
+// ===== 核心导出逻辑（分批处理，避免 eval cost 超限） =====
 
+// 启动导出：收集文件列表，进入分批处理
 void do_export(object me)
 {
-    string *files;
-    mapping result;
-    mapping topics;
-    string topics_raw;
-    string json;
-    int i;
-
     if (exporting) return;
     exporting = 1;
 
-    if (me) tell_object(me, "开始导出帮助文档...\n");
+    export_requestor = me;
+    export_files = get_dir("/help/");
 
-    files = get_dir("/help/");
-    if (!files || !sizeof(files))
+    if (!export_files || !sizeof(export_files))
     {
         if (me) tell_object(me, "导出失败：/help/ 目录为空。\n");
         exporting = 0;
         return;
     }
 
-    // /help/topics 原文（供前端 parseHelpTopics 解析分类树）
-    topics_raw = read_file("/help/topics") || "";
+    export_topics_raw = read_file("/help/topics") || "";
+    export_topics = ([]);
+    export_batch_idx = 0;
 
-    topics = ([]);
+    if (me) tell_object(me, sprintf("开始导出帮助文档（%d 个文件，分 %d 批）...\n",
+                        sizeof(export_files),
+                        (sizeof(export_files) + BATCH_SIZE - 1) / BATCH_SIZE));
 
-    for (i = 0; i < sizeof(files); i++)
+    // 第一批在下一个 heart_beat 处理，确保当前 call 链释放
+    call_out("export_batch_step", 0);
+}
+
+// 处理一批文件
+void export_batch_step()
+{
+    int start, end, i;
+
+    start = export_batch_idx * BATCH_SIZE;
+    end = start + BATCH_SIZE;
+    if (end > sizeof(export_files)) end = sizeof(export_files);
+
+    for (i = start; i < end; i++)
     {
-        string raw;
-
-        raw = read_file("/help/" + files[i]);
+        string raw = read_file("/help/" + export_files[i]);
         if (!raw) continue;
 
-        topics[files[i]] = ([
+        export_topics[export_files[i]] = ([
             "content"    : help_to_html(raw),
             "search_text": help_to_text(raw),
         ]);
     }
 
-    result = ([
-        "ts"     : time(),
-        "index"  : topics_raw,
-        "topics" : topics,
-    ]);
+    export_batch_idx++;
 
-    json = json_encode(result);
-
-    assure_file(HELP_OUTPUT);
-
-    if (write_file(HELP_OUTPUT, json, 1))
+    if (end < sizeof(export_files))
     {
-        string msg = sprintf("帮助导出完成：%d 个主题 → %s (%d 字节)",
-                              sizeof(files), HELP_OUTPUT, strlen(json));
-        log_file("help_export", sprintf("%s %s\n", ctime(time()), msg));
-        if (me) tell_object(me, msg + "\n");
+        // 还有更多批次
+        call_out("export_batch_step", 0);
     }
     else
     {
-        log_file("help_export", sprintf("%s 导出失败：无法写入 %s\n", ctime(time()), HELP_OUTPUT));
-        if (me) tell_object(me, "帮助导出失败：无法写入 " + HELP_OUTPUT + "\n");
+        // 全部处理完毕，进入最终组装
+        call_out("export_finalize", 0);
+    }
+}
+
+// 组装 JSON 并写入文件（分块写入，避免字符串超长）
+void export_finalize()
+{
+    string *keys;
+    string chunk;
+    int i;
+    int total;
+
+    assure_file(HELP_OUTPUT);
+
+    keys = keys(export_topics);
+
+    // 第一步：写入 JSON 头部（覆盖模式）
+    chunk = sprintf("{\"ts\":%d,\"index\":\"%s\",\"topics\":{",
+                    time(),
+                    replace_string(replace_string(export_topics_raw,
+                        "\\", "\\\\"), "\"", "\\\""));
+    if (!write_file(HELP_OUTPUT, chunk, 1))
+    {
+        log_file("help_export", sprintf("%s 导出失败：无法写入头部 %s\n",
+                     ctime(time()), HELP_OUTPUT));
+        if (export_requestor)
+            tell_object(export_requestor, "帮助导出失败：无法写入 " + HELP_OUTPUT + "\n");
+        export_cleanup();
+        return;
+    }
+    total = strlen(chunk);
+
+    // 第二步：逐条编码并追加写入（每条约 4-5KB，不会超长）
+    for (i = 0; i < sizeof(keys); i++)
+    {
+        string entry_json = json_encode(export_topics[keys[i]]);
+        string key_escaped = replace_string(replace_string(keys[i],
+                               "\\", "\\\\"), "\"", "\\\"");
+        chunk = (i > 0 ? "," : "") + "\"" + key_escaped + "\":" + entry_json;
+        write_file(HELP_OUTPUT, chunk, 0);
+        total += strlen(chunk);
     }
 
+    // 第三步：写入 JSON 尾部
+    write_file(HELP_OUTPUT, "}}", 0);
+    total += 2;
+
+    {
+        string msg = sprintf("帮助导出完成：%d 个主题 → %s (%d 字节)",
+                              sizeof(export_files), HELP_OUTPUT, total);
+        log_file("help_export", sprintf("%s %s\n", ctime(time()), msg));
+        if (export_requestor) tell_object(export_requestor, msg + "\n");
+    }
+
+    export_cleanup();
+}
+
+// 清理 nosave 状态
+void export_cleanup()
+{
+    export_requestor = 0;
+    export_files = 0;
+    export_topics = 0;
+    export_topics_raw = 0;
+    export_batch_idx = 0;
     exporting = 0;
 }
