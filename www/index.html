@@ -106,6 +106,7 @@
     <div class="bottom-bar">
         <button class="qc-btn status-trigger-btn" id="statusTriggerBtn" title="查看角色详细状态">状态</button>
         <button class="qc-btn help-btn" id="helpBtn" title="浏览帮助文档 (F1)">帮助</button>
+        <button class="qc-btn askpath-btn" id="askPathBtn" title="搜索房间并寻路">问路</button>
         <div class="quick-commands" id="quickCommands"></div>
         <div class="status-container">
             <div class="status connecting" id="status">
@@ -207,6 +208,43 @@
             </div>
             <div class="char-panel-footer">
                 <span>Esc 关闭 · 点击标签页切换</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 问路面板：搜索房间 + 路径指引 + 自动行走 -->
+    <div class="askpath-overlay" id="askPathOverlay">
+        <div class="askpath-modal">
+            <div class="askpath-titlebar">
+                <span>〔 问路 〕</span>
+                <button class="askpath-close" id="askPathClose" title="关闭 (Esc)">✕</button>
+            </div>
+            <div class="askpath-searchbar">
+                <span class="askpath-prompt">&gt;</span>
+                <input type="text" id="askPathInput" class="askpath-input" placeholder="输入目的地名称…（如 客栈、灵鹫宫）" autocomplete="off">
+                <button class="askpath-search-btn" id="askPathSearchBtn">搜索</button>
+            </div>
+            <div class="askpath-area-bar" id="askPathAreaBar" style="display:none">
+                <span class="askpath-area-label">区域筛选：</span>
+                <span class="askpath-area-all active" id="askPathAreaAll">全部</span>
+                <span class="askpath-area-tags" id="askPathAreaTags"></span>
+            </div>
+            <div class="askpath-body" id="askPathBody">
+                <div class="askpath-empty">输入关键词搜索目的地</div>
+            </div>
+            <div class="askpath-detail" id="askPathDetail" style="display:none">
+                <div class="askpath-detail-header">
+                    <span class="askpath-detail-title" id="askPathDetailTitle"></span>
+                    <button class="askpath-detail-close" id="askPathDetailClose">✕</button>
+                </div>
+                <div class="askpath-detail-steps" id="askPathDetailSteps"></div>
+                <div class="askpath-detail-actions">
+                    <button class="askpath-walk-btn" id="askPathWalkBtn">自动行走</button>
+                    <span class="askpath-detail-info" id="askPathDetailInfo"></span>
+                </div>
+            </div>
+            <div class="askpath-footer">
+                <span>Enter 搜索 · 点击结果查看路径 · 双击自动行走</span>
             </div>
         </div>
     </div>

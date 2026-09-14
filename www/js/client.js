@@ -140,6 +140,7 @@ class AdvancedMUDClient {
         this.setupQuickCommands();
         this.setupRoomExits();
         this.setupStatusBar();
+        this.setupAskPathEvents();
         this.setupTerminalExits();
         this.setupHelpModal();
         // 请求屏幕常亮 Wake Lock，防止锁屏/休眠导致定时器被浏览器节流

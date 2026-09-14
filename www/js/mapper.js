@@ -18,6 +18,15 @@ const DIR_OFFSETS = {
     'out':       { dx:  2, dy:  0 },
     'enter':     { dx:  0, dy: -2 },
     'leave':     { dx:  0, dy:  2 },
+    // 复合方向（水平 + 垂直）
+    'northup':   { dx:  0, dy:  1 },
+    'southup':   { dx:  0, dy: -1 },
+    'eastup':    { dx:  1, dy:  0 },
+    'westup':    { dx: -1, dy:  0 },
+    'northdown': { dx:  0, dy:  1 },
+    'southdown': { dx:  0, dy: -1 },
+    'eastdown':  { dx:  1, dy:  0 },
+    'westdown':  { dx: -1, dy:  0 },
 };
 
 // 方向 → 连线颜色
@@ -25,6 +34,9 @@ const DIR_COLORS = {
     'north': '#0a0', 'south': '#0a0', 'east': '#0a0', 'west': '#0a0',
     'northeast': '#088', 'northwest': '#088', 'southeast': '#088', 'southwest': '#088',
     'up': '#886', 'down': '#886', 'in': '#668', 'out': '#668',
+    // 复合方向
+    'northup': '#0a0', 'southup': '#0a0', 'eastup': '#0a0', 'westup': '#0a0',
+    'northdown': '#0a0', 'southdown': '#0a0', 'eastdown': '#0a0', 'westdown': '#0a0',
 };
 
 // 方向 → 中文短标签
@@ -34,6 +46,9 @@ const DIR_SHORT = {
     'southeast': '东南', 'southwest': '西南',
     'up': '上', 'down': '下', 'in': '进', 'out': '出',
     'enter': '入', 'leave': '离',
+    // 复合方向
+    'northup': '北上', 'southup': '南上', 'eastup': '东上', 'westup': '西上',
+    'northdown': '北下', 'southdown': '南下', 'eastdown': '东下', 'westdown': '西下',
 };
 
 const STORAGE_KEY = 'mud_mapper_rooms';
@@ -232,10 +247,10 @@ class Mapper {
                 const offset = DIR_OFFSETS[dir] || { dx: 0, dy: 0 };
                 let nx = pos.x + offset.dx;
                 let ny = pos.y + offset.dy;
-                // up/down 改变楼层 z 坐标
+                // up/down 及复合方向改变楼层 z 坐标
                 let nz = z;
-                if (dir === 'up' || dir === 'leave') nz = z + 1;
-                else if (dir === 'down' || dir === 'enter') nz = z - 1;
+                if (dir === 'up' || dir === 'leave' || dir.endsWith('up')) nz = z + 1;
+                else if (dir === 'down' || dir === 'enter' || dir.endsWith('down')) nz = z - 1;
                 zCoords.set(targetHash, nz);
 
                 // 检测坐标冲突：该格位已被其他房间占据
@@ -343,6 +358,11 @@ class Mapper {
             'up': 'down', 'down': 'up',
             'in': 'out', 'out': 'in',
             'enter': 'leave', 'leave': 'enter',
+            // 复合方向
+            'northup': 'southdown', 'southdown': 'northup',
+            'southup': 'northdown', 'northdown': 'southup',
+            'eastup': 'westdown', 'westdown': 'eastup',
+            'westup': 'eastdown', 'eastdown': 'westup',
         };
         return map[dir] || null;
     }
