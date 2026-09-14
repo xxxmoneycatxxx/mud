@@ -40,20 +40,10 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
     settingsBtn.addEventListener('click', () => this._openSettings());
     qcContainer.appendChild(settingsBtn);
 
-    // 游戏设置按钮：打开环境变量抽屉面板
-    const envBtn = document.createElement('button');
-    envBtn.className = 'qc-btn qc-env-btn';
-    envBtn.textContent = '选项';
-    envBtn.title = '游戏环境变量 (set)';
-    envBtn.addEventListener('click', () => this._toggleEnvDrawer());
-    qcContainer.appendChild(envBtn);
-
     // 设置面板事件绑定
     this._setupSettingsEvents();
     // 角色面板事件绑定
     this._setupCharPanelEvents();
-    // 游戏设置抽屉事件绑定
-    this._setupEnvDrawerEvents();
 };
 
 // 设置面板：事件绑定（只调用一次）
@@ -97,6 +87,21 @@ AdvancedMUDClient.prototype._setupSettingsEvents = function () {
     if (btnImportAll) {
         btnImportAll.addEventListener('click', () => this._importAllConfigJSON());
     }
+
+    // 选项标签页：环境变量 toggle/select 事件委托
+    overlay.addEventListener('change', (e) => {
+        const toggle = e.target.closest('.env-toggle input');
+        if (toggle) {
+            const term = toggle.getAttribute('data-term');
+            this._sendEnvSet(term, toggle.checked ? 1 : 0);
+            return;
+        }
+        const select = e.target.closest('.env-select');
+        if (select) {
+            const term = select.getAttribute('data-term');
+            this._sendEnvSet(term, select.value);
+        }
+    });
 };
 
 // 打开设置面板
@@ -275,61 +280,16 @@ const ENV_GROUPS = [
     { title: '其他',   keys: ['keep_idle', 'halt_age', 'pure_say', 'default_sign'] },
 ];
 
-// 抽屉事件绑定
-AdvancedMUDClient.prototype._setupEnvDrawerEvents = function () {
-    const drawer = document.getElementById('envSettingsDrawer');
-    const closeBtn = document.getElementById('envDrawerClose');
-    if (!drawer) return;
-
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => this._closeEnvDrawer());
-    }
-    // Esc 关闭
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && drawer.classList.contains('visible')) {
-            this._closeEnvDrawer();
-        }
-    });
-    // 事件委托：toggle 和 select 变更
-    drawer.addEventListener('change', (e) => {
-        const toggle = e.target.closest('.env-toggle input');
-        if (toggle) {
-            const term = toggle.getAttribute('data-term');
-            this._sendEnvSet(term, toggle.checked ? 1 : 0);
-            return;
-        }
-        const select = e.target.closest('.env-select');
-        if (select) {
-            const term = select.getAttribute('data-term');
-            this._sendEnvSet(term, select.value);
-        }
-    });
-};
-
-// 切换抽屉开关
-AdvancedMUDClient.prototype._toggleEnvDrawer = function () {
-    const drawer = document.getElementById('envSettingsDrawer');
-    if (!drawer) return;
-    if (drawer.classList.contains('visible')) {
-        this._closeEnvDrawer();
-    } else {
-        this._openEnvDrawer();
-    }
-};
-
-AdvancedMUDClient.prototype._openEnvDrawer = function () {
-    const drawer = document.getElementById('envSettingsDrawer');
-    if (!drawer) return;
-    drawer.classList.add('visible');
-    // 如果还没有收到过数据，请求一次
+// 渲染选项标签页：请求数据（如未缓存）并渲染
+AdvancedMUDClient.prototype._renderEnvSettingsTab = function () {
+    const container = document.getElementById('settingsEnvSettings');
+    if (!container) return;
     if (!this._envSettingsData) {
+        container.innerHTML = '<div class="settings-empty">加载中…</div>';
         if (this.sendGMCP) this.sendGMCP('Env.Settings.Get', {});
+        return;
     }
-};
-
-AdvancedMUDClient.prototype._closeEnvDrawer = function () {
-    const drawer = document.getElementById('envSettingsDrawer');
-    if (drawer) drawer.classList.remove('visible');
+    this._renderEnvSettings(this._envSettingsData);
 };
 
 // 发送环境变量变更
@@ -342,7 +302,7 @@ AdvancedMUDClient.prototype._sendEnvSet = function (term, value) {
 // 渲染环境变量设置面板
 AdvancedMUDClient.prototype._renderEnvSettings = function (data) {
     this._envSettingsData = data;
-    const body = document.getElementById('envDrawerBody');
+    const body = document.getElementById('settingsEnvSettings');
     if (!body) return;
 
     const current = data.current || {};
@@ -921,6 +881,7 @@ AdvancedMUDClient.prototype._renderActiveSettingsTab = function () {
         case 'highlights': this._renderHighlightList(); break;
         case 'scripts': this._renderScriptList(); break;
         case 'connection': this._renderConnectionSettings(); break;
+        case 'options': this._renderEnvSettingsTab(); break;
     }
 };
 
@@ -3832,7 +3793,6 @@ AdvancedMUDClient.prototype._resetLoginGate = function () {
     // 关闭依赖服务端数据的模态框（数据已失效）；设置面板是纯本地配置，不关
     if (this.helpOverlay && this.helpOverlay.classList.contains('visible')) this.closeHelpModal();
     this._closeCharPanel();
-    this._closeEnvDrawer();
     this._envSettingsData = null;  // 重连后重新请求环境变量
     const questDetail = document.getElementById('questDetailOverlay');
     if (questDetail) questDetail.classList.remove('visible');

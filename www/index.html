@@ -91,17 +91,6 @@
         <span class="vitals-item"><span class="vitals-label">潜能</span> <span class="vitals-val vitals-text" data-stat="pot">--</span></span>
     </div>
 
-    <!-- 游戏环境变量设置抽屉：从底部栏上方滑出 -->
-    <div class="env-settings-drawer" id="envSettingsDrawer">
-        <div class="env-drawer-header">
-            <span class="env-drawer-title">〔 游戏设置 〕</span>
-            <button class="env-drawer-close" id="envDrawerClose" title="关闭">✕</button>
-        </div>
-        <div class="env-drawer-body" id="envDrawerBody">
-            <div class="env-drawer-loading">加载中…</div>
-        </div>
-    </div>
-
     <!-- 底部条：状态唤出 + 帮助按钮 + 快捷命令 + 连接状态 -->
     <div class="bottom-bar">
         <button class="qc-btn status-trigger-btn" id="statusTriggerBtn" title="查看角色详细状态">状态</button>
@@ -151,6 +140,7 @@
                 <button class="settings-tab" data-tab="highlights">高亮</button>
                 <button class="settings-tab" data-tab="scripts">脚本</button>
                 <button class="settings-tab" data-tab="connection">连接</button>
+                <button class="settings-tab" data-tab="options">选项</button>
             </div>
             <div class="settings-body">
                 <div class="settings-tab-content active" id="tab-triggers">
@@ -170,6 +160,9 @@
                 </div>
                 <div class="settings-tab-content" id="tab-connection">
                     <div class="settings-list" id="settingsConnection"></div>
+                </div>
+                <div class="settings-tab-content" id="tab-options">
+                    <div class="settings-list" id="settingsEnvSettings"></div>
                 </div>
             </div>
             <div class="settings-footer">
