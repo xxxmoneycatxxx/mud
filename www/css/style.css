@@ -1466,6 +1466,27 @@ body:not(.logged-in) .vitals-bar {
     background: #1a3a1a;
     border-color: #0f0;
 }
+.settings-action-btn.danger {
+    color: #f44;
+    border-color: #533;
+}
+.settings-action-btn.danger:hover {
+    background: #3a1a1a;
+    border-color: #f44;
+}
+
+/* 连接设置：凭据输入表单 */
+.settings-credential-form {
+    padding: 8px 4px;
+    border-top: 1px solid #1a1a1a;
+    margin-top: 4px;
+}
+.settings-credential-form .settings-item-name {
+    margin-bottom: 6px;
+}
+.settings-credential-form .settings-action-btn {
+    margin-top: 4px;
+}
 
 /* 列表项操作按钮组 */
 .settings-item-actions {

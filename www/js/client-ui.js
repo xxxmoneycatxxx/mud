@@ -920,7 +920,151 @@ AdvancedMUDClient.prototype._renderActiveSettingsTab = function () {
         case 'timers': this._renderTimerList(); break;
         case 'highlights': this._renderHighlightList(); break;
         case 'scripts': this._renderScriptList(); break;
+        case 'connection': this._renderConnectionSettings(); break;
     }
+};
+
+// 渲染连接设置（自动重连/记住我/凭据管理）
+AdvancedMUDClient.prototype._renderConnectionSettings = function () {
+    const container = document.getElementById('tab-connection');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // 自动重连开关
+    const reconnectItem = document.createElement('div');
+    reconnectItem.className = 'settings-item';
+    const reconnectInfo = document.createElement('div');
+    reconnectInfo.className = 'settings-item-info';
+    reconnectInfo.innerHTML = '<div class="settings-item-name">自动重连</div>'
+        + '<div class="settings-item-detail">断线后自动尝试重新连接（指数退避，上限 30s）</div>';
+    const reconnectToggle = document.createElement('label');
+    reconnectToggle.className = 'settings-toggle';
+    const reconnectInput = document.createElement('input');
+    reconnectInput.type = 'checkbox';
+    reconnectInput.checked = this._autoReconnect;
+    reconnectInput.addEventListener('change', () => {
+        this._autoReconnect = reconnectInput.checked;
+        this._saveConnectionSettings();
+    });
+    const reconnectSlider = document.createElement('span');
+    reconnectSlider.className = 'slider';
+    reconnectToggle.appendChild(reconnectInput);
+    reconnectToggle.appendChild(reconnectSlider);
+    reconnectItem.appendChild(reconnectInfo);
+    reconnectItem.appendChild(reconnectToggle);
+    container.appendChild(reconnectItem);
+
+    // 记住我开关
+    const rememberItem = document.createElement('div');
+    rememberItem.className = 'settings-item';
+    const rememberInfo = document.createElement('div');
+    rememberInfo.className = 'settings-item-info';
+    rememberInfo.innerHTML = '<div class="settings-item-name">记住登录</div>'
+        + '<div class="settings-item-detail">保存账号密码，重连/服务器重启后自动登录</div>';
+    const rememberToggle = document.createElement('label');
+    rememberToggle.className = 'settings-toggle';
+    const rememberInput = document.createElement('input');
+    rememberInput.type = 'checkbox';
+    rememberInput.checked = this._rememberMe;
+    rememberInput.addEventListener('change', () => {
+        this._rememberMe = rememberInput.checked;
+        this._saveConnectionSettings();
+        if (rememberInput.checked) {
+            // 开启时弹出凭据输入
+            this._showCredentialForm(container);
+        } else {
+            this.clearCredentials();
+            this._renderConnectionSettings();
+        }
+    });
+    const rememberSlider = document.createElement('span');
+    rememberSlider.className = 'slider';
+    rememberToggle.appendChild(rememberInput);
+    rememberToggle.appendChild(rememberSlider);
+    rememberItem.appendChild(rememberInfo);
+    rememberItem.appendChild(rememberToggle);
+    container.appendChild(rememberItem);
+
+    // 已保存凭据信息 / 凭据输入表单
+    if (this._rememberMe && this._savedCredentials) {
+        const credItem = document.createElement('div');
+        credItem.className = 'settings-item';
+        const credInfo = document.createElement('div');
+        credInfo.className = 'settings-item-info';
+        credInfo.innerHTML = '<div class="settings-item-name">已保存账号</div>'
+            + '<div class="settings-item-detail">' + this._escHtml(this._savedCredentials.id) + ' · 密码 ••••••</div>';
+        const credActions = document.createElement('div');
+        credActions.className = 'settings-item-actions';
+        const clearBtn = document.createElement('button');
+        clearBtn.className = 'settings-action-btn danger';
+        clearBtn.textContent = '清除';
+        clearBtn.addEventListener('click', () => {
+            this.clearCredentials();
+            this._renderConnectionSettings();
+        });
+        credActions.appendChild(clearBtn);
+        credItem.appendChild(credInfo);
+        credItem.appendChild(credActions);
+        container.appendChild(credItem);
+    } else if (this._rememberMe && !this._savedCredentials) {
+        this._showCredentialForm(container);
+    }
+
+    // 提示信息
+    const hint = document.createElement('div');
+    hint.className = 'settings-form-hint';
+    hint.innerHTML = '💡 凭据仅存储在本机浏览器 localStorage 中，不会上传到服务器。<br>公共电脑请勿开启「记住登录」。';
+    container.appendChild(hint);
+};
+
+// 凭据输入表单
+AdvancedMUDClient.prototype._showCredentialForm = function (container) {
+    const formItem = document.createElement('div');
+    formItem.className = 'settings-credential-form';
+    formItem.innerHTML = '<div class="settings-item-name">输入登录凭据</div>';
+
+    const idRow = document.createElement('div');
+    idRow.className = 'settings-form-row';
+    const idLabel = document.createElement('label');
+    idLabel.textContent = '账号 (ID)';
+    const idInput = document.createElement('input');
+    idInput.type = 'text';
+    idInput.className = 'settings-form-input';
+    idInput.placeholder = '英文ID';
+    idInput.value = (this._savedCredentials && this._savedCredentials.id) || '';
+    idRow.appendChild(idLabel);
+    idRow.appendChild(idInput);
+    formItem.appendChild(idRow);
+
+    const passRow = document.createElement('div');
+    passRow.className = 'settings-form-row';
+    const passLabel = document.createElement('label');
+    passLabel.textContent = '密码';
+    const passInput = document.createElement('input');
+    passInput.type = 'password';
+    passInput.className = 'settings-form-input';
+    passInput.placeholder = '登录密码';
+    passInput.value = (this._savedCredentials && this._savedCredentials.password) || '';
+    passRow.appendChild(passLabel);
+    passRow.appendChild(passInput);
+    formItem.appendChild(passRow);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'settings-action-btn';
+    saveBtn.textContent = '保存凭据';
+    saveBtn.addEventListener('click', () => {
+        const id = idInput.value.trim();
+        const pass = passInput.value;
+        if (!id || !pass) {
+            alert('请输入账号和密码');
+            return;
+        }
+        this.saveCredentials(id, pass);
+        this._renderConnectionSettings();
+    });
+    formItem.appendChild(saveBtn);
+
+    container.appendChild(formItem);
 };
 
 // 渲染触发器列表到设置面板
@@ -3750,6 +3894,20 @@ AdvancedMUDClient.prototype.appendMessage = function (message, className) {
 
     // 速走智能中断：遇敌暂停、事件结束恢复
     this._checkSpeedwalkTriggers(message);
+
+    // 自动登录：重连/重启后自动发送 ID 和密码
+    if (!this._loginDone && this._savedCredentials) {
+        if (!this._autoLoginIdSent && /英文名字/.test(message)) {
+            this._autoLoginIdSent = true;
+            this.appendMessage('> [自动登录] ' + this._savedCredentials.id, 'system');
+            this.sendCommand(this._savedCredentials.id);
+        } else if (this._autoLoginIdSent && this._expectPassword) {
+            this._expectPassword = false;
+            this.appendMessage('> [自动登录] ***', 'system');
+            this.sendCommand(this._savedCredentials.password);
+            this._autoLoginIdSent = false;
+        }
+    }
 
     const div = document.createElement('div');
     div.className = 'message ' + className;

@@ -29,6 +29,13 @@ class AdvancedMUDClient {
         this._lastRoomInfo = null;       // 最近一次房间信息（脚本 API 用）
         this.scriptEngine = null;        // 用户脚本引擎（init 中初始化）
 
+        // 自动重连与自动登录
+        this._autoReconnect = true;      // 断线自动重连开关
+        this._rememberMe = false;        // 记住登录凭据开关
+        this._savedCredentials = null;   // { id, password } 或 null
+        this._autoLoginIdSent = false;   // 本次连接是否已自动发送过 ID（防止重复发送）
+        this._reconnectScheduled = false; // 防止 catch 和 onclose 同时触发导致重复调度重连
+
         // 轻量触发器规则表：pattern 匹配消息时自动执行 command
         // 新增规则只需往数组加一条，支持 cooldown 防刷
         this._triggers = [
@@ -120,12 +127,14 @@ class AdvancedMUDClient {
 
     init() {
         this.retryCount = 0;
-        this.maxRetries = 3;
+        this.maxRetries = 10;
         // 从 localStorage 恢复命令历史
         try {
             const saved = localStorage.getItem('mud_command_history');
             if (saved) this.history = JSON.parse(saved);
         } catch (e) { /* 解析失败则使用空历史 */ }
+        // 加载连接设置（自动重连/记住我/凭据）
+        this._loadConnectionSettings();
         // 初始化 Worker 定时器管理器（后台/锁屏不被浏览器节流）
         this._wtm = new WorkerTimerManager('js/timer-worker.js');
 
@@ -134,6 +143,9 @@ class AdvancedMUDClient {
         this._loadScripts();
         this._loadTimers();
         this._loadHighlights();
+
+        // 标签页切回重连
+        this._setupVisibilityReconnect();
 
         this.setupEventListeners();
         this.setupTerminalFeatures();
@@ -233,6 +245,11 @@ class AdvancedMUDClient {
         // 停止所有定时器
         this._stopAllTimers();
 
+        // 重置自动登录状态
+        this._autoLoginIdSent = false;
+        // 重置重连调度标志，确保下次断连/清理后能正常调度重连
+        this._reconnectScheduled = false;
+
         console.log('[MUD] 连接已强制清理');
     }
 
@@ -290,6 +307,35 @@ class AdvancedMUDClient {
         if ('wakeLock' in navigator && !this._wakeLock) {
             this._acquireWakeLock();
         }
+    }
+
+    // ===== 自动重连调度（catch 和 onclose 共用，防止重复调度） =====
+    _scheduleReconnect() {
+        if (!this._autoReconnect || this._reconnectScheduled) return;
+        this._reconnectScheduled = true;
+        this.retryCount++;
+        const delay = Math.min(2000 * Math.pow(1.5, this.retryCount - 1), 30000);
+        this._reconnectTimeout = this._wtm.setTimeout(() => {
+            this._reconnectScheduled = false;
+            this.appendMessage(`══ 正在重连 (${this.retryCount})，${Math.round(delay / 1000)}s 后尝试… ══`, 'system');
+            this.connect(this.resolveWsUrl());
+        }, delay);
+    }
+
+    // ===== 标签页切回时重置重连计数：给一次立即重连机会 =====
+    _setupVisibilityReconnect() {
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && !this.connected && this._autoReconnect) {
+                console.log('[MUD] 标签页回到前台，尝试重连');
+                this.retryCount = 0;
+                this._reconnectScheduled = false;
+                if (this._reconnectTimeout) {
+                    this._wtm.clear(this._reconnectTimeout);
+                    this._reconnectTimeout = null;
+                }
+                this.connect(this.resolveWsUrl());
+            }
+        });
     }
 
     connect(wsUrl) {
@@ -372,23 +418,19 @@ class AdvancedMUDClient {
                     this.forceCleanup();
                 }, 1000);
 
-                if (this.retryCount < this.maxRetries) {
-                    this.retryCount++;
-                    this._reconnectTimeout = this._wtm.setTimeout(() => {
-                        this.appendMessage(`══ 正在重连 (${this.retryCount}/${this.maxRetries}) ══`, 'system');
-                        this.connect(this.resolveWsUrl());
-                    }, 2000 * this.retryCount);
-                }
+                this._scheduleReconnect();
             };
 
             this.ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
-                this.appendMessage('══ 连接错误，请检查网络 ══', 'error');
+                // 错误提示延迟到 onclose 时统一显示，避免闪断场景下重复提示
             };
 
         } catch (error) {
+            // WebSocket 构造失败（服务器不可达/重启中），仍需调度重试
             console.error('Connection failed:', error);
-            this.appendMessage('══ 创建连接失败: ' + error.message + ' ══', 'error');
+            this.appendMessage('══ 连接失败: ' + error.message + ' ══', 'error');
+            this._scheduleReconnect();
         }
     }
 
@@ -1112,6 +1154,50 @@ class AdvancedMUDClient {
             });
         }
         this._saveHighlights();
+    }
+
+    // ===== 连接设置（自动重连/记住我/凭据） =====
+
+    _loadConnectionSettings() {
+        try {
+            const saved = localStorage.getItem('mud_connection_settings');
+            if (saved) {
+                const cfg = JSON.parse(saved);
+                this._autoReconnect = cfg.autoReconnect !== false;
+                this._rememberMe = cfg.rememberMe === true;
+            }
+            if (this._rememberMe) {
+                const cred = localStorage.getItem('mud_credentials');
+                if (cred) {
+                    const c = JSON.parse(cred);
+                    if (c.id && c.password) this._savedCredentials = c;
+                }
+            }
+        } catch (e) { /* 解析失败忽略 */ }
+    }
+
+    _saveConnectionSettings() {
+        try {
+            localStorage.setItem('mud_connection_settings', JSON.stringify({
+                autoReconnect: this._autoReconnect,
+                rememberMe: this._rememberMe,
+            }));
+        } catch (e) { /* 存储失败忽略 */ }
+    }
+
+    saveCredentials(id, password) {
+        this._savedCredentials = { id, password };
+        try { localStorage.setItem('mud_credentials', JSON.stringify({ id, password })); }
+        catch (e) { /* 存储失败忽略 */ }
+    }
+
+    clearCredentials() {
+        this._savedCredentials = null;
+        this._rememberMe = false;
+        try {
+            localStorage.removeItem('mud_credentials');
+            this._saveConnectionSettings();
+        } catch (e) { /* 忽略 */ }
     }
 
     // ===== 全套配置备份 =====
