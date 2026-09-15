@@ -4262,6 +4262,300 @@ AdvancedMUDClient.prototype._startPathwalk = function (targetHash, targetName) {
     );
 };
 
+// ===== 问路模块：搜索房间 + 路径指引 + 自动行走 =====
+
+// 问路模块初始化：绑定底部栏按钮 + 内部事件
+AdvancedMUDClient.prototype.setupAskPathEvents = function () {
+    // 底部栏“问路”按钮
+    const btn = document.getElementById('askPathBtn');
+    if (btn) {
+        btn.addEventListener('click', () => this._openAskPath());
+    }
+    // 内部事件绑定
+    this._setupAskPathEvents();
+};
+
+// 问路面板事件绑定（只调用一次）
+AdvancedMUDClient.prototype._setupAskPathEvents = function () {
+    const overlay = document.getElementById('askPathOverlay');
+    const closeBtn = document.getElementById('askPathClose');
+    const input = document.getElementById('askPathInput');
+    const searchBtn = document.getElementById('askPathSearchBtn');
+    const detailClose = document.getElementById('askPathDetailClose');
+    const walkBtn = document.getElementById('askPathWalkBtn');
+    const areaAll = document.getElementById('askPathAreaAll');
+    if (!overlay) return;
+
+    // 关闭按钮
+    if (closeBtn) closeBtn.addEventListener('click', () => this._closeAskPath());
+    // 点击背景关闭
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) this._closeAskPath(); });
+    // 搜索按钮
+    if (searchBtn) searchBtn.addEventListener('click', () => this._doAskPathSearch());
+    // Enter 搜索
+    if (input) input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); this._doAskPathSearch(); }
+    });
+    // 路径详情关闭
+    if (detailClose) detailClose.addEventListener('click', () => {
+        const detail = document.getElementById('askPathDetail');
+        if (detail) detail.style.display = 'none';
+    });
+    // 自动行走按钮
+    if (walkBtn) walkBtn.addEventListener('click', () => {
+        if (this._askPathTarget) {
+            // 必须在 _closeAskPath 之前保存，因为 close 会清空 target
+            const target = this._askPathTarget;
+            this._closeAskPath();
+            this._startPathwalk(target.hash, target.name);
+        }
+    });
+    // “全部”区域标签
+    if (areaAll) areaAll.addEventListener('click', () => {
+        this._askPathAreaFilter = null;
+        areaAll.classList.add('active');
+        // 取消所有区域标签选中
+        const tags = document.querySelectorAll('.askpath-area-tag.active');
+        tags.forEach(t => t.classList.remove('active'));
+        this._doAskPathSearch();
+    });
+    // Esc 关闭（文档级监听已存在，此处注册额外逻辑）
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.classList.contains('visible')) {
+            this._closeAskPath();
+        }
+    });
+};
+
+// 打开问路面板
+AdvancedMUDClient.prototype._openAskPath = function () {
+    const overlay = document.getElementById('askPathOverlay');
+    const input = document.getElementById('askPathInput');
+    if (!overlay) return;
+    overlay.classList.add('visible');
+    if (input) { input.focus(); input.select(); }
+};
+
+// 关闭问路面板
+AdvancedMUDClient.prototype._closeAskPath = function () {
+    const overlay = document.getElementById('askPathOverlay');
+    if (overlay) overlay.classList.remove('visible');
+    this._askPathResults = null;
+    this._askPathTarget = null;
+};
+
+// 执行搜索
+AdvancedMUDClient.prototype._doAskPathSearch = async function () {
+    const input = document.getElementById('askPathInput');
+    const body = document.getElementById('askPathBody');
+    const areaBar = document.getElementById('askPathAreaBar');
+    const areaTags = document.getElementById('askPathAreaTags');
+    const areaAll = document.getElementById('askPathAreaAll');
+    if (!input || !body) return;
+
+    const keyword = input.value.trim();
+    if (!keyword) {
+        body.innerHTML = '<div class="askpath-empty">输入关键词搜索目的地</div>';
+        if (areaBar) areaBar.style.display = 'none';
+        return;
+    }
+
+    // 确保 pathfinder 已加载
+    if (typeof pathfinder === 'undefined') {
+        body.innerHTML = '<div class="askpath-empty">寻路组件未加载</div>';
+        return;
+    }
+    const ok = await pathfinder.ensureLoaded();
+    if (!ok) {
+        body.innerHTML = '<div class="askpath-empty">地图数据不可用（需先探索一些房间）</div>';
+        return;
+    }
+
+    // 搜索
+    const results = pathfinder.searchRoom(keyword, this._askPathAreaFilter);
+    if (results.length === 0) {
+        body.innerHTML = '<div class="askpath-empty">未找到匹配「' + this._escHtml(keyword) + '」的房间</div>';
+        if (areaBar) areaBar.style.display = 'none';
+        return;
+    }
+
+    // 计算距离
+    let distMap = new Map();
+    if (typeof mapper !== 'undefined' && mapper.currentHash) {
+        distMap = pathfinder.calcDistances(mapper.currentHash);
+    }
+
+    // 按距离排序
+    if (distMap.size > 0) {
+        results.sort((a, b) => {
+            const da = distMap.has(a.hash) ? distMap.get(a.hash) : Infinity;
+            const db = distMap.has(b.hash) ? distMap.get(b.hash) : Infinity;
+            return da - db;
+        });
+    }
+
+    // 收集区域分布，显示区域筛选栏
+    const areaCounts = {};
+    for (const r of results) {
+        const a = r.area || '未知';
+        areaCounts[a] = (areaCounts[a] || 0) + 1;
+    }
+    const areaEntries = Object.entries(areaCounts).sort((x, y) => y[1] - x[1]);
+
+    if (areaBar && areaTags && areaEntries.length > 1) {
+        areaBar.style.display = 'flex';
+        areaTags.innerHTML = '';
+        for (const [area, count] of areaEntries) {
+            const tag = document.createElement('span');
+            tag.className = 'askpath-area-tag';
+            if (this._askPathAreaFilter === area) tag.classList.add('active');
+            tag.textContent = area + '(' + count + ')';
+            tag.addEventListener('click', () => {
+                this._askPathAreaFilter = area;
+                if (areaAll) areaAll.classList.remove('active');
+                // 更新标签选中状态
+                areaTags.querySelectorAll('.askpath-area-tag').forEach(t => t.classList.remove('active'));
+                tag.classList.add('active');
+                this._doAskPathSearch();
+            });
+            areaTags.appendChild(tag);
+        }
+        // 更新“全部”状态
+        if (areaAll) {
+            if (!this._askPathAreaFilter) {
+                areaAll.classList.add('active');
+            } else {
+                areaAll.classList.remove('active');
+            }
+        }
+    } else if (areaBar) {
+        areaBar.style.display = 'none';
+    }
+
+    // 渲染结果列表
+    const dirShort = (d) => (typeof DIR_SHORT !== 'undefined' ? DIR_SHORT[d] : d) || d;
+    const maxShow = Math.min(results.length, 30);
+    let html = '';
+
+    for (let i = 0; i < maxShow; i++) {
+        const r = results[i];
+        const dist = distMap.has(r.hash) ? distMap.get(r.hash) : -1;
+        let distLabel, distClass;
+        if (dist === 0) { distLabel = '在此'; distClass = 'here'; }
+        else if (dist > 0) { distLabel = dist + '步'; distClass = 'reachable'; }
+        else { distLabel = '不可达'; distClass = 'unreachable'; }
+
+        html += '<div class="askpath-result-item" data-idx="' + i + '">'
+            + '<span class="askpath-r-name">' + this._escHtml(r.name) + '</span>'
+            + '<span class="askpath-r-area">[' + this._escHtml(r.area) + ']</span>'
+            + '<span class="askpath-r-dist ' + distClass + '">' + distLabel + '</span>'
+            + '</div>';
+    }
+    if (results.length > maxShow) {
+        html += '<div class="askpath-empty">… 还有 ' + (results.length - maxShow) + ' 个结果</div>';
+    }
+    body.innerHTML = html;
+
+    // 保存结果引用
+    this._askPathResults = results;
+    this._askPathDistMap = distMap;
+
+    // 绑定点击/双击事件
+    const items = body.querySelectorAll('.askpath-result-item');
+    items.forEach(item => {
+        item.addEventListener('click', () => {
+            const idx = parseInt(item.getAttribute('data-idx'));
+            this._showAskPathDetail(idx);
+            // 标记选中
+            items.forEach(el => el.classList.remove('selected'));
+            item.classList.add('selected');
+        });
+        item.addEventListener('dblclick', () => {
+            const idx = parseInt(item.getAttribute('data-idx'));
+            if (this._askPathResults && this._askPathResults[idx]) {
+                const r = this._askPathResults[idx];
+                this._closeAskPath();
+                this._startPathwalk(r.hash, r.name);
+            }
+        });
+    });
+
+    // 隐藏路径详情（新搜索时重置）
+    const detail = document.getElementById('askPathDetail');
+    if (detail) detail.style.display = 'none';
+    this._askPathTarget = null;
+};
+
+// 显示路径详情（逐步方向）
+AdvancedMUDClient.prototype._showAskPathDetail = function (idx) {
+    if (!this._askPathResults || !this._askPathResults[idx]) return;
+    const r = this._askPathResults[idx];
+    const detail = document.getElementById('askPathDetail');
+    const title = document.getElementById('askPathDetailTitle');
+    const steps = document.getElementById('askPathDetailSteps');
+    const info = document.getElementById('askPathDetailInfo');
+    const walkBtn = document.getElementById('askPathWalkBtn');
+    if (!detail || !steps) return;
+
+    this._askPathTarget = r;
+    if (title) title.textContent = '→ ' + r.name + ' [' + r.area + ']';
+
+    // 计算路径
+    if (!mapper || !mapper.currentHash) {
+        steps.innerHTML = '<div class="askpath-empty">当前位置未知，无法计算路径</div>';
+        if (walkBtn) walkBtn.style.display = 'none';
+        if (info) info.textContent = '';
+        detail.style.display = 'flex';
+        return;
+    }
+
+    const path = pathfinder.findPath(mapper.currentHash, r.hash);
+    if (!path) {
+        steps.innerHTML = '<div class="askpath-empty">无法找到通往此处的路径</div>';
+        if (walkBtn) walkBtn.style.display = 'none';
+        if (info) info.textContent = '不可达';
+        detail.style.display = 'flex';
+        return;
+    }
+    if (path.length === 0) {
+        steps.innerHTML = '<div class="askpath-empty">你已经在这里了</div>';
+        if (walkBtn) walkBtn.style.display = 'none';
+        if (info) info.textContent = '已到达';
+        detail.style.display = 'flex';
+        return;
+    }
+
+    // 构建路径房间序列（用于显示途经房间名）
+    const pathRooms = [];
+    let cur = mapper.currentHash;
+    for (const dir of path) {
+        const room = mapper.rooms.get(cur);
+        const next = room && room.connections[dir];
+        if (!next) break;
+        const nextRoom = mapper.rooms.get(next);
+        pathRooms.push({ dir, name: nextRoom ? nextRoom.name : '?', hash: next });
+        cur = next;
+    }
+
+    // 渲染步骤列表
+    const dirShort = (d) => (typeof DIR_SHORT !== 'undefined' ? DIR_SHORT[d] : d) || d;
+    let html = '';
+    for (let i = 0; i < pathRooms.length; i++) {
+        const step = pathRooms[i];
+        html += '<div class="askpath-step">'
+            + '<span class="askpath-step-num">' + (i + 1) + '.</span>'
+            + '<span class="askpath-step-dir">' + this._escHtml(dirShort(step.dir)) + '</span>'
+            + '<span class="askpath-step-arrow">→</span>'
+            + '<span class="askpath-step-room">' + this._escHtml(step.name) + '</span>'
+            + '</div>';
+    }
+    steps.innerHTML = html;
+
+    if (walkBtn) walkBtn.style.display = '';
+    if (info) info.textContent = '共 ' + path.length + ' 步';
+    detail.style.display = 'flex';
+};
+
 AdvancedMUDClient.prototype.navigateHistory = function (direction) {
     if (this.history.length === 0) return;
 
