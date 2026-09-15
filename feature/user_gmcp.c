@@ -759,6 +759,14 @@ void gmcp_vitals_update()
     send_char_vitals();
 }
 
+// 公开接口：供外部对象（如房间）在状态变化后主动推送任务数据
+void gmcp_quest_update()
+{
+    if (!has_gmcp())
+        return;
+    send_char_quests();
+}
+
 // 构建并发送房间信息
 public void send_room_info()
 {

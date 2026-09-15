@@ -157,6 +157,9 @@ int do_pray(string arg)
         if (me->query("skybook/guard/death") < i)
             me->set("skybook/guard/death", i);
         me->set(festival, day);
+        // 祈福完成后，主动推送 GMCP 任务数据以更新客户端任务面板
+        if (userp(me) && interactive(me))
+            me->gmcp_quest_update();
         message_vision(HIW "$N获得了" + chinese_number(pot) + "点潜能奖励和" + chinese_number(i) + "点积分。\n" NOR, me);
         me->start_busy(3);
     }
