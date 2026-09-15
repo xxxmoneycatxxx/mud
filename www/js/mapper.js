@@ -442,6 +442,61 @@ class Mapper {
             }
         }
 
+        // 绘制跨楼层连接指示（up/down/复合方向等通往其他楼层的出口）
+        if (this._zCoords) {
+            const drawnCross = new Set();
+            for (const vr of visibleRooms) {
+                if (!vr.room) continue;
+                for (const dir of vr.room.exits) {
+                    const targetHash = vr.room.connections[dir];
+                    if (!targetHash) continue;
+                    const targetZ = this._zCoords.get(targetHash);
+                    if (targetZ === undefined || targetZ === this._currentFloor) continue;
+                    // 跳过已在同楼层绘制的连接
+                    if (visibleRooms.some(v => v.hash === targetHash)) continue;
+                    const edgeKey = vr.hash + '>' + targetHash;
+                    if (drawnCross.has(edgeKey)) continue;
+                    drawnCross.add(edgeKey);
+
+                    const offset = DIR_OFFSETS[dir] || { dx: 0, dy: 0 };
+                    const len = Math.sqrt(offset.dx * offset.dx + offset.dy * offset.dy) || 1;
+                    const ndx = offset.dx / len;
+                    const ndy = offset.dy / len;
+                    const lineLen = cs * 0.45;
+                    const endX = vr.screenX + ndx * lineLen;
+                    const endY = vr.screenY - ndy * lineLen;
+
+                    ctx.save();
+                    ctx.strokeStyle = '#c80';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([3, 3]);
+                    ctx.globalAlpha = 0.7;
+                    ctx.beginPath();
+                    ctx.moveTo(vr.screenX, vr.screenY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    // 箭头
+                    const angle = Math.atan2(-ndy, ndx);
+                    const as = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX - as * Math.cos(angle - 0.5), endY - as * Math.sin(angle - 0.5));
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX - as * Math.cos(angle + 0.5), endY - as * Math.sin(angle + 0.5));
+                    ctx.stroke();
+                    // 楼层标签
+                    ctx.globalAlpha = 0.6;
+                    ctx.fillStyle = '#c80';
+                    ctx.font = '8px Consolas, monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText('F' + targetZ, endX, endY - 3);
+                    ctx.restore();
+                }
+            }
+        }
+
         // 绘制寻路高亮路径
         if (this.highlightPath && this.highlightPath.length > 1) {
             ctx.save();
@@ -640,8 +695,12 @@ class Mapper {
             if (oldName) oldName.remove();
         }
 
-        // 扩展栏：up/down/in/out/enter/leave + 楼层切换
-        const EXTRA_DIRS = ['up', 'down', 'in', 'out', 'enter', 'leave'];
+        // 扩展栏：up/down/in/out/enter/leave + 复合方向 + 楼层切换
+        const EXTRA_DIRS = [
+            'up', 'down', 'in', 'out', 'enter', 'leave',
+            'northup', 'southup', 'eastup', 'westup',
+            'northdown', 'southdown', 'eastdown', 'westdown',
+        ];
         const extra = document.getElementById('moveExtra');
         if (!extra) return;
         extra.innerHTML = '';
@@ -844,6 +903,58 @@ class Mapper {
                 ctx.moveTo(vr.screenX, vr.screenY);
                 ctx.lineTo(targetVR.screenX, targetVR.screenY);
                 ctx.stroke();
+            }
+        }
+
+        // 绘制跨楼层连接指示（全屏模式）
+        if (this._zCoords) {
+            const drawnCross = new Set();
+            for (const vr of visibleRooms) {
+                if (!vr.room) continue;
+                for (const dir of vr.room.exits) {
+                    const targetHash = vr.room.connections[dir];
+                    if (!targetHash) continue;
+                    const targetZ = this._zCoords.get(targetHash);
+                    if (targetZ === undefined || targetZ === this._currentFloor) continue;
+                    if (visibleRooms.some(v => v.hash === targetHash)) continue;
+                    const edgeKey = vr.hash + '>' + targetHash;
+                    if (drawnCross.has(edgeKey)) continue;
+                    drawnCross.add(edgeKey);
+
+                    const offset = DIR_OFFSETS[dir] || { dx: 0, dy: 0 };
+                    const len = Math.sqrt(offset.dx * offset.dx + offset.dy * offset.dy) || 1;
+                    const ndx = offset.dx / len;
+                    const ndy = offset.dy / len;
+                    const lineLen = cs * 0.45;
+                    const endX = vr.screenX + ndx * lineLen;
+                    const endY = vr.screenY - ndy * lineLen;
+
+                    ctx.save();
+                    ctx.strokeStyle = '#c80';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 4]);
+                    ctx.globalAlpha = 0.7;
+                    ctx.beginPath();
+                    ctx.moveTo(vr.screenX, vr.screenY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    const angle = Math.atan2(-ndy, ndx);
+                    const as = 7;
+                    ctx.beginPath();
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX - as * Math.cos(angle - 0.5), endY - as * Math.sin(angle - 0.5));
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX - as * Math.cos(angle + 0.5), endY - as * Math.sin(angle + 0.5));
+                    ctx.stroke();
+                    ctx.globalAlpha = 0.6;
+                    ctx.fillStyle = '#c80';
+                    ctx.font = '10px Consolas, monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText('F' + targetZ, endX, endY - 4);
+                    ctx.restore();
+                }
             }
         }
 

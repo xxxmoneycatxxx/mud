@@ -3986,10 +3986,11 @@ AdvancedMUDClient.prototype.parseANSI = function (text) {
 };
 
 // 将 look 出口句中的方向词渲染为可点击链接（data-cmd 为英文方向命令）
+// 注意：复合方向（northup 等）必须排在基本方向（north 等）之前，防止部分匹配
 AdvancedMUDClient.prototype.linkifyRoomExits = function (html) {
     return html.replace(/(这里(?:明显的出口是|唯一的出口是))([\s\S]*?。)/g, (m, prefix, sentence) => {
         return prefix + sentence.replace(
-            /\b(northeast|northwest|southeast|southwest|north|south|east|west|up|down|in|out|enter|leave)\b(\([^<)]*\))?/g,
+            /\b(northup|southup|eastup|westup|northdown|southdown|eastdown|westdown|northeast|northwest|southeast|southwest|north|south|east|west|up|down|in|out|enter|leave)\b(\([^<)]*\))?/g,
             (mm, dir) => '<a class="exit-link" data-cmd="' + dir + '">' + mm + '</a>'
         );
     });
