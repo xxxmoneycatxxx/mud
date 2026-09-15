@@ -85,19 +85,10 @@ int do_pray(string arg)
     }
     else
     {
-        int i = 1;
+        int i = 2;
         int lunar_m, lunar_d;
         // 取得农历日期
         sscanf(TIME->to_lunar(year + " " + month + " " + day), "%*d-%d-%d", lunar_m, lunar_d);
-        // 绑定手机奖励加倍
-        if (me->query("mobile"))
-        {
-            i *= 2;
-        }
-        else
-        {
-            tell_object(me, HIM "你还没绑定手机号码，输入`mobile`根据提示绑定手机可获得双倍奖励。\n" NOR);
-        }
         // 周末加倍(无调休)
         if (!wday || wday == 6)
         {
