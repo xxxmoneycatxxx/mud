@@ -246,7 +246,7 @@ AdvancedMUDClient.prototype._requestCharPanelData = function (tabName) {
 const ENV_LABELS = {
     auto_get:        ['自动拾取', '拾取尸体时自动 get all'],
     auto_drinkout:   ['自动喝光', '自动喝光容器中的液体'],
-    auto_regenerate: ['自动打坐', '空闲时自动打坐修炼'],
+    auto_regenerate: ['自动调息', '学习/研究时精气不足自动 exert regenerate 恢复'],
     auto_say:        ['自动说话', '重复上次说话内容'],
     brief:           ['简要描述', '移动时只显示房间名'],
     careful:         ['小心模式', '战斗时更加谨慎'],
@@ -2491,7 +2491,7 @@ AdvancedMUDClient.prototype._buildEditorApiPanel = function (container) {
             sig: 'onMessage(pattern, callback)',
             desc: '注册消息匹配回调，分发脱色后的纯文本（已自动去除 ANSI 转义码）。',
             params: ['pattern: RegExp — 匹配消息的正则表达式', 'callback: function(matchedText, matchResult)'],
-            example: 'onMessage(/你盘膝坐下/, () => sendCommand("meditation"));'
+            example: 'onMessage(/你深深吸了几口气/, () => log("调息完成"));'
         },
         {
             sig: 'sendCommand(cmd)',
@@ -2668,7 +2668,7 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
                 'pattern: RegExp — 匹配消息的正则表达式（必须）',
                 'callback: function(matchedText, matchResult) — 匹配时执行的回调'
             ],
-            example: 'onMessage(/你盘膝坐下/, () => sendCommand("meditation"));'
+            example: 'onMessage(/你深深吸了几口气/, () => log("调息完成"));'
         },
         {
             name: 'sendCommand',
@@ -2706,7 +2706,7 @@ AdvancedMUDClient.prototype._renderApiDoc = function (container) {
             sig: 'sleep(ms)',
             desc: '延迟指定毫秒数，返回 Promise。配合 async/await 实现顺序延迟。脚本停止时自动取消。',
             params: ['ms: number — 延迟毫秒数（最小 100）'],
-            example: 'onMessage(/你盘膝坐下/, async () => {\n    sendCommand("meditation");\n    await sleep(3000);\n    sendCommand("exert recover");\n});'
+            example: 'onMessage(/战斗结束/, async () => {\n    sendCommand("get all from corpse");\n    await sleep(3000);\n    sendCommand("north");\n});'
         },
         {
             name: 'log',
@@ -2946,7 +2946,7 @@ AdvancedMUDClient.prototype._vbRenderTriggerForm = function (container) {
     const cmdInput = document.createElement('input');
     cmdInput.type = 'text';
     cmdInput.className = 'settings-form-input';
-    cmdInput.placeholder = '如：meditation';
+    cmdInput.placeholder = '如：exert regenerate';
     cmdInput.id = 'vbTriggerCmd';
     cmdRow.appendChild(cmdInput);
     container.appendChild(cmdRow);
@@ -3919,11 +3919,13 @@ AdvancedMUDClient.prototype._checkSpeedwalkTriggers = function (message) {
 // 触发器处理：遍历规则表，匹配则自动发送命令
 AdvancedMUDClient.prototype._processTriggers = function (message) {
     if (!this._triggers || !this._canAutoSend()) return;
+    // 去除 ANSI 转义码后再匹配，避免颜色码嵌入文本中间时干扰正则
+    const stripped = message.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\].*?\x07/g, '');
     const now = Date.now();
     for (const trigger of this._triggers) {
         if (!trigger.enabled) continue;
         if (trigger.cooldown > 0 && now - trigger._lastFired < trigger.cooldown * 1000) continue;
-        if (trigger.pattern.test(message)) {
+        if (trigger.pattern.test(stripped)) {
             trigger._lastFired = now;
             this.sendCommand(trigger.command);
             this.appendMessage('» [' + trigger.name + '] → ' + trigger.command, 'system');

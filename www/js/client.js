@@ -41,7 +41,7 @@ class AdvancedMUDClient {
         this._triggers = [
             {
                 name: '仙丹自动拾取',
-                pattern: /"啪"的一声一颗仙丹掉到你面前。/,
+                pattern: /\u201C啪\u201D的一声一颗仙丹掉到你面前。/,
                 command: 'get dan',
                 enabled: true,
                 cooldown: 0,
@@ -55,8 +55,8 @@ class AdvancedMUDClient {
         // 注意：方向缩写(n/s/e/w等)、技能中文别名(dazuo/lian/xue等) 已由服务端 aliasd.c 处理，无需客户端重复
         this._aliases = [
             { name: '寻路', pattern: '^go (.+)$', command: 'gtr $1', enabled: true, builtin: true },
-            { name: '施法', pattern: '^c (.+)$', command: 'cast $1', enabled: true, builtin: true },
-            { name: '战前准备', pattern: 'zb', command: 'wield sword;ready shield;cast armor', enabled: false, builtin: true },
+            { name: '施法', pattern: '^c (.+)$', command: 'perform $1', enabled: true, builtin: true },
+            { name: '战前准备', pattern: 'zb', command: 'wield sword;wear shield;enable armor', enabled: false, builtin: true },
             { name: '物品栏', pattern: 'eq', command: 'inventory', enabled: false, builtin: true },
         ];
         this._loadAliases();
@@ -92,9 +92,9 @@ class AdvancedMUDClient {
         // 用户脚本表：自定义 JavaScript 脚本片段
         this._scripts = [
             {
-                name: '自动打坐',
-                description: '检测到「你盘膝坐下」时自动执行 meditation',
-                code: 'onMessage(/你盘膝坐下/, () => sendCommand("meditation"));',
+                name: '自动调息',
+                description: '每 5 秒检查精气，低于 70% 自动 exert regenerate',
+                code: 'registerTimer(5000, () => {\n    const v = getVitals();\n    if (v.jing && v.max_jing && v.jing < v.max_jing * 0.7) {\n        sendCommand("exert regenerate");\n        log("精气不足，自动调息");\n    }\n});',
                 enabled: false,
                 builtin: true,
             },
@@ -107,8 +107,8 @@ class AdvancedMUDClient {
             },
             {
                 name: '自动逃跑',
-                description: '每 2 秒检查气血，低于 20% 自动 flee',
-                code: 'registerTimer(2000, () => {\n    const v = getVitals();\n    if (v.hp && v.max_hp && v.hp < v.max_hp * 0.2 && isConnected()) {\n        sendCommand("flee");\n        log("气血危急，紧急逃跑！");\n    }\n});',
+                description: '每 2 秒检查气血，低于 20% 自动 halt 脱离战斗',
+                code: 'registerTimer(2000, () => {\n    const v = getVitals();\n    if (v.hp && v.max_hp && v.hp < v.max_hp * 0.2 && isConnected()) {\n        sendCommand("halt");\n        log("气血危急，紧急脱离战斗！");\n    }\n});',
                 enabled: false,
                 builtin: true,
             },
