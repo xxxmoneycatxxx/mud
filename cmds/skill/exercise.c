@@ -110,6 +110,8 @@ int exercising(object me)
         {
             me->add("max_neili", 1);
             me->set("neili", (int)me->query("max_neili"));
+            // 重新计算气血等派生属性（max_qi 依赖 max_neili）
+            CHAR_D->setup_char(me);
             write("你的内力增加了！！\n");
             return 0;
         }

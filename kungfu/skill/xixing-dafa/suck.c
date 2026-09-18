@@ -90,6 +90,8 @@ int exert(object me, object target)
                 amount = 1 + (me->query_skill("xixing-dafa", 1) - 120) / 10;
                 target->add("max_neili", -amount);
                 me->add("max_neili", amount);
+                // 重新计算气血等派生属性（max_qi 依赖 max_neili）
+                CHAR_D->setup_char(me);
                 me->add("exception/xixing-count", amount * 10);
                 SKILL_D("xixing-dafa")->check_count(me);
                 if (target->query("max_neili") < 1)

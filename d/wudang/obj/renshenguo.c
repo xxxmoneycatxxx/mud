@@ -40,6 +40,9 @@ int do_effect(object me)
         if (me->query("max_neili") > me->query_neili_limit())
                 me->set("max_neili", me->query_neili_limit());
 
+    // 重新计算气血等派生属性（max_qi 依赖 max_neili）
+    CHAR_D->setup_char(me);
+
     me->set("neili", me->query("max_neili"));
     me->set("eff_qi", me->query("max_qi"));
     me->set("qi", me->query("eff_qi"));

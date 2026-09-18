@@ -28,6 +28,8 @@ int do_effect(object me)
             me->set("neili", me->query("max_neili"));
         if (me->query("max_neili") > max_limit)
             me->set("max_neili", max_limit);
+        // 重新计算气血等派生属性（max_qi 依赖 max_neili）
+        CHAR_D->setup_char(me);
 
         message_vision(HIY "$N吃下一枚百花腹蛇膏，顿然间只觉一股清凉之气直沁心肺...\n" NOR, this_player());
     }

@@ -96,7 +96,11 @@ int exert(object me, object target)
                         tell_object(me, HIG "可是你发现对方内力"
                                     "似乎弱过你太多，一时难以吸收以为己用。\n" NOR);
                 else
+                {
                         me->add("max_neili", sucked);
+                        // 重新计算气血等派生属性（max_qi 依赖 max_neili）
+                        CHAR_D->setup_char(me);
+                }
 
                 //me->start_busy(4 + random(4));
                 me->start_busy(4);
