@@ -69,6 +69,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     python3 \
     locales \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # 配置 UTF-8 区域
