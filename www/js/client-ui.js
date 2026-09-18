@@ -198,8 +198,6 @@ AdvancedMUDClient.prototype._openCharPanel = function (tabName) {
     if (!overlay) return;
     this._switchCharPanelTab(tabName || 'score');
     overlay.classList.add('visible');
-    // 发送 GMCP 请求获取数据
-    this._requestCharPanelData(tabName);
 };
 
 // 关闭角色面板
@@ -219,10 +217,8 @@ AdvancedMUDClient.prototype._switchCharPanelTab = function (tabName) {
     const target = document.getElementById('charTab-' + tabName);
     if (target) {
         target.classList.add('active');
-        // 如果内容区仍显示"加载中…"，说明数据尚未加载，发送 GMCP 请求
-        if (target.querySelector('.char-panel-loading')) {
-            this._requestCharPanelData(tabName);
-        }
+        // 每次切换标签都发送 GMCP 请求获取最新数据
+        this._requestCharPanelData(tabName);
     }
 };
 
