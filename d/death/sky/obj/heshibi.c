@@ -155,6 +155,8 @@ void xiqu7(string arg)
                                 "舒服受用。\n" NOR); 
 
                 me->improve_skill("force", 20000);
+                // 重新计算派生属性（max_qi 依赖 max_neili，max_jing 依赖 max_jingli）
+                CHAR_D->setup_char(me);
                 max = me->query("max_qi");
                 me->set("eff_qi", max);
                 me->set("qi", max);

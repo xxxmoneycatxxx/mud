@@ -97,6 +97,8 @@ int respirating(object me)
         {
             me->add("max_jingli", 1);
             me->set("jingli", (int)me->query("max_jingli"));
+            // 重新计算精气等派生属性（max_jing 依赖 max_jingli）
+            CHAR_D->setup_char(me);
             write("你的精力增加了！！\n");
             return 0;
         }

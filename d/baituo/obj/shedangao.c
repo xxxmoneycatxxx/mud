@@ -26,17 +26,20 @@ int do_eat(string arg)
     if((me->query("max_jing")>=200)||(me->query("max_qi")>=200))
         return notify_fail("你吃『蛇胆膏』已无效用！\n");
     if(me->query("max_jing")<180)
-       {me->add("max_jing", 10);
-        me->add("jing",10);
-        me->add("max_qi",10);
-        me->add("qi",10);
-       }
+    {
+        // 改为增加内力/精力上限，由 setup_char 重算气血/精气，确保持久化
+        me->add("max_neili", 40);
+        me->add("max_jingli", 40);
+    }
     else
-       {me->add("max_jing",2);
-        me->add("jing",2);
-        me->add("max_qi",2);
-        me->add("qi",2);
-        }
+    {
+        me->add("max_neili", 8);
+        me->add("max_jingli", 8);
+    }
+    // 重新计算派生属性（max_qi 依赖 max_neili，max_jing 依赖 max_jingli）
+    CHAR_D->setup_char(me);
+    me->set("qi", me->query("max_qi"));
+    me->set("jing", me->query("max_jing"));
     message_vision( "$N吃下一块蛇胆膏，顿觉一股浩荡真气直涌上来，
 精，气大增...\n" , me);
     destruct(this_object());

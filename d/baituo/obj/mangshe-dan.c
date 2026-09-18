@@ -54,6 +54,8 @@ int cure_ob(object me)
     me->add_temp("apply/strength", 1);
     me->add("eff_jingli", 1);
     me->add("max_jingli", 1);
+    // 重新计算精气等派生属性（max_jing 依赖 max_jingli）
+    CHAR_D->setup_char(me);
     me->add("jingli", 100);
     me->apply_condition("bonze_drug", 30 + me->query_condition("bonze_drug"));
     me->apply_condition("mang_shedan", 30);
