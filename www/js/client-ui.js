@@ -44,6 +44,15 @@ AdvancedMUDClient.prototype.setupQuickCommands = function () {
     this._setupSettingsEvents();
     // 角色面板事件绑定
     this._setupCharPanelEvents();
+
+    // 底部栏“退出”按钮：发送 quit 命令
+    const quitBtn = document.getElementById('quitBtn');
+    if (quitBtn) {
+        quitBtn.addEventListener('click', () => {
+            this.commandInput.value = 'quit';
+            this.handleSendCommand();
+        });
+    }
 };
 
 // 设置面板：事件绑定（只调用一次）

@@ -852,6 +852,7 @@ body:not(.logged-in) .quick-commands,
 body:not(.logged-in) #helpBtn,
 body:not(.logged-in) #askPathBtn,
 body:not(.logged-in) #statusTriggerBtn,
+body:not(.logged-in) #quitBtn,
 body:not(.logged-in) .vitals-bar {
     display: none !important;
 }
@@ -2699,4 +2700,14 @@ body:not(.logged-in) .vitals-bar {
 .askpath-btn {
     flex-shrink: 0;
     margin-left: 4px;
+}
+/* 退出按钮：底部右侧，hover 红色警示 */
+.quit-btn {
+    flex-shrink: 0;
+    margin-right: 8px;
+}
+.quit-btn:hover {
+    color: #f44;
+    border-color: #f44;
+    text-shadow: 0 0 6px rgba(255, 68, 68, 0.3);
 }
