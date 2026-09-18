@@ -12,13 +12,14 @@ const DIR_OFFSETS = {
     'northwest': { dx: -1, dy:  1 },
     'southeast': { dx:  1, dy: -1 },
     'southwest': { dx: -1, dy: -1 },
-    'up':        { dx:  0, dy:  2 },
-    'down':      { dx:  0, dy: -2 },
+    // up/down/enter/leave 不改变 2D 位置，只改变 z 坐标
+    'up':        { dx:  0, dy:  0 },
+    'down':      { dx:  0, dy:  0 },
     'in':        { dx: -2, dy:  0 },
     'out':       { dx:  2, dy:  0 },
-    'enter':     { dx:  0, dy: -2 },
-    'leave':     { dx:  0, dy:  2 },
-    // 复合方向（水平 + 垂直）
+    'enter':     { dx:  0, dy:  0 },
+    'leave':     { dx:  0, dy:  0 },
+    // 复合方向：只应用水平分量，垂直分量由 z 坐标处理
     'northup':   { dx:  0, dy:  1 },
     'southup':   { dx:  0, dy: -1 },
     'eastup':    { dx:  1, dy:  0 },
@@ -253,46 +254,50 @@ class Mapper {
                 else if (dir === 'down' || dir === 'enter' || dir.endsWith('down')) nz = z - 1;
                 zCoords.set(targetHash, nz);
 
-                // 检测坐标冲突：该格位已被其他房间占据
-                const occupantKey = this._findOccupant(nx, ny);
-                if (occupantKey && occupantKey !== targetHash) {
-                    // 收集 targetHash 的整棵 BFS 子树
-                    const block = [];
-                    const blockQ = [targetHash];
-                    const blockSet = new Set([targetHash]);
-                    while (blockQ.length > 0) {
-                        const h = blockQ.shift();
-                        block.push(h);
-                        const r = this.rooms.get(h);
-                        if (!r) continue;
-                        for (const d of r.exits) {
-                            const t = r.connections[d];
-                            if (t && !blockSet.has(t) && !this.positions.has(t)) {
-                                blockSet.add(t);
-                                blockQ.push(t);
+                // 纯垂直移动（up/down/enter/leave）：跳过 2D 冲突检测，允许多层堆叠
+                const isVerticalOnly = (dir === 'up' || dir === 'down' || dir === 'enter' || dir === 'leave');
+                if (!isVerticalOnly) {
+                    // 检测坐标冲突：该格位已被其他房间占据
+                    const occupantKey = this._findOccupant(nx, ny);
+                    if (occupantKey && occupantKey !== targetHash) {
+                        // 收集 targetHash 的整棵 BFS 子树
+                        const block = [];
+                        const blockQ = [targetHash];
+                        const blockSet = new Set([targetHash]);
+                        while (blockQ.length > 0) {
+                            const h = blockQ.shift();
+                            block.push(h);
+                            const r = this.rooms.get(h);
+                            if (!r) continue;
+                            for (const d of r.exits) {
+                                const t = r.connections[d];
+                                if (t && !blockSet.has(t) && !this.positions.has(t)) {
+                                    blockSet.add(t);
+                                    blockQ.push(t);
+                                }
                             }
                         }
-                    }
 
-                    // 在螺旋环上搜索空闲格位
-                    const free = this._findFreePos(nx, ny);
-                    if (free) {
-                        const shiftDx = free.x - nx;
-                        const shiftDy = free.y - ny;
-                        for (const bh of block) {
-                            const bp = this.positions.get(bh);
-                            if (bp) {
-                                this.positions.set(bh, {
-                                    x: bp.x + shiftDx,
-                                    y: bp.y + shiftDy,
-                                });
+                        // 在螺旋环上搜索空闲格位
+                        const free = this._findFreePos(nx, ny);
+                        if (free) {
+                            const shiftDx = free.x - nx;
+                            const shiftDy = free.y - ny;
+                            for (const bh of block) {
+                                const bp = this.positions.get(bh);
+                                if (bp) {
+                                    this.positions.set(bh, {
+                                        x: bp.x + shiftDx,
+                                        y: bp.y + shiftDy,
+                                    });
+                                }
                             }
+                            // 子树已整体平移，跳过常规赋值
+                            continue;
                         }
-                        // 子树已整体平移，跳过常规赋值
+                        // 找不到空闲格位则放弃该房间
                         continue;
                     }
-                    // 找不到空闲格位则放弃该房间
-                    continue;
                 }
 
                 this.positions.set(targetHash, { x: nx, y: ny });
@@ -462,37 +467,110 @@ class Mapper {
                     const len = Math.sqrt(offset.dx * offset.dx + offset.dy * offset.dy) || 1;
                     const ndx = offset.dx / len;
                     const ndy = offset.dy / len;
-                    const lineLen = cs * 0.45;
-                    const endX = vr.screenX + ndx * lineLen;
-                    const endY = vr.screenY - ndy * lineLen;
 
-                    ctx.save();
-                    ctx.strokeStyle = '#c80';
-                    ctx.lineWidth = 1.5;
-                    ctx.setLineDash([3, 3]);
-                    ctx.globalAlpha = 0.7;
-                    ctx.beginPath();
-                    ctx.moveTo(vr.screenX, vr.screenY);
-                    ctx.lineTo(endX, endY);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                    // 箭头
-                    const angle = Math.atan2(-ndy, ndx);
-                    const as = 5;
-                    ctx.beginPath();
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - as * Math.cos(angle - 0.5), endY - as * Math.sin(angle - 0.5));
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - as * Math.cos(angle + 0.5), endY - as * Math.sin(angle + 0.5));
-                    ctx.stroke();
-                    // 楼层标签
-                    ctx.globalAlpha = 0.6;
-                    ctx.fillStyle = '#c80';
-                    ctx.font = '8px Consolas, monospace';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'bottom';
-                    ctx.fillText('F' + targetZ, endX, endY - 3);
-                    ctx.restore();
+                    // 判断是否为同位置跨楼层（纯垂直移动）
+                    const isSamePos = (len < 0.5);
+
+                    if (isSamePos) {
+                        // 同位置跨楼层：绘制弧形指示器 + 楼层标签
+                        const arcR = rs * 0.9;
+                        const isUp = targetZ > this._currentFloor;
+
+                        ctx.save();
+                        ctx.strokeStyle = '#c80';
+                        ctx.lineWidth = 2;
+                        ctx.globalAlpha = 0.8;
+
+                        // 绘制半圆弧
+                        ctx.beginPath();
+                        if (isUp) {
+                            // 上层：上半圆弧（从右到左）
+                            ctx.arc(vr.screenX, vr.screenY, arcR, 0, Math.PI, false);
+                        } else {
+                            // 下层：下半圆弧（从左到右）
+                            ctx.arc(vr.screenX, vr.screenY, arcR, Math.PI, Math.PI * 2, false);
+                        }
+                        ctx.stroke();
+
+                        // 起点箭头
+                        const as = 6;
+                        ctx.fillStyle = '#c80';
+                        ctx.beginPath();
+                        if (isUp) {
+                            // 起点在右侧，箭头向右
+                            ctx.moveTo(vr.screenX + arcR, vr.screenY);
+                            ctx.lineTo(vr.screenX + arcR - as, vr.screenY - as * 0.6);
+                            ctx.lineTo(vr.screenX + arcR - as, vr.screenY + as * 0.6);
+                        } else {
+                            // 起点在左侧，箭头向左
+                            ctx.moveTo(vr.screenX - arcR, vr.screenY);
+                            ctx.lineTo(vr.screenX - arcR + as, vr.screenY - as * 0.6);
+                            ctx.lineTo(vr.screenX - arcR + as, vr.screenY + as * 0.6);
+                        }
+                        ctx.fill();
+
+                        // 终点箭头
+                        ctx.beginPath();
+                        if (isUp) {
+                            // 终点在左侧，箭头向左
+                            ctx.moveTo(vr.screenX - arcR, vr.screenY);
+                            ctx.lineTo(vr.screenX - arcR + as, vr.screenY - as * 0.6);
+                            ctx.lineTo(vr.screenX - arcR + as, vr.screenY + as * 0.6);
+                        } else {
+                            // 终点在右侧，箭头向右
+                            ctx.moveTo(vr.screenX + arcR, vr.screenY);
+                            ctx.lineTo(vr.screenX + arcR - as, vr.screenY - as * 0.6);
+                            ctx.lineTo(vr.screenX + arcR - as, vr.screenY + as * 0.6);
+                        }
+                        ctx.fill();
+
+                        // 楼层标签（弧顶/弧底外侧）
+                        ctx.globalAlpha = 0.9;
+                        ctx.fillStyle = '#c80';
+                        ctx.font = 'bold 9px Consolas, monospace';
+                        ctx.textAlign = 'center';
+                        if (isUp) {
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillText('F' + targetZ, vr.screenX, vr.screenY - arcR - 3);
+                        } else {
+                            ctx.textBaseline = 'top';
+                            ctx.fillText('F' + targetZ, vr.screenX, vr.screenY + arcR + 3);
+                        }
+                        ctx.restore();
+                    } else {
+                        // 不同位置跨楼层：原有虚线箭头逻辑
+                        const lineLen = cs * 0.45;
+                        const endX = vr.screenX + ndx * lineLen;
+                        const endY = vr.screenY - ndy * lineLen;
+
+                        ctx.save();
+                        ctx.strokeStyle = '#c80';
+                        ctx.lineWidth = 1.5;
+                        ctx.setLineDash([3, 3]);
+                        ctx.globalAlpha = 0.7;
+                        ctx.beginPath();
+                        ctx.moveTo(vr.screenX, vr.screenY);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        // 箭头
+                        const angle = Math.atan2(-ndy, ndx);
+                        const as = 5;
+                        ctx.beginPath();
+                        ctx.moveTo(endX, endY);
+                        ctx.lineTo(endX - as * Math.cos(angle - 0.5), endY - as * Math.sin(angle - 0.5));
+                        ctx.moveTo(endX, endY);
+                        ctx.lineTo(endX - as * Math.cos(angle + 0.5), endY - as * Math.sin(angle + 0.5));
+                        ctx.stroke();
+                        // 楼层标签
+                        ctx.globalAlpha = 0.6;
+                        ctx.fillStyle = '#c80';
+                        ctx.font = '8px Consolas, monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText('F' + targetZ, endX, endY - 3);
+                        ctx.restore();
+                    }
                 }
             }
         }
@@ -546,6 +624,26 @@ class Mapper {
                 ctx.beginPath();
                 ctx.arc(vr.screenX + half + 2, vr.screenY - half - 2, 2.5, 0, Math.PI * 2);
                 ctx.fill();
+            }
+
+            // 堆叠房间楼层徽章：当多个房间共享同一 2D 位置但不同楼层时显示
+            if (!vr.isCurrent && explored && this._zCoords) {
+                const stackedFloors = this._getStackedFloors(vr.hash);
+                if (stackedFloors.length > 0) {
+                    const badgeX = vr.screenX + half + 6;
+                    const badgeY = vr.screenY - half - 6;
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(200,128,0,0.85)';
+                    ctx.beginPath();
+                    ctx.arc(badgeX, badgeY, 7, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 7px Consolas, monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(stackedFloors.length > 1 ? stackedFloors.length + 'L' : 'F' + stackedFloors[0], badgeX, badgeY);
+                    ctx.restore();
+                }
             }
 
             // 标签：当前房间 + 所有已探索的可见房间
@@ -605,6 +703,23 @@ class Mapper {
             if (cur.connections[dir] === hash) return true;
         }
         return false;
+    }
+
+    // 获取与指定房间共享同一 2D 网格位置但不同楼层的房间 z 坐标列表
+    _getStackedFloors(hash) {
+        if (!this._zCoords || !this.positions.has(hash)) return [];
+        const pos = this.positions.get(hash);
+        const curZ = this._zCoords.get(hash);
+        const floors = [];
+        for (const [h, p] of this.positions) {
+            if (p.x === pos.x && p.y === pos.y && h !== hash) {
+                const z = this._zCoords.get(h);
+                if (z !== undefined && z !== curZ) {
+                    floors.push(z);
+                }
+            }
+        }
+        return floors;
     }
 
     _truncate(str, maxLen) {
@@ -925,35 +1040,102 @@ class Mapper {
                     const len = Math.sqrt(offset.dx * offset.dx + offset.dy * offset.dy) || 1;
                     const ndx = offset.dx / len;
                     const ndy = offset.dy / len;
-                    const lineLen = cs * 0.45;
-                    const endX = vr.screenX + ndx * lineLen;
-                    const endY = vr.screenY - ndy * lineLen;
 
-                    ctx.save();
-                    ctx.strokeStyle = '#c80';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([4, 4]);
-                    ctx.globalAlpha = 0.7;
-                    ctx.beginPath();
-                    ctx.moveTo(vr.screenX, vr.screenY);
-                    ctx.lineTo(endX, endY);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
-                    const angle = Math.atan2(-ndy, ndx);
-                    const as = 7;
-                    ctx.beginPath();
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - as * Math.cos(angle - 0.5), endY - as * Math.sin(angle - 0.5));
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - as * Math.cos(angle + 0.5), endY - as * Math.sin(angle + 0.5));
-                    ctx.stroke();
-                    ctx.globalAlpha = 0.6;
-                    ctx.fillStyle = '#c80';
-                    ctx.font = '10px Consolas, monospace';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'bottom';
-                    ctx.fillText('F' + targetZ, endX, endY - 4);
-                    ctx.restore();
+                    // 判断是否为同位置跨楼层（纯垂直移动）
+                    const isSamePos = (len < 0.5);
+
+                    if (isSamePos) {
+                        // 同位置跨楼层：绘制弧形指示器 + 楼层标签
+                        const arcR = rs * 0.9;
+                        const isUp = targetZ > this._currentFloor;
+
+                        ctx.save();
+                        ctx.strokeStyle = '#c80';
+                        ctx.lineWidth = 2.5;
+                        ctx.globalAlpha = 0.8;
+
+                        // 绘制半圆弧
+                        ctx.beginPath();
+                        if (isUp) {
+                            ctx.arc(vr.screenX, vr.screenY, arcR, 0, Math.PI, false);
+                        } else {
+                            ctx.arc(vr.screenX, vr.screenY, arcR, Math.PI, Math.PI * 2, false);
+                        }
+                        ctx.stroke();
+
+                        // 起点箭头
+                        const as = 8;
+                        ctx.fillStyle = '#c80';
+                        ctx.beginPath();
+                        if (isUp) {
+                            ctx.moveTo(vr.screenX + arcR, vr.screenY);
+                            ctx.lineTo(vr.screenX + arcR - as, vr.screenY - as * 0.6);
+                            ctx.lineTo(vr.screenX + arcR - as, vr.screenY + as * 0.6);
+                        } else {
+                            ctx.moveTo(vr.screenX - arcR, vr.screenY);
+                            ctx.lineTo(vr.screenX - arcR + as, vr.screenY - as * 0.6);
+                            ctx.lineTo(vr.screenX - arcR + as, vr.screenY + as * 0.6);
+                        }
+                        ctx.fill();
+
+                        // 终点箭头
+                        ctx.beginPath();
+                        if (isUp) {
+                            ctx.moveTo(vr.screenX - arcR, vr.screenY);
+                            ctx.lineTo(vr.screenX - arcR + as, vr.screenY - as * 0.6);
+                            ctx.lineTo(vr.screenX - arcR + as, vr.screenY + as * 0.6);
+                        } else {
+                            ctx.moveTo(vr.screenX + arcR, vr.screenY);
+                            ctx.lineTo(vr.screenX + arcR - as, vr.screenY - as * 0.6);
+                            ctx.lineTo(vr.screenX + arcR - as, vr.screenY + as * 0.6);
+                        }
+                        ctx.fill();
+
+                        // 楼层标签
+                        ctx.globalAlpha = 0.9;
+                        ctx.fillStyle = '#c80';
+                        ctx.font = 'bold 11px Consolas, monospace';
+                        ctx.textAlign = 'center';
+                        if (isUp) {
+                            ctx.textBaseline = 'bottom';
+                            ctx.fillText('F' + targetZ, vr.screenX, vr.screenY - arcR - 4);
+                        } else {
+                            ctx.textBaseline = 'top';
+                            ctx.fillText('F' + targetZ, vr.screenX, vr.screenY + arcR + 4);
+                        }
+                        ctx.restore();
+                    } else {
+                        // 不同位置跨楼层：原有虚线箭头逻辑
+                        const lineLen = cs * 0.45;
+                        const endX = vr.screenX + ndx * lineLen;
+                        const endY = vr.screenY - ndy * lineLen;
+
+                        ctx.save();
+                        ctx.strokeStyle = '#c80';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([4, 4]);
+                        ctx.globalAlpha = 0.7;
+                        ctx.beginPath();
+                        ctx.moveTo(vr.screenX, vr.screenY);
+                        ctx.lineTo(endX, endY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        const angle = Math.atan2(-ndy, ndx);
+                        const as = 7;
+                        ctx.beginPath();
+                        ctx.moveTo(endX, endY);
+                        ctx.lineTo(endX - as * Math.cos(angle - 0.5), endY - as * Math.sin(angle - 0.5));
+                        ctx.moveTo(endX, endY);
+                        ctx.lineTo(endX - as * Math.cos(angle + 0.5), endY - as * Math.sin(angle + 0.5));
+                        ctx.stroke();
+                        ctx.globalAlpha = 0.6;
+                        ctx.fillStyle = '#c80';
+                        ctx.font = '10px Consolas, monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText('F' + targetZ, endX, endY - 4);
+                        ctx.restore();
+                    }
                 }
             }
         }
@@ -1007,6 +1189,26 @@ class Mapper {
                 ctx.beginPath();
                 ctx.arc(vr.screenX + half + 3, vr.screenY - half - 3, 3, 0, Math.PI * 2);
                 ctx.fill();
+            }
+
+            // 堆叠房间楼层徽章：当多个房间共享同一 2D 位置但不同楼层时显示
+            if (!vr.isCurrent && explored && this._zCoords) {
+                const stackedFloors = this._getStackedFloors(vr.hash);
+                if (stackedFloors.length > 0) {
+                    const badgeX = vr.screenX + half + 8;
+                    const badgeY = vr.screenY - half - 8;
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(200,128,0,0.85)';
+                    ctx.beginPath();
+                    ctx.arc(badgeX, badgeY, 9, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 8px Consolas, monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(stackedFloors.length > 1 ? stackedFloors.length + 'L' : 'F' + stackedFloors[0], badgeX, badgeY);
+                    ctx.restore();
+                }
             }
 
             // 标签
