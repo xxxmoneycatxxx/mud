@@ -44,7 +44,7 @@ mapping query_terms()
                "no_story":0,
                "no_teach":0,
                 "no_tell":LIST_TERM,
-                 "prompt":0,
+                 "prompt":STRING_TERM,
                  "public":0,
                "pure_say":0,
                "show_map":0,
@@ -53,8 +53,8 @@ mapping query_terms()
                   "sign3":STRING_TERM,
                   "sign4":STRING_TERM,
                   "sign5":STRING_TERM,
-                  "wimpy":0,
-            "wimpy_apply":0,
+                  "wimpy":NUMBER_TERM | NON_NEG,
+            "wimpy_apply":STRING_TERM,
             // wiz term
             "combat_test":WIZ_ONLY,
               "invisible":WIZ_ONLY,
@@ -79,6 +79,14 @@ mapping query_env_domains()
             "none":0,
             "half":1,
             "abs":2,
+        ]),
+        "prompt":([
+            "off":"",
+            "time":"time",
+            "date":"date",
+            "mud":"mud",
+            "hp":"hp",
+            "path":"path",
         ]),
     ]);
 }

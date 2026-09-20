@@ -252,37 +252,37 @@ const ENV_LABELS = {
     auto_get:        ['自动拾取', '拾取尸体时自动 get all'],
     auto_drinkout:   ['自动喝光', '自动喝光容器中的液体'],
     auto_regenerate: ['自动调息', '学习/研究时精气不足自动 exert regenerate 恢复'],
-    auto_say:        ['自动说话', '重复上次说话内容'],
+    auto_say:        ['自动说话', '无法识别的输入自动作为说话处理'],
     brief:           ['简要描述', '移动时只显示房间名'],
-    careful:         ['小心模式', '战斗时更加谨慎'],
+    careful:         ['小心模式', '饮食只使用随身物品，不取用附近的'],
     combatd:         ['战斗消息', '战斗消息显示模式'],
-    halt_age:        ['停止年龄', '达到指定年龄停止增长'],
+    halt_age:        ['停止年龄', '在聊天室中停止年龄增长'],
     jam_talk:        ['消息过滤', '过滤部分频道消息'],
-    keep_idle:       ['保持空闲', '保持空闲状态不被踢出'],
-    look_window:     ['窗口模式', 'look 输出适配窗口宽度'],
-    no_autoultra:    ['禁止超杀', '禁止自动超杀'],
+    keep_idle:       ['保持空闲', '保持空闲状态不被踢出（当前未生效）'],
+    look_window:     ['窗外视角', '室内时也能看到户外动态'],
+    no_autoultra:    ['禁止升频', 'chat 不自动升级为 ultra 频道'],
     no_emote:        ['屏蔽表情', '屏蔽指定玩家的表情'],
     no_follow:       ['拒绝跟随', '拒绝跟随其他玩家'],
     no_more:         ['关闭分页', '关闭长文本分页显示'],
     no_story:        ['屏蔽故事', '屏蔽故事频道消息'],
     no_teach:        ['拒绝拜师', '拒绝其他玩家的拜师'],
     no_tell:         ['屏蔽私聊', '屏蔽指定玩家的私聊'],
-    prompt:          ['提示符', '显示命令行提示符'],
+    prompt:          ['提示符', '提示符附加信息（time/date/mud/hp/path）'],
     public:          ['公开模式', '允许其他玩家查看属性'],
-    pure_say:        ['纯净说话', '说话时不附加额外信息'],
+    pure_say:        ['纯净说话', '所有输入视为说话（除非以 / 开头）'],
     show_map:        ['显示地图', '显示小地图面板'],
-    wimpy:           ['胆小模式', '气血低时自动逃跑'],
-    wimpy_apply:     ['胆小应用', '将胆小模式应用到战斗'],
+    wimpy:           ['逃跑阈值', '气血或精气低于此百分比时自动逃跑（建议 40~70）'],
+    wimpy_apply:     ['逃跑道具', '逃跑时优先使用的随身对象 ID'],
     default_sign:    ['默认签名', '默认个人签名序号'],
 };
 
 // 环境变量分组
 const ENV_GROUPS = [
     { title: '自动化', keys: ['auto_get', 'auto_drinkout', 'auto_regenerate', 'auto_say', 'no_autoultra'] },
-    { title: '战斗',   keys: ['combatd', 'careful', 'wimpy', 'wimpy_apply'] },
+    { title: '战斗',   keys: ['combatd', 'wimpy', 'wimpy_apply'] },
     { title: '显示',   keys: ['brief', 'no_more', 'look_window', 'show_map', 'prompt'] },
     { title: '社交',   keys: ['public', 'no_follow', 'no_emote', 'no_tell', 'no_story', 'no_teach', 'jam_talk'] },
-    { title: '其他',   keys: ['keep_idle', 'halt_age', 'pure_say', 'default_sign'] },
+    { title: '其他',   keys: ['careful', 'keep_idle', 'halt_age', 'pure_say', 'default_sign'] },
 ];
 
 // 渲染选项标签页：请求数据（如未缓存）并渲染
@@ -381,6 +381,18 @@ AdvancedMUDClient.prototype._renderEnvSettings = function (data) {
                 // 数值输入用 blur 提交
                 input.addEventListener('change', () => {
                     this._sendEnvSet(key, parseInt(input.value, 10) || 0);
+                });
+                row.appendChild(input);
+            } else if (m.type === 'string') {
+                // 文本输入
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'env-select';
+                input.setAttribute('data-term', key);
+                input.value = current[key] || '';
+                input.style.width = '100px';
+                input.addEventListener('change', () => {
+                    this._sendEnvSet(key, input.value);
                 });
                 row.appendChild(input);
             }
