@@ -899,6 +899,22 @@ class Mapper {
             }
         });
 
+        // 复合方向角标：根据出口显示/隐藏 N/S/E/W 格子的上下角标
+        const COMPOUND_MAP = {
+            north: { up: 'northup', down: 'northdown' },
+            south: { up: 'southup', down: 'southdown' },
+            east:  { up: 'eastup',  down: 'eastdown'  },
+            west:  { up: 'westup',  down: 'westdown'  },
+        };
+        for (const [baseDir, compounds] of Object.entries(COMPOUND_MAP)) {
+            const cell = panel.querySelector(`.move-cell[data-dir="${baseDir}"]`);
+            if (!cell) continue;
+            const upBadge = cell.querySelector('.badge-up');
+            const downBadge = cell.querySelector('.badge-down');
+            if (upBadge) upBadge.classList.toggle('visible', exits.has(compounds.up));
+            if (downBadge) downBadge.classList.toggle('visible', exits.has(compounds.down));
+        }
+
         // 中心格：多层叠加模式切换按钮
         const center = document.getElementById('moveCenter');
         if (center) {
@@ -915,12 +931,8 @@ class Mapper {
             }
         }
 
-        // 扩展栏：up/down/in/out/enter/leave + 复合方向 + 楼层切换
-        const EXTRA_DIRS = [
-            'up', 'down', 'in', 'out', 'enter', 'leave',
-            'northup', 'southup', 'eastup', 'westup',
-            'northdown', 'southdown', 'eastdown', 'westdown',
-        ];
+        // 扩展栏：仅保留纯垂直/进出方向
+        const EXTRA_DIRS = ['up', 'down', 'in', 'out', 'enter', 'leave'];
         const extra = document.getElementById('moveExtra');
         if (!extra) return;
         extra.innerHTML = '';

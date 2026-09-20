@@ -3113,6 +3113,16 @@ AdvancedMUDClient.prototype.setupRoomExits = function () {
     const movePanel = document.getElementById('movePanel');
     if (movePanel) {
         movePanel.addEventListener('click', (e) => {
+            // 复合方向角标（优先匹配，因角标在格子内部）
+            const badge = e.target.closest('.move-badge.visible');
+            if (badge && this.connected) {
+                const dir = badge.getAttribute('data-dir');
+                if (dir) {
+                    this.commandInput.value = dir;
+                    this.handleSendCommand();
+                    return;
+                }
+            }
             // 九宫格方向格子
             const cell = e.target.closest('.move-cell.has-exit[data-dir]');
             if (cell && this.connected) {

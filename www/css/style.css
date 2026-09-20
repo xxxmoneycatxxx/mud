@@ -495,16 +495,16 @@ body {
     justify-content: center;
     padding: 4px 2px;
     min-height: 36px;
-    background: #0a0f0a;
-    border: 1px solid #1a2a1a;
+    background: #050805;
+    border: 1px solid #0a150a;
     border-radius: 3px;
     cursor: default;
-    opacity: 0.3;
     transition: all 0.15s;
     user-select: none;
+    position: relative;
 }
 .move-cell.has-exit {
-    opacity: 1;
+    background: #0a1a0a;
     cursor: pointer;
     border-color: #0a0;
 }
@@ -545,6 +545,84 @@ body {
 .move-center-btn.active {
     color: #ff0;
     text-shadow: 0 0 6px rgba(255,255,0,0.4);
+}
+
+/* 复合方向角标 */
+.move-badge {
+    position: absolute;
+    background: rgba(255,160,0,0.6);
+    border: 1px solid rgba(255,200,0,0.9);
+    border-radius: 3px;
+    color: #ffe000;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 2px 5px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.12s, background 0.12s;
+    z-index: 2;
+    pointer-events: none;
+    box-shadow: 0 0 3px rgba(255,160,0,0.4);
+}
+.move-badge.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+/* 北格：右上=北上，右下=北下 */
+.move-cell[data-dir="north"] .badge-up {
+    top: 2px;
+    right: 3px;
+    left: auto;
+    transform: none;
+}
+.move-cell[data-dir="north"] .badge-down {
+    bottom: 2px;
+    right: 3px;
+    left: auto;
+    transform: none;
+}
+/* 南格：左下=南下，左上=南上 */
+.move-cell[data-dir="south"] .badge-up {
+    top: 2px;
+    left: 3px;
+    transform: none;
+}
+.move-cell[data-dir="south"] .badge-down {
+    bottom: 2px;
+    left: 3px;
+    transform: none;
+}
+/* 东格：右上=东上，右下=东下 */
+.move-cell[data-dir="east"] .badge-up {
+    top: 2px;
+    right: 3px;
+    left: auto;
+    transform: none;
+}
+.move-cell[data-dir="east"] .badge-down {
+    bottom: 2px;
+    right: 3px;
+    left: auto;
+    transform: none;
+}
+/* 西格：左上=西上，左下=西下 */
+.move-cell[data-dir="west"] .badge-up {
+    top: 2px;
+    left: 3px;
+    transform: none;
+}
+.move-cell[data-dir="west"] .badge-down {
+    bottom: 2px;
+    left: 3px;
+    transform: none;
+}
+.move-badge:hover {
+    background: rgba(255,220,0,0.7);
+    border-color: #ff0;
+    color: #fff;
+    text-shadow: 0 0 6px rgba(255,255,0,0.8);
+    box-shadow: 0 0 6px rgba(255,200,0,0.6);
 }
 .move-dir {
     font-size: 14px;
