@@ -5,25 +5,6 @@ inherit ROOM;
 
 #define TIME "/cmds/usr/time"
 #define GIFT "/clone/fam/max/naobaijin"
-// 农历节日
-nosave mapping *lunar_day = ({
-    (["month" :  1, "day" :  1, "name" : RED"春节"NOR]),
-    (["month" :  1, "day" : 15, "name" : RED"元宵节"NOR]),
-    (["month" :  5, "day" :  5, "name" : GRN"端午节"NOR]),
-    (["month" :  7, "day" :  7, "name" : CYN"七夕乞巧节"NOR]),
-    (["month" :  8, "day" : 15, "name" : CYN"中秋节"NOR]),
-    (["month" :  9, "day" :  9, "name" : MAG"重阳节"NOR]),
-    (["month" : 12, "day" :  8, "name" : BLU"腊八节"NOR]),
-    (["month" : 12, "day" : 23, "name" : RED"小年"NOR]),
-    (["month" : 12, "day" : 30, "name" : RED"除夕"NOR]),
-});
-// 公历节日
-nosave mapping *solar_day = ({
-    (["month" :  1, "day" :  1, "name" : RED"元旦"NOR]),
-    (["month" :  4, "day" :  5, "name" : CYN"清明节"NOR]),
-    (["month" :  5, "day" :  1, "name" : WHT"国际劳动节"NOR]),
-    (["month" : 10, "day" :  1, "name" : RED"中国国庆节"NOR]),
-});
 
 void create()
 {
@@ -56,19 +37,16 @@ void init()
 int do_pray(string arg)
 {
     object me = this_player();
-    int exp, pot, wday, day, month, year, *date;
-    // int exp0, exp1;
+    int exp, pot, day, month, year, *date;
     string festival;
+    int scale, i;
 
     date = localtime(time());
     year = date[LT_YEAR];
     month = date[LT_MON] + 1;
     day = date[LT_MDAY];
-    wday = date[LT_WDAY];
 
     exp = me->query("combat_exp");
-    // exp0 = me->query("experience");
-    // exp1 = me->query("learned_experience");
 
     festival = "festival/" + year + "/" + month;
 
@@ -85,59 +63,30 @@ int do_pray(string arg)
     }
     else
     {
-        int i = 2;
-        int lunar_m, lunar_d;
-        // 取得农历日期
-        sscanf(TIME->to_lunar(year + " " + month + " " + day), "%*d-%d-%d", lunar_m, lunar_d);
-        // 周末加倍(无调休)
-        if (!wday || wday == 6)
-        {
-            tell_object(me, HIM "今天是周末，奖励加倍^_^\n" NOR);
-            i *= 2;
-        }
-        //节假日加倍
-        foreach (mapping m in solar_day)
-        {
-            if (m["month"] < month)
-            {
-                continue;
-            }
-            if (m["month"] > month)
-            {
-                break;
-            }
-            if (month == m["month"] && day == m["day"])
-            {
-                tell_object(me, "今天是" + m["name"] + "，奖励加倍^_^\n");
-                i *= 2;
-                break;
-            }
-        }
-        foreach (mapping m in lunar_day)
-        {
-            if (m["month"] < lunar_m)
-            {
-                continue;
-            }
-            if (m["month"] > lunar_m)
-            {
-                break;
-            }
-            if (lunar_m == m["month"] && lunar_d == m["day"])
-            {
-                tell_object(me, "今天是" + m["name"] + "，奖励加倍^_^\n");
-                i *= 2;
+        // 使用全局动态奖励基数（祈祷基础倍率 2x）
+        scale = GIFT_D->query_reward_scale();
+        i = scale / 100 * 2;
+        if (i < 2) i = 2;
 
-                if (exp >= 100000)
-                {
-                    object gift = new (GIFT);
-                    gift->move(me);
-                    tell_object(me, "你得到节日礼物" + gift->short() + "^_^\n");
-                }
+        // 节日提示
+        if (scale > 100)
+        {
+            string info = GIFT_D->query_reward_info();
+            tell_object(me, HIM info + "，奖励提升^_^\n" NOR);
+        }
 
-                break;
+        // 农历节日额外赠送礼物
+        {
+            int lunar_m, lunar_d;
+            sscanf(TIME->to_lunar(year + " " + month + " " + day), "%*d-%d-%d", lunar_m, lunar_d);
+            if (scale >= 200 && exp >= 100000)
+            {
+                object gift = new(GIFT);
+                gift->move(me);
+                tell_object(me, "你得到节日礼物" + gift->short() + "^_^\n");
             }
         }
+
         // 增加积分
         me->add("state/jifen", i);
         // 记录祈福次数
@@ -148,7 +97,7 @@ int do_pray(string arg)
         if (pot < 5000)
             pot = 5000;
 
-        // 周末双倍，上限5万
+        // 按奖励基数缩放，上限5万
         pot *= i;
         if (pot > 50000)
             pot = 50000;
