@@ -71,6 +71,7 @@
 #define INQUIRY_D       "/adm/daemons/inquiryd"
 #define IP_D            "/adm/daemons/ipd"
 #define ITEM_D          "/adm/daemons/itemd"
+#define JOBS_D          "/adm/daemons/jobsd"
 #define LEAGUE_D        "/adm/daemons/leagued"
 #define LOGIN_D         "/adm/daemons/logind"
 #define MAP_D           "/adm/daemons/mapd"

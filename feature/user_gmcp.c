@@ -281,6 +281,7 @@ protected void send_char_quests()
     int i, quest_count, festival_done;
     int *date;
     string festival;
+    mapping tianshu_data;
 
     if (!has_gmcp())
         return;
@@ -348,12 +349,22 @@ protected void send_char_quests()
         }
     }
 
+    // —— 天书任务（通过 JOBS_D 聚合）——
+    tianshu_data = ([]);
+    catch {
+        object jobsd = find_object(JOBS_D);
+        if (!jobsd) jobsd = load_object(JOBS_D);
+        if (jobsd)
+            tianshu_data = jobsd->query_tianshu_job(ob);
+    };
+
     mapping data = ([
         "family_quest" : family_quest,
         "quest_count"  : quest_count,
         "daily_done"   : festival_done,
         "todo"         : todo_list,
         "solved"       : solved_list,
+        "tianshu"      : tianshu_data,
     ]);
 
     string msg = "Char.Quests " + json_encode(data);
