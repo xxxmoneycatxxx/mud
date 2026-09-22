@@ -72,7 +72,7 @@ int do_pray(string arg)
         if (scale > 100)
         {
             string info = GIFT_D->query_reward_info();
-            tell_object(me, HIM info + "，奖励提升^_^\n" NOR);
+            tell_object(me, HIM + info + "，奖励提升^_^\n" NOR);
         }
 
         // 农历节日额外赠送礼物
